@@ -5,12 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 0.0.0.0",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:seed": "tsx scripts/seed.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
     "db:setup": "psql \"$DATABASE_URL\" -f schema.sql && npm run db:seed"
   },
   "dependencies": {

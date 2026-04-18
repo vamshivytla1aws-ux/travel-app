@@ -1,12 +1,9 @@
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
-import { APP_MODULES } from "@/lib/auth";
-import { createSession } from "@/lib/auth";
+import { APP_MODULES, createSession, sessionCookieSecureForHost } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 
 export async function POST(request: Request) {
-  await ensureTransportEnhancements();
   const formData = await request.formData();
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
@@ -60,7 +57,7 @@ export async function POST(request: Request) {
   response.cookies.set("etms_session", finalToken, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: sessionCookieSecureForHost(request.headers.get("host")),
     path: "/",
     maxAge: 60 * 60 * 12,
   });

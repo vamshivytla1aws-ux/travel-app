@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 const cookieName = "etms_session";
@@ -28,6 +28,16 @@ export type SessionUser = {
   moduleAccess: AppModule[];
 };
 
+/**
+ * `Secure` cookies are not sent on plain HTTP. Production builds (`next start`)
+ * on localhost would otherwise never persist sessions. Real deployments use HTTPS.
+ */
+export function sessionCookieSecureForHost(hostHeader: string | null): boolean {
+  if (process.env.NODE_ENV !== "production") return false;
+  const host = hostHeader?.split(":")[0]?.toLowerCase();
+  return host !== "localhost" && host !== "127.0.0.1" && host !== "::1";
+}
+
 export async function createSession(user: SessionUser): Promise<string> {
   return new SignJWT(user as unknown as Record<string, unknown>)
     .setProtectedHeader({ alg: "HS256" })
@@ -38,10 +48,11 @@ export async function createSession(user: SessionUser): Promise<string> {
 
 export async function setSessionCookie(token: string) {
   const cookieStore = await cookies();
+  const host = (await headers()).get("host");
   cookieStore.set(cookieName, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: sessionCookieSecureForHost(host),
     path: "/",
     maxAge: 60 * 60 * 12,
   });

@@ -12,40 +12,57 @@ function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => T): T {
 }
 
 describe("getDbConfig", () => {
-  it("prefers PG* environment variables", () =>
+  it("prefers DATABASE_URL when set (Railway-style: URL carries the password)", () =>
     withEnv(
       {
         PGHOST: "localhost",
         PGPORT: "5432",
         PGDATABASE: "employee_transport",
         PGUSER: "postgres",
+        PGPASSWORD: "from-pg-star",
+        DATABASE_URL: "postgresql://postgres:from-url@localhost:5432/employee_transport",
+      },
+      () => {
+        const config = getDbConfig();
+        expect(config).toMatchObject({
+          connectionString:
+            "postgresql://postgres:from-url@localhost:5432/employee_transport",
+        });
+      },
+    ));
+
+  it("falls back to PG* when DATABASE_URL is unset", () =>
+    withEnv(
+      {
+        DATABASE_URL: "",
+        PGHOST: "localhost",
+        PGPORT: "5432",
+        PGDATABASE: "employee_transport",
+        PGUSER: "postgres",
         PGPASSWORD: "secret",
-        DATABASE_URL: "postgresql://ignored",
       },
       () => {
         const config = getDbConfig();
         expect(config).toMatchObject({
           host: "localhost",
           user: "postgres",
+          password: "secret",
           database: "employee_transport",
           port: 5432,
         });
       },
     ));
 
-  it("falls back to DATABASE_URL", () =>
+  it("throws if only discrete PG* is set without a password", () =>
     withEnv(
       {
-        PGHOST: "",
-        PGUSER: "",
-        PGDATABASE: "",
-        DATABASE_URL: "postgresql://postgres:pass@localhost:5432/employee_transport",
+        DATABASE_URL: "",
+        PGHOST: "localhost",
+        PGUSER: "postgres",
+        PGDATABASE: "employee_transport",
       },
       () => {
-        const config = getDbConfig();
-        expect(config).toMatchObject({
-          connectionString: "postgresql://postgres:pass@localhost:5432/employee_transport",
-        });
+        expect(() => getDbConfig()).toThrow(/password missing/i);
       },
     ));
 });
