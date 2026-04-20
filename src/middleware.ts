@@ -1,6 +1,14 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+function getPublicRequestBase(request: NextRequest): URL {
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host = forwardedHost ?? request.headers.get("host");
+  const proto = request.headers.get("x-forwarded-proto") ?? "https";
+  if (host) return new URL(`${proto}://${host}`);
+  return request.nextUrl;
+}
+
 export function middleware(request: NextRequest) {
   const session = request.cookies.get("etms_session")?.value;
   const { pathname } = request.nextUrl;
@@ -26,7 +34,7 @@ export function middleware(request: NextRequest) {
   const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
 
   if (isProtected && !session) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL("/login", getPublicRequestBase(request)));
   }
   return NextResponse.next();
 }

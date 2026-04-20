@@ -3,7 +3,16 @@ import { NextResponse } from "next/server";
 import { APP_MODULES, createSession, sessionCookieSecureForHost } from "@/lib/auth";
 import { query } from "@/lib/db";
 
+function getPublicRequestBase(request: Request): URL {
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host = forwardedHost ?? request.headers.get("host");
+  const proto = request.headers.get("x-forwarded-proto") ?? "https";
+  if (host) return new URL(`${proto}://${host}`);
+  return new URL(request.url);
+}
+
 export async function POST(request: Request) {
+  const publicBase = getPublicRequestBase(request);
   const formData = await request.formData();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
@@ -31,13 +40,13 @@ export async function POST(request: Request) {
     password === "Admin@123";
 
   if (!user && !fallbackAllowed) {
-    return NextResponse.redirect(new URL("/login?error=invalid", request.url));
+    return NextResponse.redirect(new URL("/login?error=invalid", publicBase));
   }
 
   if (user) {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      return NextResponse.redirect(new URL("/login?error=invalid", request.url));
+      return NextResponse.redirect(new URL("/login?error=invalid", publicBase));
     }
   }
 
@@ -59,7 +68,7 @@ export async function POST(request: Request) {
         },
       );
 
-  const response = NextResponse.redirect(new URL("/dashboard", request.url));
+  const response = NextResponse.redirect(new URL("/dashboard", publicBase));
   response.cookies.set("etms_session", finalToken, {
     httpOnly: true,
     sameSite: "lax",
