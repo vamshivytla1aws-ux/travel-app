@@ -105,6 +105,12 @@ export async function requireSession(roles?: SessionUser["role"][]) {
   return session;
 }
 
+export async function requireAdminSession() {
+  const session = await requireSession();
+  if (session.role !== "admin") redirect("/unauthorized");
+  return session;
+}
+
 export function hasModuleAccess(session: SessionUser, module: AppModule): boolean {
   if (session.role === "admin") return true;
   return session.moduleAccess.includes(module);

@@ -25,7 +25,8 @@ export async function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-30 border-b border-slate-800 bg-[#1f2331]">
         <div className={`${enterpriseContainer} space-y-2 py-2`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <EnterpriseNav allowedModules={allowedModules} />
               <h1 className="text-lg font-semibold text-white">Jai Bhavani Travels Tracking System</h1>
             </div>
             <div className="flex items-center gap-3 text-sm">
@@ -50,7 +51,6 @@ export async function AppShell({ children }: { children: ReactNode }) {
               )}
             </div>
           </div>
-          <EnterpriseNav allowedModules={allowedModules} />
           <EnterpriseBreadcrumbs />
         </div>
       </header>

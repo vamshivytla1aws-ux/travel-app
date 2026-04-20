@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { APP_MODULES, requireModuleAccess, requireSession } from "@/lib/auth";
+import { APP_MODULES, requireAdminSession, requireModuleAccess } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
@@ -32,7 +32,7 @@ function parseModuleAccessFromFormData(formData: FormData): (typeof APP_MODULES)
 
 async function createUser(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin"]);
+  const session = await requireAdminSession();
   await requireModuleAccess("user-admin");
   await ensureTransportEnhancements();
 
@@ -67,7 +67,7 @@ async function createUser(formData: FormData) {
 
 async function updateUserAccess(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin"]);
+  const session = await requireAdminSession();
   await requireModuleAccess("user-admin");
   await ensureTransportEnhancements();
 
@@ -97,7 +97,7 @@ async function updateUserAccess(formData: FormData) {
 
 async function deactivateUser(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin"]);
+  const session = await requireAdminSession();
   await requireModuleAccess("user-admin");
   const userId = Number(formData.get("userId"));
   if (!userId) return;
@@ -121,7 +121,7 @@ type Props = {
 };
 
 export default async function UsersAdminPage(props: Props) {
-  await requireSession(["admin"]);
+  await requireAdminSession();
   await requireModuleAccess("user-admin");
   await ensureTransportEnhancements();
   const searchParams = await props.searchParams;

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">My Web App</string>
-    <string name="title_activity_main">My Web App</string>
-    <string name="package_name">com.mywebapp.app</string>
-    <string name="custom_url_scheme">com.mywebapp.app</string>
+    <string name="app_name">Jai Bhavani Travels</string>
+    <string name="title_activity_main">Jai Bhavani Travels</string>
+    <string name="package_name">com.jaibhavani.travels</string>
+    <string name="custom_url_scheme">com.jaibhavani.travels</string>
 </resources>

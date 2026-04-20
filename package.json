@@ -12,7 +12,11 @@
     "test:e2e": "playwright test",
     "db:seed": "tsx scripts/seed.ts",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:setup": "psql \"$DATABASE_URL\" -f schema.sql && npm run db:seed"
+    "db:setup": "psql \"$DATABASE_URL\" -f schema.sql && npm run db:seed",
+    "cap:sync": "npx cap sync",
+    "android:sync": "npx cap sync android",
+    "android:open": "npx cap open android",
+    "android:assemble:release": "cd android && gradlew.bat assembleRelease"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",
