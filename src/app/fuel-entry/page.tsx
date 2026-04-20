@@ -11,6 +11,7 @@ import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
+import { safeDecodeURIComponent } from "@/lib/url";
 import { FuelService } from "@/services/fuel.service";
 
 const fuelService = new FuelService();
@@ -118,7 +119,7 @@ export default async function FuelEntryPage(props: Props) {
       ) : null}
       {searchParams.error ? (
         <div className="mb-4 max-w-2xl rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {decodeURIComponent(searchParams.error)}
+          {safeDecodeURIComponent(searchParams.error)}
         </div>
       ) : null}
       <Card className="max-w-2xl">

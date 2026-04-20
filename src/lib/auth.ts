@@ -102,13 +102,7 @@ export async function requireApiModuleAccess(module: AppModule): Promise<Session
 export async function requireSession(roles?: SessionUser["role"][]) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (roles && !roles.includes(session.role)) {
-    // Updater users are module-scoped editors; allow them through role gates
-    // and let requireModuleAccess() enforce page-level access.
-    if (session.role !== "updater") {
-      redirect("/unauthorized");
-    }
-  }
+  if (roles && !roles.includes(session.role)) redirect("/unauthorized");
   return session;
 }
 

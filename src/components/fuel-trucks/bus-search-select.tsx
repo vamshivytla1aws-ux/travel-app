@@ -22,6 +22,7 @@ export function BusSearchSelect({ name, id, buses, required = false }: Props) {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -51,13 +52,21 @@ export function BusSearchSelect({ name, id, buses, required = false }: Props) {
         role="combobox"
         aria-autocomplete="list"
         aria-controls={listboxId}
-        aria-expanded
+        aria-expanded={isOpen}
         aria-activedescendant={highlightedOption ? `${inputId}-option-${highlightedOption.id}` : undefined}
+        aria-describedby={`${inputId}-hint`}
         value={query}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => {
+          setTimeout(() => {
+            setIsOpen(false);
+          }, 100);
+        }}
         onChange={(event) => {
           setQuery(event.target.value);
           setSelectedId(null);
           setHighlightedIndex(0);
+          setIsOpen(true);
         }}
         onKeyDown={(event) => {
           if (!filtered.length) return;
@@ -87,7 +96,11 @@ export function BusSearchSelect({ name, id, buses, required = false }: Props) {
         placeholder="Search bus number (e.g. 6686)"
         className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
       />
-      <div id={listboxId} role="listbox" className="max-h-48 overflow-y-auto rounded-md border bg-background">
+      <div
+        id={listboxId}
+        role="listbox"
+        className={`max-h-48 overflow-y-auto rounded-md border bg-background ${isOpen ? "block" : "hidden"}`}
+      >
         {filtered.length === 0 ? (
           <p className="px-3 py-2 text-xs text-muted-foreground">No matching buses found.</p>
         ) : (
@@ -99,6 +112,7 @@ export function BusSearchSelect({ name, id, buses, required = false }: Props) {
               role="option"
               aria-selected={selectedId === bus.id}
               onMouseEnter={() => setHighlightedIndex(index)}
+              onMouseDown={(event) => event.preventDefault()}
               onClick={() => selectBus(bus)}
               className={`block w-full px-3 py-2 text-left text-sm hover:bg-muted ${
                 selectedId === bus.id || highlightedIndex === index ? "bg-muted" : ""
@@ -109,7 +123,7 @@ export function BusSearchSelect({ name, id, buses, required = false }: Props) {
           ))
         )}
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p id={`${inputId}-hint`} className="text-xs text-muted-foreground">
         Type bus number and choose from the list.
       </p>
     </div>

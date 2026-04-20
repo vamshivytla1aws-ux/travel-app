@@ -1,6 +1,8 @@
 import { ClipboardList } from "lucide-react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -54,7 +56,7 @@ export default async function LogsPage(props: Props) {
           <CardTitle>Log Portal</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form className="grid gap-3 md:grid-cols-5">
+          <form className="sticky top-20 z-10 grid gap-3 rounded-md border bg-background/95 p-3 backdrop-blur md:grid-cols-5">
             <Input name="entity" placeholder="Entity (fuel_entry, user, trip)" defaultValue={entity} />
             <Input name="action" placeholder="Action (create, update, delete)" defaultValue={action} />
             <select name="pageSize" defaultValue={String(pageSize)} className="h-9 rounded-md border border-input bg-transparent px-3 text-sm">
@@ -65,11 +67,17 @@ export default async function LogsPage(props: Props) {
               ))}
             </select>
             <input type="hidden" name="page" value="1" />
-            <button className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground">Filter</button>
-            <a href="/logs" className="inline-flex h-9 items-center justify-center rounded-md border border-input px-4 text-sm">Clear</a>
+            <Button type="submit">Filter</Button>
+            <Link href="/logs" className="inline-flex h-9 items-center justify-center rounded-md border border-input px-4 text-sm">Clear</Link>
           </form>
+          {(entity || action) ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {entity ? <span className="rounded-full border bg-muted px-2 py-1">Entity: {entity}</span> : null}
+              {action ? <span className="rounded-full border bg-muted px-2 py-1">Action: {action}</span> : null}
+            </div>
+          ) : null}
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 <TableHead>Time</TableHead>
                 <TableHead>User</TableHead>
@@ -102,19 +110,19 @@ export default async function LogsPage(props: Props) {
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span>Showing {logs.rows.length} logs on this page</span>
             <div className="flex items-center gap-2">
-              <a
+              <Link
                 className={`rounded border px-2 py-1 ${page <= 1 ? "pointer-events-none opacity-50" : ""}`}
                 href={`/logs?entity=${encodeURIComponent(entity)}&action=${encodeURIComponent(action)}&pageSize=${pageSize}&page=${Math.max(1, page - 1)}`}
               >
                 Prev
-              </a>
+              </Link>
               <span>Page {Number.isFinite(page) && page > 0 ? page : 1}</span>
-              <a
+              <Link
                 className={`rounded border px-2 py-1 ${logs.rows.length < pageSize ? "pointer-events-none opacity-50" : ""}`}
                 href={`/logs?entity=${encodeURIComponent(entity)}&action=${encodeURIComponent(action)}&pageSize=${pageSize}&page=${(Number.isFinite(page) && page > 0 ? page : 1) + 1}`}
               >
                 Next
-              </a>
+              </Link>
             </div>
           </div>
         </CardContent>

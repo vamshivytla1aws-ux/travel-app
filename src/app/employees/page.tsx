@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { StatusAlert } from "@/components/ui/status-alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
@@ -153,19 +154,13 @@ export default async function EmployeesPage(props: Props) {
         tag="Workforce"
       />
       {searchParams.error === "duplicate" ? (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          Employee code or email already exists.
-        </div>
+        <StatusAlert className="mb-4" tone="error" message="Employee code or email already exists." />
       ) : null}
       {searchParams.created ? (
-        <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-          Employee created successfully.
-        </div>
+        <StatusAlert className="mb-4" tone="success" message="Employee created successfully." />
       ) : null}
       {searchParams.deleted ? (
-        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
-          Employee deleted successfully.
-        </div>
+        <StatusAlert className="mb-4" tone="warning" message="Employee deactivated successfully." />
       ) : null}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="border-blue-200/70 bg-blue-50/40 dark:border-blue-900 dark:bg-blue-950/20">
@@ -197,7 +192,7 @@ export default async function EmployeesPage(props: Props) {
         <Card className="lg:col-span-2 border-blue-200/70 dark:border-blue-900">
           <CardHeader><CardTitle>Employees</CardTitle></CardHeader>
           <CardContent>
-            <form method="get" className="mb-4 grid gap-3 rounded-md border p-3 md:grid-cols-4">
+            <form method="get" className="sticky top-20 z-10 mb-4 grid gap-3 rounded-md border bg-background/95 p-3 backdrop-blur md:grid-cols-4">
               <div className="md:col-span-2">
                 <Label htmlFor="q">Search Employee</Label>
                 <Input
@@ -251,8 +246,14 @@ export default async function EmployeesPage(props: Props) {
                 </Link>
               </div>
             </form>
+            {(queryText || company) ? (
+              <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+                {queryText ? <span className="rounded-full border bg-muted px-2 py-1">Search: {queryText}</span> : null}
+                {company ? <span className="rounded-full border bg-muted px-2 py-1">Company: {company}</span> : null}
+              </div>
+            ) : null}
             <Table>
-              <TableHeader><TableRow><TableHead>S.No</TableHead><TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Department</TableHead><TableHead>Phone</TableHead><TableHead>Company</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-background"><TableRow><TableHead>S.No</TableHead><TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Department</TableHead><TableHead>Phone</TableHead><TableHead>Company</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
               <TableBody>
                 {visibleEmployees.map((employee, index) => (
                   <TableRow key={employee.id}>

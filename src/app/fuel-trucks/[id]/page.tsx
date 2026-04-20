@@ -6,13 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { StatusAlert } from "@/components/ui/status-alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { getUploadedFileBuffer } from "@/lib/document-storage";
+import { safeDecodeURIComponent } from "@/lib/url";
 import { FuelTruckService } from "@/services/fuel-truck.service";
 import { BusSearchSelect } from "@/components/fuel-trucks/bus-search-select";
+import { RefillAmountFields } from "@/components/fuel-trucks/refill-amount-fields";
 
 const fuelTruckService = new FuelTruckService();
 
@@ -172,24 +175,16 @@ export default async function FuelTruckDetailPage(props: Props) {
     <AppShell>
       <div className="space-y-4">
         {searchParams.updated ? (
-          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
-            Fuel tanker updated successfully.
-          </div>
+          <StatusAlert tone="info" message="Fuel tanker updated successfully." />
         ) : null}
         {searchParams.refilled ? (
-          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-            Refill saved successfully.
-          </div>
+          <StatusAlert tone="success" message="Refill saved successfully." />
         ) : null}
         {searchParams.issued ? (
-          <div className="rounded-md border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-700">
-            Issue saved successfully.
-          </div>
+          <StatusAlert tone="info" message="Issue saved successfully." />
         ) : null}
         {searchParams.error ? (
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {decodeURIComponent(searchParams.error)}
-          </div>
+          <StatusAlert tone="error" message={safeDecodeURIComponent(searchParams.error)} />
         ) : null}
 
         <div className="flex items-center justify-between">
@@ -284,12 +279,14 @@ export default async function FuelTruckDetailPage(props: Props) {
                 <Input id="fuelStationName" name="fuelStationName" required />
                 <Label htmlFor="vendorName">Vendor</Label>
                 <Input id="vendorName" name="vendorName" />
-                <Label htmlFor="quantityLiters">Liters</Label>
-                <Input id="quantityLiters" name="quantityLiters" type="number" step="0.01" required />
-                <Label htmlFor="ratePerLiter">Rate/L</Label>
-                <Input id="ratePerLiter" name="ratePerLiter" type="number" step="0.01" required />
-                <Label htmlFor="totalAmount">Total Amount</Label>
-                <Input id="totalAmount" name="totalAmount" type="number" step="0.01" required />
+                <RefillAmountFields
+                  quantityId="quantityLiters"
+                  quantityName="quantityLiters"
+                  rateId="ratePerLiter"
+                  rateName="ratePerLiter"
+                  totalId="totalAmount"
+                  totalName="totalAmount"
+                />
                 <Label htmlFor="billNumber">Bill Number</Label>
                 <Input id="billNumber" name="billNumber" />
                 <Label htmlFor="paymentMode">Payment Mode</Label>
@@ -350,7 +347,7 @@ export default async function FuelTruckDetailPage(props: Props) {
             </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>
@@ -417,7 +414,7 @@ export default async function FuelTruckDetailPage(props: Props) {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Bus</TableHead>

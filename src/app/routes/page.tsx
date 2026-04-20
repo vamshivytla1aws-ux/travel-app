@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Route } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
@@ -7,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { StatusAlert } from "@/components/ui/status-alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
+import { safeDecodeURIComponent } from "@/lib/url";
 import { RoutesService } from "@/services/routes.service";
 
 const routesService = new RoutesService();
@@ -80,14 +83,10 @@ export default async function RoutesPage(props: Props) {
         tag="Route Design"
       />
       {searchParams.created ? (
-        <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-          Route created successfully.
-        </div>
+        <StatusAlert className="mb-4" tone="success" message="Route created successfully." />
       ) : null}
       {searchParams.error ? (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {decodeURIComponent(searchParams.error)}
-        </div>
+        <StatusAlert className="mb-4" tone="error" message={safeDecodeURIComponent(searchParams.error)} />
       ) : null}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="border-violet-200/70 bg-violet-50/40 dark:border-violet-900 dark:bg-violet-950/20">
@@ -107,7 +106,7 @@ export default async function RoutesPage(props: Props) {
         <Card className="lg:col-span-2 border-violet-200/70 dark:border-violet-900">
           <CardHeader><CardTitle>Routes</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            <form className="grid gap-2 md:grid-cols-4">
+            <form className="sticky top-20 z-10 grid gap-2 rounded-md border bg-background/95 p-3 backdrop-blur md:grid-cols-4">
               <Input name="q" defaultValue={searchParams.q ?? ""} placeholder="Search code/name/start/end" />
               <select name="pageSize" defaultValue={String(pageSize)} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm">
                 {PAGE_SIZE_OPTIONS.map((size) => (
@@ -117,12 +116,19 @@ export default async function RoutesPage(props: Props) {
                 ))}
               </select>
               <Button type="submit" variant="outline">Apply</Button>
-              <a href="/routes" className="inline-flex h-10 items-center justify-center rounded-md border border-input px-3 text-sm">
+              <Link href="/routes" className="inline-flex h-10 items-center justify-center rounded-md border border-input px-3 text-sm">
                 Clear
-              </a>
+              </Link>
             </form>
+            {q ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-full border bg-muted px-2 py-1">Search: {q}</span>
+              </div>
+            ) : null}
             <Table>
-              <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Distance</TableHead></TableRow></TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableRow><TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Distance</TableHead></TableRow>
+              </TableHeader>
               <TableBody>
                 {visibleRoutes.map((route) => (
                   <TableRow key={route.id}>
@@ -145,19 +151,19 @@ export default async function RoutesPage(props: Props) {
                 Showing {total === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, total)} of {total}
               </span>
               <div className="flex items-center gap-2">
-                <a
+                <Link
                   className={`rounded border px-2 py-1 ${currentPage <= 1 ? "pointer-events-none opacity-50" : ""}`}
                   href={`/routes?q=${encodeURIComponent(searchParams.q ?? "")}&pageSize=${pageSize}&page=${Math.max(1, currentPage - 1)}`}
                 >
                   Prev
-                </a>
+                </Link>
                 <span>{currentPage}/{totalPages}</span>
-                <a
+                <Link
                   className={`rounded border px-2 py-1 ${currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}`}
                   href={`/routes?q=${encodeURIComponent(searchParams.q ?? "")}&pageSize=${pageSize}&page=${Math.min(totalPages, currentPage + 1)}`}
                 >
                   Next
-                </a>
+                </Link>
               </div>
             </div>
           </CardContent>

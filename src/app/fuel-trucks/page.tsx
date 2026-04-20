@@ -8,13 +8,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { StatusAlert } from "@/components/ui/status-alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { getUploadedFileBuffer } from "@/lib/document-storage";
+import { safeDecodeURIComponent } from "@/lib/url";
 import { FuelTruckService } from "@/services/fuel-truck.service";
 import { BusSearchSelect } from "@/components/fuel-trucks/bus-search-select";
+import { RefillAmountFields } from "@/components/fuel-trucks/refill-amount-fields";
 
 const fuelTruckService = new FuelTruckService();
 const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 50, 100] as const;
@@ -208,6 +211,14 @@ export default async function FuelTrucksPage(props: Props) {
   const currentPage = Number.isFinite(rawPage) && rawPage > 0 ? Math.min(rawPage, totalPages) : 1;
   const startIndex = (currentPage - 1) * pageSize;
   const visibleTrucks = trucks.slice(startIndex, startIndex + pageSize);
+  const activeFilters = [
+    searchParams.q ? `Search: ${searchParams.q}` : null,
+    searchParams.status ? `Status: ${searchParams.status}` : null,
+    searchParams.fromDate ? `From: ${searchParams.fromDate}` : null,
+    searchParams.toDate ? `To: ${searchParams.toDate}` : null,
+    searchParams.fuelStation ? `Station: ${searchParams.fuelStation}` : null,
+    searchParams.driver ? `Driver: ${searchParams.driver}` : null,
+  ].filter(Boolean) as string[];
 
   return (
     <AppShell>
@@ -220,24 +231,16 @@ export default async function FuelTrucksPage(props: Props) {
         />
 
         {searchParams.created ? (
-          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-            Fuel tanker created successfully.
-          </div>
+          <StatusAlert tone="success" message="Fuel tanker created successfully." />
         ) : null}
         {searchParams.refilled ? (
-          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-            Fuel tanker refill recorded and stock updated.
-          </div>
+          <StatusAlert tone="success" message="Fuel tanker refill recorded and stock updated." />
         ) : null}
         {searchParams.issued ? (
-          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
-            Diesel issue to bus recorded and stock updated.
-          </div>
+          <StatusAlert tone="info" message="Diesel issue to bus recorded and stock updated." />
         ) : null}
         {searchParams.error ? (
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {decodeURIComponent(searchParams.error)}
-          </div>
+          <StatusAlert tone="error" message={safeDecodeURIComponent(searchParams.error)} />
         ) : null}
 
         <div className="grid gap-4 md:grid-cols-4">
@@ -274,12 +277,14 @@ export default async function FuelTrucksPage(props: Props) {
             </CardHeader>
             <CardContent>
               <form action={createFuelTruck} className="grid gap-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase">Identity</p>
                 <Label htmlFor="truckCode">Truck Code</Label>
                 <Input id="truckCode" name="truckCode" required />
                 <Label htmlFor="truckName">Truck Name</Label>
                 <Input id="truckName" name="truckName" required />
                 <Label htmlFor="registrationNumber">Registration Number</Label>
                 <Input id="registrationNumber" name="registrationNumber" required />
+                <p className="pt-2 text-xs font-medium text-muted-foreground uppercase">Stock Controls</p>
                 <Label htmlFor="tankCapacityLiters">Tank Capacity (L)</Label>
                 <Input id="tankCapacityLiters" name="tankCapacityLiters" type="number" step="0.01" required />
                 <Label htmlFor="currentAvailableLiters">Current Available (L)</Label>
@@ -323,12 +328,14 @@ export default async function FuelTrucksPage(props: Props) {
                 <Input id="fuelStationName" name="fuelStationName" required />
                 <Label htmlFor="vendorName">Vendor / Company</Label>
                 <Input id="vendorName" name="vendorName" />
-                <Label htmlFor="quantityLiters">Quantity (L)</Label>
-                <Input id="quantityLiters" name="quantityLiters" type="number" step="0.01" required />
-                <Label htmlFor="ratePerLiter">Rate/L</Label>
-                <Input id="ratePerLiter" name="ratePerLiter" type="number" step="0.01" required />
-                <Label htmlFor="totalAmount">Total Amount</Label>
-                <Input id="totalAmount" name="totalAmount" type="number" step="0.01" required />
+                <RefillAmountFields
+                  quantityId="quantityLiters"
+                  quantityName="quantityLiters"
+                  rateId="ratePerLiter"
+                  rateName="ratePerLiter"
+                  totalId="totalAmount"
+                  totalName="totalAmount"
+                />
                 <Label htmlFor="billNumber">Bill Number</Label>
                 <Input id="billNumber" name="billNumber" />
                 <Label htmlFor="paymentMode">Payment Mode</Label>
@@ -395,7 +402,7 @@ export default async function FuelTrucksPage(props: Props) {
             <CardTitle>Fuel Tanker List</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <form className="grid gap-2 md:grid-cols-4">
+            <form className="sticky top-20 z-10 grid gap-2 rounded-md border bg-background/95 p-3 backdrop-blur md:grid-cols-4">
               <Input name="q" placeholder="Search code/name/registration" defaultValue={searchParams.q ?? ""} />
               <select name="status" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" defaultValue={searchParams.status ?? ""}>
                 <option value="">All status</option>
@@ -407,8 +414,17 @@ export default async function FuelTrucksPage(props: Props) {
                 Clear
               </Link>
             </form>
+            {activeFilters.length ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {activeFilters.map((value) => (
+                  <span key={value} className="rounded-full border bg-muted px-2 py-1">
+                    {value}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
@@ -495,7 +511,7 @@ export default async function FuelTrucksPage(props: Props) {
             <CardTitle>Reports & Ledger Filters</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form className="grid gap-2 md:grid-cols-7">
+            <form className="sticky top-20 z-10 grid gap-2 rounded-md border bg-background/95 p-3 backdrop-blur md:grid-cols-7">
               <Input name="fromDate" type="date" defaultValue={searchParams.fromDate ?? ""} />
               <Input name="toDate" type="date" defaultValue={searchParams.toDate ?? ""} />
               <select name="fuelTruckId" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" defaultValue={searchParams.fuelTruckId ?? ""}>
@@ -526,7 +542,7 @@ export default async function FuelTrucksPage(props: Props) {
                 </CardHeader>
                 <CardContent>
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Truck</TableHead>
@@ -561,7 +577,7 @@ export default async function FuelTrucksPage(props: Props) {
                 </CardHeader>
                 <CardContent>
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Truck</TableHead>

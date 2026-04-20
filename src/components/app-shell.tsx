@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { EnterpriseNav } from "@/components/enterprise/enterprise-nav";
+import { EnterpriseBreadcrumbs } from "@/components/enterprise/enterprise-breadcrumbs";
 import { ThemeToggleButton } from "@/components/enterprise/theme-toggle-button";
 import { APP_MODULES, clearSessionCookie, getSession, type AppModule } from "@/lib/auth";
 import { enterpriseContainer } from "@/lib/ui-core";
@@ -23,8 +24,11 @@ export async function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-[#efefef]">
       <header className="sticky top-0 z-30 border-b border-slate-800 bg-[#1f2331]">
         <div className={`${enterpriseContainer} space-y-2 py-3`}>
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-white">Employee Transport</h1>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h1 className="text-lg font-semibold text-white">Employee Transport</h1>
+              <p className="text-xs text-slate-300">Operations workspace</p>
+            </div>
             <div className="flex items-center gap-3 text-sm">
               <ThemeToggleButton />
               {session ? (
@@ -48,6 +52,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <EnterpriseNav allowedModules={allowedModules} />
+          <EnterpriseBreadcrumbs />
         </div>
       </header>
       <main className={`${enterpriseContainer} py-6`}>{children}</main>

@@ -9,6 +9,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { StatusAlert } from "@/components/ui/status-alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
@@ -159,19 +160,13 @@ export default async function DriversPage(props: Props) {
         tag="Driver Ops"
       />
       {searchParams.error === "duplicate" ? (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          Driver phone or license number already exists.
-        </div>
+        <StatusAlert className="mb-4" tone="error" message="Driver phone or license number already exists." />
       ) : null}
       {searchParams.created ? (
-        <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-          Driver created successfully.
-        </div>
+        <StatusAlert className="mb-4" tone="success" message="Driver created successfully." />
       ) : null}
       {searchParams.deleted ? (
-        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
-          Driver deleted successfully.
-        </div>
+        <StatusAlert className="mb-4" tone="warning" message="Driver deactivated successfully." />
       ) : null}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="border-emerald-200/70 bg-emerald-50/40 dark:border-emerald-900 dark:bg-emerald-950/20">
@@ -196,7 +191,7 @@ export default async function DriversPage(props: Props) {
         <Card className="lg:col-span-2 border-emerald-200/70 dark:border-emerald-900">
           <CardHeader><CardTitle>Drivers</CardTitle></CardHeader>
           <CardContent>
-            <form method="get" className="mb-4 grid gap-3 rounded-md border p-3 md:grid-cols-4">
+            <form method="get" className="sticky top-20 z-10 mb-4 grid gap-3 rounded-md border bg-background/95 p-3 backdrop-blur md:grid-cols-4">
               <div className="md:col-span-2">
                 <Label htmlFor="q">Search Driver</Label>
                 <Input
@@ -250,8 +245,14 @@ export default async function DriversPage(props: Props) {
                 </Link>
               </div>
             </form>
+            {(query || company) ? (
+              <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+                {query ? <span className="rounded-full border bg-muted px-2 py-1">Search: {query}</span> : null}
+                {company ? <span className="rounded-full border bg-muted px-2 py-1">Company: {company}</span> : null}
+              </div>
+            ) : null}
             <Table>
-              <TableHeader><TableRow><TableHead>S.No</TableHead><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Company</TableHead><TableHead>License</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-background"><TableRow><TableHead>S.No</TableHead><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Company</TableHead><TableHead>License</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
               <TableBody>
                 {visibleDrivers.map((driver, index) => (
                   <TableRow key={driver.id}>

@@ -1,9 +1,11 @@
 import { AppShell } from "@/components/app-shell";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MapPinned } from "lucide-react";
+import Link from "next/link";
 import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
@@ -55,20 +57,25 @@ export default async function TrackingPage(props: Props) {
           <CardTitle>Mock Live Tracking</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <form className="grid gap-2 md:grid-cols-4">
+          <form className="sticky top-20 z-10 grid gap-2 rounded-md border bg-background/95 p-3 backdrop-blur md:grid-cols-4">
             <Input name="q" defaultValue={searchParams.q ?? ""} placeholder="Search bus number" />
             <select name="pageSize" defaultValue={String(pageSize)} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm">
               {PAGE_SIZE_OPTIONS.map((size) => (
                 <option key={size} value={size}>
                   {size}
                 </option>
-              ))}
+                ))}
             </select>
-            <button className="h-10 rounded-md border border-input px-3 text-sm">Apply</button>
-            <a href="/tracking" className="inline-flex h-10 items-center justify-center rounded-md border border-input px-3 text-sm">Clear</a>
+            <Button type="submit" variant="outline">Apply</Button>
+            <Link href="/tracking" className="inline-flex h-10 items-center justify-center rounded-md border border-input px-3 text-sm">Clear</Link>
           </form>
+          {q ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full border bg-muted px-2 py-1">Bus: {q}</span>
+            </div>
+          ) : null}
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 <TableHead>Bus</TableHead>
                 <TableHead>Timestamp</TableHead>
