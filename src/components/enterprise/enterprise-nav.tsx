@@ -44,36 +44,48 @@ export function EnterpriseNav({ allowedModules }: { allowedModules: AppModule[] 
     }))
     .filter((group) => group.items.length > 0);
 
+  const flatItems = filteredGroups.flatMap((group, groupIndex) =>
+    group.items.map((item, itemIndex) => ({
+      ...item,
+      groupLabel: group.label,
+      showGroupLabel: itemIndex === 0,
+      key: `${group.label}-${item.href}`,
+      dividerBefore: groupIndex > 0 && itemIndex === 0,
+    })),
+  );
+
   return (
-    <nav className="space-y-2">
-      {filteredGroups.map((group) => (
-        <div key={group.label} className="rounded border border-slate-700 bg-[#101422]">
-          <p className="border-b border-slate-700 px-3 py-1 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
-            {group.label}
-          </p>
-          <div className="flex flex-wrap items-center">
-            {group.items.map((item) => {
-              const active = pathname.startsWith(item.href);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-2 border-r border-slate-700 px-3 py-2 text-sm font-medium transition-colors",
-                    active
-                      ? "bg-[#1a1f31] text-yellow-300"
-                      : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+    <nav className="overflow-x-auto rounded border border-slate-700 bg-[#101422]">
+      <div className="flex min-w-max items-center px-1 py-1">
+        {flatItems.map((item) => {
+          const active = pathname.startsWith(item.href);
+          const Icon = item.icon;
+          return (
+            <div key={item.key} className="flex items-center">
+              {item.dividerBefore ? (
+                <div className="mx-1 h-6 w-px bg-slate-700" aria-hidden />
+              ) : null}
+              {item.showGroupLabel ? (
+                <span className="mr-1 rounded bg-slate-800 px-2 py-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+                  {item.groupLabel}
+                </span>
+              ) : null}
+              <Link
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-2 rounded px-3 py-2 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-[#1a1f31] text-yellow-300"
+                    : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            </div>
+          );
+        })}
+      </div>
     </nav>
   );
 }

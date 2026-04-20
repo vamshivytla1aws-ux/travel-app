@@ -23,11 +23,10 @@ export async function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-[#efefef]">
       <header className="sticky top-0 z-30 border-b border-slate-800 bg-[#1f2331]">
-        <div className={`${enterpriseContainer} space-y-2 py-3`}>
+        <div className={`${enterpriseContainer} space-y-2 py-2`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
+            <div className="min-w-0">
               <h1 className="text-lg font-semibold text-white">Employee Transport</h1>
-              <p className="text-xs text-slate-300">Operations workspace</p>
             </div>
             <div className="flex items-center gap-3 text-sm">
               <ThemeToggleButton />
