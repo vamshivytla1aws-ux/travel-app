@@ -93,7 +93,7 @@ export default async function FuelEntryPage(props: Props) {
     query<{ registration_number: string }>(
       `SELECT registration_number
        FROM buses
-       WHERE is_active = true
+       WHERE status = 'active'
        ORDER BY registration_number`,
     ),
     query<{ full_name: string }>(
