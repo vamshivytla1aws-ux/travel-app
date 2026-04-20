@@ -1,14 +1,14 @@
 "use client";
 
-import { MouseEvent } from "react";
+import { ButtonHTMLAttributes, MouseEvent } from "react";
 
 type ConfirmSubmitButtonProps = {
   label: string;
   message: string;
   className?: string;
-};
+} & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "onClick">;
 
-export function ConfirmSubmitButton({ label, message, className }: ConfirmSubmitButtonProps) {
+export function ConfirmSubmitButton({ label, message, className, ...props }: ConfirmSubmitButtonProps) {
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     if (!window.confirm(message)) {
       event.preventDefault();
@@ -16,7 +16,7 @@ export function ConfirmSubmitButton({ label, message, className }: ConfirmSubmit
   };
 
   return (
-    <button type="submit" className={className} onClick={handleClick}>
+    <button type="submit" className={className} onClick={handleClick} {...props}>
       {label}
     </button>
   );

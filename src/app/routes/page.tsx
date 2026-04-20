@@ -1,169 +1,445 @@
+import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { Route } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusAlert } from "@/components/ui/status-alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { requireSession } from "@/lib/auth";
-import { requireModuleAccess } from "@/lib/auth";
+import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
+import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 import { safeDecodeURIComponent } from "@/lib/url";
-import { RoutesService } from "@/services/routes.service";
 
-const routesService = new RoutesService();
 const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 50, 100] as const;
+const SHIFT_OPTIONS = ["general", "morning", "afternoon", "night", "unknown"] as const;
+type Shift = (typeof SHIFT_OPTIONS)[number];
 
-async function createRoute(formData: FormData) {
+type RoutePlannerRow = {
+  id: number;
+  bus_id: number;
+  driver_id: number;
+  bus_registration_number: string;
+  driver_name: string;
+  company_name: string | null;
+  route_name: string;
+  shift: Shift;
+  updated_at: string;
+};
+
+function normalizeShift(value: string): Shift {
+  const normalized = value.trim().toLowerCase() as Shift;
+  return SHIFT_OPTIONS.includes(normalized) ? normalized : "general";
+}
+
+async function getActiveBus(busId: number) {
+  const result = await query<{ id: number }>(
+    `SELECT id
+     FROM buses
+     WHERE id = $1 AND status = 'active'
+     LIMIT 1`,
+    [busId],
+  );
+  return result.rows[0] ?? null;
+}
+
+async function getActiveDriver(driverId: number) {
+  const result = await query<{ full_name: string; company_name: string | null }>(
+    `SELECT full_name, company_name
+     FROM drivers
+     WHERE id = $1 AND is_active = true
+     LIMIT 1`,
+    [driverId],
+  );
+  return result.rows[0] ?? null;
+}
+
+async function createRouteEntry(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("routes");
-  try {
-    const result = await query<{ id: number }>(
-      `INSERT INTO routes(route_code, route_name, start_location, end_location, total_distance_km, estimated_duration_minutes)
-       VALUES($1,$2,$3,$4,$5,$6)
-       RETURNING id`,
-      [
-        String(formData.get("routeCode")),
-        String(formData.get("routeName")),
-        String(formData.get("startLocation")),
-        String(formData.get("endLocation")),
-        Number(formData.get("totalDistanceKm")),
-        Number(formData.get("estimatedDurationMinutes")),
-      ],
-    );
-    await logAuditEvent({ session, action: "create", entityType: "route", entityId: result.rows[0].id });
-    revalidatePath("/routes");
-    redirect(`/routes?created=${Date.now()}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to create route";
-    redirect(`/routes?error=${encodeURIComponent(message)}`);
+  await ensureTransportEnhancements();
+
+  const busId = Number(formData.get("busId"));
+  const driverId = Number(formData.get("driverId"));
+  const routeName = String(formData.get("routeName") ?? "").trim();
+  const shift = normalizeShift(String(formData.get("shift") ?? ""));
+  const companyFromForm = String(formData.get("companyName") ?? "").trim();
+
+  if (!busId || !driverId || !routeName) {
+    redirect("/routes?error=Please fill all required fields.");
   }
+
+  const bus = await getActiveBus(busId);
+  if (!bus) redirect("/routes?error=Selected bus is not active.");
+
+  const driver = await getActiveDriver(driverId);
+  if (!driver) redirect("/routes?error=Selected driver is not active.");
+
+  const companyName = companyFromForm || driver.company_name || "Unknown";
+  const result = await query<{ id: number }>(
+    `INSERT INTO route_planner_entries(
+      bus_id, driver_id, company_name, route_name, shift, created_by, updated_by
+    )
+     VALUES($1,$2,$3,$4,$5,$6,$6)
+     RETURNING id`,
+    [busId, driverId, companyName, routeName, shift, session.id],
+  );
+
+  await logAuditEvent({
+    session,
+    action: "create",
+    entityType: "route_plan",
+    entityId: result.rows[0].id,
+    details: { busId, driverId, companyName, routeName, shift },
+  });
+
+  revalidatePath("/routes");
+  redirect(`/routes?created=${Date.now()}`);
+}
+
+async function updateRouteEntry(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
+  await requireModuleAccess("routes");
+  await ensureTransportEnhancements();
+
+  const routeId = Number(formData.get("routeId"));
+  const busId = Number(formData.get("busId"));
+  const driverId = Number(formData.get("driverId"));
+  const routeName = String(formData.get("routeName") ?? "").trim();
+  const shift = normalizeShift(String(formData.get("shift") ?? ""));
+  const companyFromForm = String(formData.get("companyName") ?? "").trim();
+
+  if (!routeId || !busId || !driverId || !routeName) {
+    redirect("/routes?error=Please fill all required fields.");
+  }
+
+  const bus = await getActiveBus(busId);
+  if (!bus) redirect("/routes?error=Selected bus is not active.");
+
+  const driver = await getActiveDriver(driverId);
+  if (!driver) redirect("/routes?error=Selected driver is not active.");
+
+  const companyName = companyFromForm || driver.company_name || "Unknown";
+  const result = await query<{ id: number }>(
+    `UPDATE route_planner_entries
+     SET bus_id = $1, driver_id = $2, company_name = $3, route_name = $4, shift = $5, updated_by = $6, updated_at = NOW()
+     WHERE id = $7
+     RETURNING id`,
+    [busId, driverId, companyName, routeName, shift, session.id, routeId],
+  );
+  if (!result.rows[0]) {
+    redirect("/routes?error=Route assignment not found.");
+  }
+
+  await logAuditEvent({
+    session,
+    action: "update",
+    entityType: "route_plan",
+    entityId: routeId,
+    details: { busId, driverId, companyName, routeName, shift },
+  });
+
+  revalidatePath("/routes");
+  redirect(`/routes?updated=${Date.now()}`);
+}
+
+async function deleteRouteEntry(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
+  await requireModuleAccess("routes");
+  await ensureTransportEnhancements();
+
+  const routeId = Number(formData.get("routeId"));
+  if (!routeId) return;
+
+  await query(`UPDATE route_planner_entries SET is_active = false, updated_by = $1, updated_at = NOW() WHERE id = $2`, [
+    session.id,
+    routeId,
+  ]);
+  await logAuditEvent({ session, action: "delete", entityType: "route_plan", entityId: routeId });
+
+  revalidatePath("/routes");
+  redirect(`/routes?deleted=${Date.now()}`);
 }
 
 type Props = {
-  searchParams: Promise<{ created?: string; error?: string; q?: string; page?: string; pageSize?: string }>;
+  searchParams: Promise<{
+    created?: string;
+    updated?: string;
+    deleted?: string;
+    error?: string;
+    q?: string;
+    shift?: string;
+    page?: string;
+    pageSize?: string;
+    editId?: string;
+  }>;
 };
 
 export default async function RoutesPage(props: Props) {
   await requireSession();
   await requireModuleAccess("routes");
+  await ensureTransportEnhancements();
   const searchParams = await props.searchParams;
-  const routes = await routesService.listRoutes();
+
+  const [buses, drivers, entriesResult] = await Promise.all([
+    query<{ id: number; registration_number: string }>(
+      `SELECT id, registration_number
+       FROM buses
+       WHERE status = 'active'
+       ORDER BY registration_number`,
+    ),
+    query<{ id: number; full_name: string; company_name: string | null }>(
+      `SELECT id, full_name, company_name
+       FROM drivers
+       WHERE is_active = true
+       ORDER BY full_name`,
+    ),
+    query<RoutePlannerRow>(
+      `SELECT rp.id, rp.bus_id, rp.driver_id, rp.company_name, rp.route_name, rp.shift::text, rp.updated_at::text,
+              b.registration_number AS bus_registration_number,
+              d.full_name AS driver_name
+       FROM route_planner_entries rp
+       JOIN buses b ON b.id = rp.bus_id
+       JOIN drivers d ON d.id = rp.driver_id
+       WHERE rp.is_active = true
+       ORDER BY rp.id DESC`,
+    ),
+  ]);
+
   const q = String(searchParams.q ?? "").trim().toLowerCase();
-  const filtered = routes.filter(
-    (route) =>
+  const shiftParam = String(searchParams.shift ?? "").trim().toLowerCase();
+  const shiftFilter = SHIFT_OPTIONS.includes(shiftParam as Shift) ? (shiftParam as Shift) : "";
+
+  const filtered = entriesResult.rows.filter((entry) => {
+    const matchesSearch =
       !q ||
-      route.routeCode.toLowerCase().includes(q) ||
-      route.routeName.toLowerCase().includes(q) ||
-      route.startLocation.toLowerCase().includes(q) ||
-      route.endLocation.toLowerCase().includes(q),
-  );
+      entry.bus_registration_number.toLowerCase().includes(q) ||
+      entry.driver_name.toLowerCase().includes(q) ||
+      (entry.company_name ?? "").toLowerCase().includes(q) ||
+      entry.route_name.toLowerCase().includes(q);
+    const matchesShift = !shiftFilter || entry.shift === shiftFilter;
+    return matchesSearch && matchesShift;
+  });
+
   const requestedPageSize = Number(searchParams.pageSize ?? "15");
   const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize as (typeof PAGE_SIZE_OPTIONS)[number]) ? requestedPageSize : 15;
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const parsedPage = Number(searchParams.page ?? "1");
-  const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? Math.min(parsedPage, totalPages) : 1;
+  const rawPage = Number(searchParams.page ?? "1");
+  const currentPage = Number.isFinite(rawPage) && rawPage > 0 ? Math.min(rawPage, totalPages) : 1;
   const startIndex = (currentPage - 1) * pageSize;
-  const visibleRoutes = filtered.slice(startIndex, startIndex + pageSize);
+  const visibleEntries = filtered.slice(startIndex, startIndex + pageSize);
+  const editId = Number(searchParams.editId ?? "");
+  const editEntry = Number.isFinite(editId) && editId > 0
+    ? entriesResult.rows.find((entry) => entry.id === editId) ?? null
+    : null;
+
+  const companies = Array.from(
+    new Set(drivers.rows.map((driver) => (driver.company_name ?? "").trim()).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b));
+
+  const activeFilters = [
+    q ? `Search: ${q}` : null,
+    shiftFilter ? `Shift: ${shiftFilter}` : null,
+  ].filter(Boolean) as string[];
 
   return (
     <AppShell>
       <EnterprisePageHeader
         title="Route Planner"
-        subtitle="Design route coverage and optimize travel distance for shifts"
+        subtitle="Bus + driver assignment per shift (duplicate-friendly by design)"
         icon={Route}
         tag="Route Design"
       />
-      {searchParams.created ? (
-        <StatusAlert className="mb-4" tone="success" message="Route created successfully." />
-      ) : null}
-      {searchParams.error ? (
-        <StatusAlert className="mb-4" tone="error" message={safeDecodeURIComponent(searchParams.error)} />
-      ) : null}
+
+      {searchParams.created ? <StatusAlert className="mb-4" tone="success" message="Route assignment created." /> : null}
+      {searchParams.updated ? <StatusAlert className="mb-4" tone="info" message="Route assignment updated." /> : null}
+      {searchParams.deleted ? <StatusAlert className="mb-4" tone="warning" message="Route assignment deleted." /> : null}
+      {searchParams.error ? <StatusAlert className="mb-4" tone="error" message={safeDecodeURIComponent(searchParams.error)} /> : null}
+
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="border-violet-200/70 bg-violet-50/40 dark:border-violet-900 dark:bg-violet-950/20">
-          <CardHeader><CardTitle>Create Route</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>{editEntry ? "Update Route Assignment" : "Create Route Assignment"}</CardTitle>
+          </CardHeader>
           <CardContent>
-            <form action={createRoute} className="grid gap-2">
-              <Label htmlFor="routeCode">Code</Label><Input id="routeCode" name="routeCode" required />
-              <Label htmlFor="routeName">Name</Label><Input id="routeName" name="routeName" required />
-              <Label htmlFor="startLocation">Start</Label><Input id="startLocation" name="startLocation" required />
-              <Label htmlFor="endLocation">End</Label><Input id="endLocation" name="endLocation" required />
-              <Label htmlFor="totalDistanceKm">Distance (km)</Label><Input id="totalDistanceKm" name="totalDistanceKm" type="number" step="0.01" required />
-              <Label htmlFor="estimatedDurationMinutes">Duration (min)</Label><Input id="estimatedDurationMinutes" name="estimatedDurationMinutes" type="number" required />
-              <Button type="submit">Save</Button>
+            <form action={editEntry ? updateRouteEntry : createRouteEntry} className="grid gap-2">
+              {editEntry ? <input type="hidden" name="routeId" value={editEntry.id} /> : null}
+
+              <Label htmlFor="busId">Bus Registration No</Label>
+              <select id="busId" name="busId" defaultValue={editEntry ? String(editEntry.bus_id) : ""} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" required>
+                <option value="">Select bus</option>
+                {buses.rows.map((bus) => (
+                  <option key={bus.id} value={bus.id}>
+                    {bus.registration_number}
+                  </option>
+                ))}
+              </select>
+
+              <Label htmlFor="driverId">Driver</Label>
+              <select id="driverId" name="driverId" defaultValue={editEntry ? String(editEntry.driver_id) : ""} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" required>
+                <option value="">Select driver</option>
+                {drivers.rows.map((driver) => (
+                  <option key={driver.id} value={driver.id}>
+                    {driver.full_name}
+                  </option>
+                ))}
+              </select>
+
+              <Label htmlFor="companyName">Company</Label>
+              <select
+                id="companyName"
+                name="companyName"
+                defaultValue={editEntry?.company_name ?? ""}
+                className="h-10 rounded-md border border-input bg-transparent px-3 text-sm"
+              >
+                <option value="">Auto from selected driver</option>
+                {companies.map((company) => (
+                  <option key={company} value={company}>
+                    {company}
+                  </option>
+                ))}
+              </select>
+
+              <Label htmlFor="routeName">Route Name</Label>
+              <Input id="routeName" name="routeName" defaultValue={editEntry?.route_name ?? ""} required />
+
+              <Label htmlFor="shift">Shift</Label>
+              <select id="shift" name="shift" defaultValue={editEntry?.shift ?? "general"} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm">
+                {SHIFT_OPTIONS.map((shift) => (
+                  <option key={shift} value={shift}>
+                    {shift.charAt(0).toUpperCase() + shift.slice(1)}
+                  </option>
+                ))}
+              </select>
+
+              <Button type="submit">{editEntry ? "Update Assignment" : "Create Assignment"}</Button>
+              {editEntry ? (
+                <Link href="/routes" className={`${buttonVariants({ variant: "outline" })} justify-center`}>
+                  Cancel Edit
+                </Link>
+              ) : null}
             </form>
           </CardContent>
         </Card>
+
         <Card className="lg:col-span-2 border-violet-200/70 dark:border-violet-900">
-          <CardHeader><CardTitle>Routes</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Route Assignments</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
             <form className="grid gap-2 rounded-md border bg-background p-3 md:grid-cols-4">
-              <Input name="q" defaultValue={searchParams.q ?? ""} placeholder="Search code/name/start/end" />
-              <select name="pageSize" defaultValue={String(pageSize)} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm">
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
+              {editEntry ? <input type="hidden" name="editId" value={String(editEntry.id)} /> : null}
+              <Input name="q" defaultValue={searchParams.q ?? ""} placeholder="Search bus/driver/company/route" />
+              <select name="shift" defaultValue={searchParams.shift ?? ""} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm">
+                <option value="">All shifts</option>
+                {SHIFT_OPTIONS.map((shift) => (
+                  <option key={shift} value={shift}>
+                    {shift.charAt(0).toUpperCase() + shift.slice(1)}
                   </option>
                 ))}
               </select>
               <Button type="submit" variant="outline">Apply</Button>
-              <Link href="/routes" className="inline-flex h-10 items-center justify-center rounded-md border border-input px-3 text-sm">
+              <Link href={editEntry ? `/routes?editId=${editEntry.id}` : "/routes"} className="inline-flex h-10 items-center justify-center rounded-md border border-input px-3 text-sm">
                 Clear
               </Link>
             </form>
-            {q ? (
+
+            {activeFilters.length ? (
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="rounded-full border bg-muted px-2 py-1">Search: {q}</span>
+                {activeFilters.map((value) => (
+                  <span key={value} className="rounded-full border bg-muted px-2 py-1 capitalize">
+                    {value}
+                  </span>
+                ))}
               </div>
             ) : null}
+
             <Table>
               <TableHeader>
-                <TableRow><TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Distance</TableHead></TableRow>
+                <TableRow>
+                  <TableHead>Bus Registration No</TableHead>
+                  <TableHead>Driver</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Route Name</TableHead>
+                  <TableHead>Shift</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
               </TableHeader>
               <TableBody>
-                {visibleRoutes.map((route) => (
-                  <TableRow key={route.id}>
-                    <TableCell>{route.routeCode}</TableCell>
-                    <TableCell>{route.routeName}</TableCell>
-                    <TableCell>{route.totalDistanceKm.toFixed(2)} km</TableCell>
+                {visibleEntries.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCell>{entry.bus_registration_number}</TableCell>
+                    <TableCell>{entry.driver_name}</TableCell>
+                    <TableCell>{entry.company_name ?? "-"}</TableCell>
+                    <TableCell>{entry.route_name}</TableCell>
+                    <TableCell className="capitalize">{entry.shift}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Link href={`/routes?editId=${entry.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                          Edit
+                        </Link>
+                        <form action={deleteRouteEntry}>
+                          <input type="hidden" name="routeId" value={entry.id} />
+                          <ConfirmSubmitButton
+                            label="Delete"
+                            message="Delete this route assignment?"
+                            className={buttonVariants({ variant: "destructive", size: "sm" })}
+                          />
+                        </form>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
-                {visibleRoutes.length === 0 ? (
+                {visibleEntries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground">
-                      No routes found.
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      No route assignments found.
                     </TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
             </Table>
+
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>
                 Showing {total === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, total)} of {total}
               </span>
               <div className="flex items-center gap-2">
-                <Link
-                  className={`rounded border px-2 py-1 ${currentPage <= 1 ? "pointer-events-none opacity-50" : ""}`}
-                  href={`/routes?q=${encodeURIComponent(searchParams.q ?? "")}&pageSize=${pageSize}&page=${Math.max(1, currentPage - 1)}`}
-                >
-                  Prev
-                </Link>
+                {currentPage <= 1 ? (
+                  <span className={`${buttonVariants({ variant: "outline", size: "sm" })} pointer-events-none opacity-50`}>
+                    Prev
+                  </span>
+                ) : (
+                  <Link
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                    href={`/routes?q=${encodeURIComponent(searchParams.q ?? "")}&shift=${encodeURIComponent(searchParams.shift ?? "")}&pageSize=${pageSize}&page=${Math.max(1, currentPage - 1)}`}
+                  >
+                    Prev
+                  </Link>
+                )}
                 <span>{currentPage}/{totalPages}</span>
-                <Link
-                  className={`rounded border px-2 py-1 ${currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}`}
-                  href={`/routes?q=${encodeURIComponent(searchParams.q ?? "")}&pageSize=${pageSize}&page=${Math.min(totalPages, currentPage + 1)}`}
-                >
-                  Next
-                </Link>
+                {currentPage >= totalPages ? (
+                  <span className={`${buttonVariants({ variant: "outline", size: "sm" })} pointer-events-none opacity-50`}>
+                    Next
+                  </span>
+                ) : (
+                  <Link
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                    href={`/routes?q=${encodeURIComponent(searchParams.q ?? "")}&shift=${encodeURIComponent(searchParams.shift ?? "")}&pageSize=${pageSize}&page=${Math.min(totalPages, currentPage + 1)}`}
+                  >
+                    Next
+                  </Link>
+                )}
               </div>
             </div>
           </CardContent>

@@ -103,9 +103,120 @@ async function addDailyMileageEntry(formData: FormData) {
   redirect(`/buses/${busId}?fuelSaved=${Date.now()}`);
 }
 
+async function createMaintenanceRecord(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
+  await requireModuleAccess("buses");
+  await ensureTransportEnhancements();
+
+  const busId = Number(formData.get("busId"));
+  const maintenanceDate = String(formData.get("maintenanceDate") ?? "");
+  const issueType = String(formData.get("issueType") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const cost = Number(formData.get("cost") ?? 0);
+
+  if (!busId || !maintenanceDate || !issueType || !description || Number.isNaN(cost) || cost < 0) {
+    redirect(`/buses/${busId}?maintenanceError=invalid`);
+  }
+
+  const result = await query<{ id: number }>(
+    `INSERT INTO maintenance_records (bus_id, maintenance_date, issue_type, description, cost, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id`,
+    [busId, maintenanceDate, issueType, description, cost, session.id],
+  );
+  await logAuditEvent({
+    session,
+    action: "create",
+    entityType: "maintenance_record",
+    entityId: result.rows[0].id,
+    details: { busId, maintenanceDate, issueType, cost },
+  });
+  revalidatePath(`/buses/${busId}`);
+  redirect(`/buses/${busId}?maintenanceSaved=${Date.now()}`);
+}
+
+async function updateMaintenanceRecord(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
+  await requireModuleAccess("buses");
+  await ensureTransportEnhancements();
+
+  const busId = Number(formData.get("busId"));
+  const maintenanceId = Number(formData.get("maintenanceId"));
+  const maintenanceDate = String(formData.get("maintenanceDate") ?? "");
+  const issueType = String(formData.get("issueType") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const cost = Number(formData.get("cost") ?? 0);
+
+  if (
+    !busId ||
+    !maintenanceId ||
+    !maintenanceDate ||
+    !issueType ||
+    !description ||
+    Number.isNaN(cost) ||
+    cost < 0
+  ) {
+    redirect(`/buses/${busId}?maintenanceError=invalid`);
+  }
+
+  const result = await query<{ id: number }>(
+    `UPDATE maintenance_records
+     SET maintenance_date = $1, issue_type = $2, description = $3, cost = $4
+     WHERE id = $5 AND bus_id = $6
+     RETURNING id`,
+    [maintenanceDate, issueType, description, cost, maintenanceId, busId],
+  );
+  if (!result.rows[0]) {
+    redirect(`/buses/${busId}?maintenanceError=notfound`);
+  }
+  await logAuditEvent({
+    session,
+    action: "update",
+    entityType: "maintenance_record",
+    entityId: maintenanceId,
+    details: { busId, maintenanceDate, issueType, cost },
+  });
+  revalidatePath(`/buses/${busId}`);
+  redirect(`/buses/${busId}?maintenanceUpdated=${Date.now()}`);
+}
+
+async function deleteMaintenanceRecord(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
+  await requireModuleAccess("buses");
+  await ensureTransportEnhancements();
+
+  const busId = Number(formData.get("busId"));
+  const maintenanceId = Number(formData.get("maintenanceId"));
+  if (!busId || !maintenanceId) return;
+
+  await query(`DELETE FROM maintenance_records WHERE id = $1 AND bus_id = $2`, [maintenanceId, busId]);
+  await logAuditEvent({
+    session,
+    action: "delete",
+    entityType: "maintenance_record",
+    entityId: maintenanceId,
+    details: { busId },
+  });
+  revalidatePath(`/buses/${busId}`);
+  redirect(`/buses/${busId}?maintenanceDeleted=${Date.now()}`);
+}
+
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ fuelSaved?: string; fuelError?: string; docUploaded?: string; docDeleted?: string }>;
+  searchParams: Promise<{
+    fuelSaved?: string;
+    fuelError?: string;
+    docUploaded?: string;
+    docDeleted?: string;
+    maintenanceSaved?: string;
+    maintenanceUpdated?: string;
+    maintenanceDeleted?: string;
+    maintenanceError?: string;
+    editMaintenanceId?: string;
+  }>;
 };
 
 export default async function BusDetailPage(props: Props) {
@@ -115,6 +226,10 @@ export default async function BusDetailPage(props: Props) {
   const searchParams = await props.searchParams;
   const detail = await busesService.getBusDetail(Number(params.id));
   if (!detail) notFound();
+  const editMaintenanceId = Number(searchParams.editMaintenanceId ?? "");
+  const maintenanceToEdit = Number.isFinite(editMaintenanceId) && editMaintenanceId > 0
+    ? detail.maintenance.find((record) => record.id === editMaintenanceId) ?? null
+    : null;
 
   return (
     <AppShell>
@@ -137,6 +252,31 @@ export default async function BusDetailPage(props: Props) {
         {searchParams.docDeleted ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
             Bus document deleted successfully.
+          </div>
+        ) : null}
+        {searchParams.maintenanceSaved ? (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+            Maintenance record saved.
+          </div>
+        ) : null}
+        {searchParams.maintenanceUpdated ? (
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+            Maintenance record updated.
+          </div>
+        ) : null}
+        {searchParams.maintenanceDeleted ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+            Maintenance record deleted.
+          </div>
+        ) : null}
+        {searchParams.maintenanceError === "invalid" ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            Invalid maintenance data. Please check date, issue, description, and cost.
+          </div>
+        ) : null}
+        {searchParams.maintenanceError === "notfound" ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            Maintenance record not found.
           </div>
         ) : null}
         <h2 className="text-2xl font-semibold">Bus {detail.bus.busNumber}</h2>
@@ -243,13 +383,65 @@ export default async function BusDetailPage(props: Props) {
 
           <Card>
             <CardHeader><CardTitle>Maintenance History</CardTitle></CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <form action={maintenanceToEdit ? updateMaintenanceRecord : createMaintenanceRecord} className="grid gap-3 md:grid-cols-2">
+                <input type="hidden" name="busId" value={detail.bus.id} />
+                {maintenanceToEdit ? <input type="hidden" name="maintenanceId" value={maintenanceToEdit.id} /> : null}
+                <div className="grid gap-1">
+                  <Label htmlFor="maintenanceDate">Date</Label>
+                  <Input
+                    id="maintenanceDate"
+                    name="maintenanceDate"
+                    type="date"
+                    defaultValue={maintenanceToEdit?.maintenance_date ?? ""}
+                    required
+                  />
+                </div>
+                <div className="grid gap-1">
+                  <Label htmlFor="issueType">Issue</Label>
+                  <Input
+                    id="issueType"
+                    name="issueType"
+                    defaultValue={maintenanceToEdit?.issue_type ?? ""}
+                    placeholder="Engine, Tyre, Brake..."
+                    required
+                  />
+                </div>
+                <div className="grid gap-1 md:col-span-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Input
+                    id="description"
+                    name="description"
+                    defaultValue={maintenanceToEdit?.description ?? ""}
+                    placeholder="Service details"
+                    required
+                  />
+                </div>
+                <div className="grid gap-1">
+                  <Label htmlFor="cost">Cost</Label>
+                  <Input id="cost" name="cost" type="number" step="0.01" min="0" defaultValue={maintenanceToEdit?.cost ?? ""} required />
+                </div>
+                <div className="flex items-end gap-2">
+                  <button className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground">
+                    {maintenanceToEdit ? "Update Record" : "Add Record"}
+                  </button>
+                  {maintenanceToEdit ? (
+                    <a
+                      href={`/buses/${detail.bus.id}`}
+                      className="inline-flex h-9 items-center rounded-md border border-input px-4 text-sm"
+                    >
+                      Cancel
+                    </a>
+                  ) : null}
+                </div>
+              </form>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Issue</TableHead>
                     <TableHead>Cost</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -258,8 +450,34 @@ export default async function BusDetailPage(props: Props) {
                       <TableCell>{new Date(record.maintenance_date).toLocaleDateString()}</TableCell>
                       <TableCell>{record.issue_type}</TableCell>
                       <TableCell>{Number(record.cost).toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <a
+                            href={`/buses/${detail.bus.id}?editMaintenanceId=${record.id}`}
+                            className="inline-flex h-8 items-center rounded-md border border-input px-3 text-xs"
+                          >
+                            Edit
+                          </a>
+                          <form action={deleteMaintenanceRecord}>
+                            <input type="hidden" name="busId" value={detail.bus.id} />
+                            <input type="hidden" name="maintenanceId" value={record.id} />
+                            <ConfirmSubmitButton
+                              label="Delete"
+                              message="Delete this maintenance record?"
+                              className="inline-flex h-8 items-center rounded-md bg-red-600 px-3 text-xs text-white hover:bg-red-700"
+                            />
+                          </form>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
+                  {detail.maintenance.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                        No maintenance records available.
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
                 </TableBody>
               </Table>
             </CardContent>

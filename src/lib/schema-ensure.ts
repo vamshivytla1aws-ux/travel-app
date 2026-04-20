@@ -114,6 +114,46 @@ export async function ensureTransportEnhancements() {
   await query(`CREATE INDEX IF NOT EXISTS idx_fuel_issues_bus_date ON fuel_issues(bus_id, issue_date DESC, id DESC);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_fuel_truck_ledger_truck_date ON fuel_truck_ledger(fuel_truck_id, transaction_date DESC, id DESC);`);
   await query(`
+    CREATE TABLE IF NOT EXISTS route_planner_entries (
+      id BIGSERIAL PRIMARY KEY,
+      bus_id BIGINT NOT NULL REFERENCES buses(id),
+      driver_id BIGINT NOT NULL REFERENCES drivers(id),
+      company_name VARCHAR(160),
+      route_name VARCHAR(160) NOT NULL,
+      shift VARCHAR(20) NOT NULL CHECK (shift IN ('general', 'morning', 'afternoon', 'night', 'unknown')),
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_by BIGINT REFERENCES users(id),
+      updated_by BIGINT REFERENCES users(id),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_route_planner_entries_active ON route_planner_entries(is_active, id DESC);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_route_planner_entries_shift ON route_planner_entries(shift, id DESC);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_route_planner_entries_bus ON route_planner_entries(bus_id, id DESC);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_route_planner_entries_driver ON route_planner_entries(driver_id, id DESC);`);
+  await query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'route_planner_entries_shift_check'
+      ) THEN
+        ALTER TABLE route_planner_entries DROP CONSTRAINT route_planner_entries_shift_check;
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'route_planner_entries_shift_allowed_check'
+      ) THEN
+        ALTER TABLE route_planner_entries
+        ADD CONSTRAINT route_planner_entries_shift_allowed_check
+        CHECK (shift IN ('general', 'morning', 'afternoon', 'night', 'unknown'));
+      END IF;
+    END $$;
+  `);
+  await query(`
     DO $$
     BEGIN
       IF NOT EXISTS (
