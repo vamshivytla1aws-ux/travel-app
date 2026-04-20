@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CarFront, ClipboardList, Gauge, KeyRound, MapPinned, Route, Timer, Truck, Users, Fuel } from "lucide-react";
+import { CarFront, ChevronDown, ClipboardList, Gauge, KeyRound, MapPinned, Route, Timer, Truck, Users, Fuel } from "lucide-react";
 import { cn } from "@/lib/ui-core";
 import { AppModule } from "@/lib/auth";
 
@@ -44,7 +44,10 @@ export function EnterpriseNav({ allowedModules }: { allowedModules: AppModule[] 
     }))
     .filter((group) => group.items.length > 0);
 
-  const flatItems = filteredGroups.flatMap((group, groupIndex) =>
+  const adminGroup = filteredGroups.find((group) => group.label === "Admin");
+  const nonAdminGroups = filteredGroups.filter((group) => group.label !== "Admin");
+
+  const flatItems = nonAdminGroups.flatMap((group, groupIndex) =>
     group.items.map((item, itemIndex) => ({
       ...item,
       groupLabel: group.label,
@@ -54,9 +57,11 @@ export function EnterpriseNav({ allowedModules }: { allowedModules: AppModule[] 
     })),
   );
 
+  const adminActive = Boolean(adminGroup?.items.some((item) => pathname.startsWith(item.href)));
+
   return (
     <nav className="rounded border border-slate-700 bg-[#101422]">
-      <div className="flex flex-wrap items-center gap-1 px-1 py-1">
+      <div className="flex items-center gap-1 px-1 py-1 md:flex-nowrap">
         {flatItems.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;
@@ -85,6 +90,47 @@ export function EnterpriseNav({ allowedModules }: { allowedModules: AppModule[] 
             </div>
           );
         })}
+        {adminGroup ? (
+          <div className="ml-auto flex items-center">
+            <div className="mx-1 h-6 w-px bg-slate-700" aria-hidden />
+            <details className="group relative">
+              <summary
+                className={cn(
+                  "flex cursor-pointer list-none items-center gap-2 rounded px-3 py-2 text-sm font-medium transition-colors marker:content-none",
+                  adminActive
+                    ? "bg-[#1a1f31] text-yellow-300"
+                    : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
+                )}
+              >
+                <span className="rounded bg-slate-800 px-2 py-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+                  Admin
+                </span>
+                <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="absolute right-0 z-40 mt-1 w-48 rounded border border-slate-700 bg-[#0f1627] p-1 shadow-xl">
+                {adminGroup.items.map((item) => {
+                  const ItemIcon = item.icon;
+                  const active = pathname.startsWith(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center gap-2 rounded px-3 py-2 text-sm transition-colors",
+                        active
+                          ? "bg-[#1a1f31] text-yellow-300"
+                          : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
+                      )}
+                    >
+                      <ItemIcon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </details>
+          </div>
+        ) : null}
       </div>
     </nav>
   );
