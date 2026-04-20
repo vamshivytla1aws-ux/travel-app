@@ -21,7 +21,6 @@ export const APP_MODULES = [
   "employees",
   "routes",
   "tracking",
-  "fuel-entry",
   "fuel-truck",
   "user-admin",
   "logs",

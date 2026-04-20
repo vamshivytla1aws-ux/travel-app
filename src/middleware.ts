@@ -25,7 +25,6 @@ export function middleware(request: NextRequest) {
   const protectedPaths = [
     "/dashboard",
     "/buses",
-    "/fuel-entry",
     "/employees",
     "/drivers",
     "/routes",

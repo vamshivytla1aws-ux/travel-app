@@ -239,43 +239,6 @@ export default async function DriverProfilePage(props: Props) {
           </Card>
           <Card className="md:col-span-3">
             <CardHeader>
-              <CardTitle>Route Assignment History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Route</TableHead>
-                    <TableHead>Shift</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Bus</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {profile.routeAssignments.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                        No route assignments found for this driver.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    profile.routeAssignments.map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell>{new Date(entry.assignment_date).toLocaleDateString()}</TableCell>
-                        <TableCell>{entry.route_name}</TableCell>
-                        <TableCell className="capitalize">{entry.shift}</TableCell>
-                        <TableCell>{entry.company_name ?? "-"}</TableCell>
-                        <TableCell>{entry.bus_registration_number}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-          <Card className="md:col-span-3">
-            <CardHeader>
               <CardTitle>Edit Driver Profile</CardTitle>
             </CardHeader>
             <CardContent>
@@ -411,6 +374,44 @@ export default async function DriverProfilePage(props: Props) {
                 </div>
               ))
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Route Assignment History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Route</TableHead>
+                  <TableHead>Shift</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Bus</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {profile.routeAssignments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                      No route assignments found for this driver.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  profile.routeAssignments.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell>{new Date(entry.assignment_date).toLocaleDateString()}</TableCell>
+                      <TableCell>{entry.route_name}</TableCell>
+                      <TableCell className="capitalize">{entry.shift}</TableCell>
+                      <TableCell>{entry.company_name ?? "-"}</TableCell>
+                      <TableCell>{entry.bus_registration_number}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>

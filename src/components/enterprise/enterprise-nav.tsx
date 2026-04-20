@@ -22,7 +22,6 @@ const navGroups = [
   {
     label: "Fuel",
     items: [
-      { href: "/fuel-entry", label: "Fuel Entry", icon: Fuel, module: "fuel-entry" as AppModule },
       { href: "/fuel-trucks", label: "Fuel Tankers", icon: Fuel, module: "fuel-truck" as AppModule },
     ],
   },

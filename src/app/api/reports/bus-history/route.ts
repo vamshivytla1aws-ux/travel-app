@@ -17,7 +17,7 @@ function formatDate(value: string) {
 }
 
 export async function GET(request: Request) {
-  const session = await requireApiModuleAccess("fuel-entry");
+  const session = await requireApiModuleAccess("buses");
   if (!session) {
     return new Response("Forbidden", { status: 403 });
   }
