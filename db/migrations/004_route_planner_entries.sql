@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS route_planner_entries (
   id BIGSERIAL PRIMARY KEY,
   bus_id BIGINT NOT NULL REFERENCES buses(id),
   driver_id BIGINT NOT NULL REFERENCES drivers(id),
+  assignment_date DATE NOT NULL DEFAULT CURRENT_DATE,
   company_name VARCHAR(160),
   route_name VARCHAR(160) NOT NULL,
   shift VARCHAR(20) NOT NULL CHECK (shift IN ('general', 'morning', 'afternoon', 'night', 'unknown')),
@@ -13,6 +14,7 @@ CREATE TABLE IF NOT EXISTS route_planner_entries (
 );
 
 CREATE INDEX IF NOT EXISTS idx_route_planner_entries_active ON route_planner_entries(is_active, id DESC);
+CREATE INDEX IF NOT EXISTS idx_route_planner_entries_date ON route_planner_entries(assignment_date DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_route_planner_entries_shift ON route_planner_entries(shift, id DESC);
 CREATE INDEX IF NOT EXISTS idx_route_planner_entries_bus ON route_planner_entries(bus_id, id DESC);
 CREATE INDEX IF NOT EXISTS idx_route_planner_entries_driver ON route_planner_entries(driver_id, id DESC);

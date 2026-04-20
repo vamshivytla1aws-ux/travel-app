@@ -80,6 +80,28 @@ export class BusesService {
        ORDER BY uploaded_at DESC`,
       [id],
     );
+    const routeAssignments = await query<{
+      id: number;
+      assignment_date: string;
+      route_name: string;
+      shift: string;
+      company_name: string | null;
+      driver_name: string;
+    }>(
+      `SELECT
+          rp.id,
+          rp.assignment_date::text,
+          rp.route_name,
+          rp.shift::text,
+          rp.company_name,
+          d.full_name as driver_name
+       FROM route_planner_entries rp
+       JOIN drivers d ON d.id = rp.driver_id
+       WHERE rp.bus_id = $1 AND rp.is_active = true
+       ORDER BY rp.assignment_date DESC, rp.id DESC
+       LIMIT 25`,
+      [id],
+    );
     const todayMileage =
       latestFuel != null
         ? Number(
@@ -95,6 +117,7 @@ export class BusesService {
       fuelHistory,
       maintenance: maintenanceResult.rows,
       documents: busDocuments.rows,
+      routeAssignments: routeAssignments.rows,
     };
   }
 }

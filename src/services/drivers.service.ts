@@ -56,9 +56,33 @@ export class DriversService {
       [id],
     );
 
+    const routeAssignments = await query<{
+      id: number;
+      assignment_date: string;
+      route_name: string;
+      shift: string;
+      company_name: string | null;
+      bus_registration_number: string;
+    }>(
+      `SELECT
+          rp.id,
+          rp.assignment_date::text,
+          rp.route_name,
+          rp.shift::text,
+          rp.company_name,
+          b.registration_number as bus_registration_number
+       FROM route_planner_entries rp
+       JOIN buses b ON b.id = rp.bus_id
+       WHERE rp.driver_id = $1 AND rp.is_active = true
+       ORDER BY rp.assignment_date DESC, rp.id DESC
+       LIMIT 25`,
+      [id],
+    );
+
     return {
       driver,
       documents: documents.rows,
+      routeAssignments: routeAssignments.rows,
     };
   }
 }

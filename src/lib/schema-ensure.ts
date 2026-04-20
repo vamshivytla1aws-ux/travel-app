@@ -118,6 +118,7 @@ export async function ensureTransportEnhancements() {
       id BIGSERIAL PRIMARY KEY,
       bus_id BIGINT NOT NULL REFERENCES buses(id),
       driver_id BIGINT NOT NULL REFERENCES drivers(id),
+      assignment_date DATE NOT NULL DEFAULT CURRENT_DATE,
       company_name VARCHAR(160),
       route_name VARCHAR(160) NOT NULL,
       shift VARCHAR(20) NOT NULL CHECK (shift IN ('general', 'morning', 'afternoon', 'night', 'unknown')),
@@ -129,9 +130,14 @@ export async function ensureTransportEnhancements() {
     );
   `);
   await query(`CREATE INDEX IF NOT EXISTS idx_route_planner_entries_active ON route_planner_entries(is_active, id DESC);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_route_planner_entries_date ON route_planner_entries(assignment_date DESC, id DESC);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_route_planner_entries_shift ON route_planner_entries(shift, id DESC);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_route_planner_entries_bus ON route_planner_entries(bus_id, id DESC);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_route_planner_entries_driver ON route_planner_entries(driver_id, id DESC);`);
+  await query(`ALTER TABLE route_planner_entries ADD COLUMN IF NOT EXISTS assignment_date DATE;`);
+  await query(`UPDATE route_planner_entries SET assignment_date = COALESCE(assignment_date, DATE(created_at), CURRENT_DATE) WHERE assignment_date IS NULL;`);
+  await query(`ALTER TABLE route_planner_entries ALTER COLUMN assignment_date SET DEFAULT CURRENT_DATE;`);
+  await query(`ALTER TABLE route_planner_entries ALTER COLUMN assignment_date SET NOT NULL;`);
   await query(`
     DO $$
     BEGIN

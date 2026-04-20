@@ -25,6 +25,7 @@ type RoutePlannerRow = {
   id: number;
   bus_id: number;
   driver_id: number;
+  assignment_date: string;
   bus_registration_number: string;
   driver_name: string;
   company_name: string | null;
@@ -69,10 +70,11 @@ async function createRouteEntry(formData: FormData) {
   const busId = Number(formData.get("busId"));
   const driverId = Number(formData.get("driverId"));
   const routeName = String(formData.get("routeName") ?? "").trim();
+  const assignmentDate = String(formData.get("assignmentDate") ?? "").trim();
   const shift = normalizeShift(String(formData.get("shift") ?? ""));
   const companyFromForm = String(formData.get("companyName") ?? "").trim();
 
-  if (!busId || !driverId || !routeName) {
+  if (!busId || !driverId || !routeName || !assignmentDate) {
     redirect("/routes?error=Please fill all required fields.");
   }
 
@@ -85,11 +87,11 @@ async function createRouteEntry(formData: FormData) {
   const companyName = companyFromForm || driver.company_name || "Unknown";
   const result = await query<{ id: number }>(
     `INSERT INTO route_planner_entries(
-      bus_id, driver_id, company_name, route_name, shift, created_by, updated_by
+      bus_id, driver_id, company_name, route_name, shift, assignment_date, created_by, updated_by
     )
-     VALUES($1,$2,$3,$4,$5,$6,$6)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$7)
      RETURNING id`,
-    [busId, driverId, companyName, routeName, shift, session.id],
+    [busId, driverId, companyName, routeName, shift, assignmentDate, session.id],
   );
 
   await logAuditEvent({
@@ -97,7 +99,7 @@ async function createRouteEntry(formData: FormData) {
     action: "create",
     entityType: "route_plan",
     entityId: result.rows[0].id,
-    details: { busId, driverId, companyName, routeName, shift },
+    details: { busId, driverId, companyName, routeName, shift, assignmentDate },
   });
 
   revalidatePath("/routes");
@@ -114,10 +116,11 @@ async function updateRouteEntry(formData: FormData) {
   const busId = Number(formData.get("busId"));
   const driverId = Number(formData.get("driverId"));
   const routeName = String(formData.get("routeName") ?? "").trim();
+  const assignmentDate = String(formData.get("assignmentDate") ?? "").trim();
   const shift = normalizeShift(String(formData.get("shift") ?? ""));
   const companyFromForm = String(formData.get("companyName") ?? "").trim();
 
-  if (!routeId || !busId || !driverId || !routeName) {
+  if (!routeId || !busId || !driverId || !routeName || !assignmentDate) {
     redirect("/routes?error=Please fill all required fields.");
   }
 
@@ -130,10 +133,10 @@ async function updateRouteEntry(formData: FormData) {
   const companyName = companyFromForm || driver.company_name || "Unknown";
   const result = await query<{ id: number }>(
     `UPDATE route_planner_entries
-     SET bus_id = $1, driver_id = $2, company_name = $3, route_name = $4, shift = $5, updated_by = $6, updated_at = NOW()
-     WHERE id = $7
+     SET bus_id = $1, driver_id = $2, company_name = $3, route_name = $4, shift = $5, assignment_date = $6, updated_by = $7, updated_at = NOW()
+     WHERE id = $8
      RETURNING id`,
-    [busId, driverId, companyName, routeName, shift, session.id, routeId],
+    [busId, driverId, companyName, routeName, shift, assignmentDate, session.id, routeId],
   );
   if (!result.rows[0]) {
     redirect("/routes?error=Route assignment not found.");
@@ -144,7 +147,7 @@ async function updateRouteEntry(formData: FormData) {
     action: "update",
     entityType: "route_plan",
     entityId: routeId,
-    details: { busId, driverId, companyName, routeName, shift },
+    details: { busId, driverId, companyName, routeName, shift, assignmentDate },
   });
 
   revalidatePath("/routes");
@@ -204,7 +207,7 @@ export default async function RoutesPage(props: Props) {
        ORDER BY full_name`,
     ),
     query<RoutePlannerRow>(
-      `SELECT rp.id, rp.bus_id, rp.driver_id, rp.company_name, rp.route_name, rp.shift::text, rp.updated_at::text,
+      `SELECT rp.id, rp.bus_id, rp.driver_id, rp.assignment_date::text, rp.company_name, rp.route_name, rp.shift::text, rp.updated_at::text,
               b.registration_number AS bus_registration_number,
               d.full_name AS driver_name
        FROM route_planner_entries rp
@@ -225,7 +228,8 @@ export default async function RoutesPage(props: Props) {
       entry.bus_registration_number.toLowerCase().includes(q) ||
       entry.driver_name.toLowerCase().includes(q) ||
       (entry.company_name ?? "").toLowerCase().includes(q) ||
-      entry.route_name.toLowerCase().includes(q);
+      entry.route_name.toLowerCase().includes(q) ||
+      entry.assignment_date.includes(q);
     const matchesShift = !shiftFilter || entry.shift === shiftFilter;
     return matchesSearch && matchesShift;
   });
@@ -296,22 +300,24 @@ export default async function RoutesPage(props: Props) {
               </select>
 
               <Label htmlFor="companyName">Company</Label>
-              <select
-                id="companyName"
-                name="companyName"
-                defaultValue={editEntry?.company_name ?? ""}
-                className="h-10 rounded-md border border-input bg-transparent px-3 text-sm"
-              >
-                <option value="">Auto from selected driver</option>
+              <Input id="companyName" name="companyName" list="company-list" defaultValue={editEntry?.company_name ?? ""} placeholder="Editable company name" />
+              <datalist id="company-list">
                 {companies.map((company) => (
-                  <option key={company} value={company}>
-                    {company}
-                  </option>
+                  <option key={company} value={company} />
                 ))}
-              </select>
+              </datalist>
 
               <Label htmlFor="routeName">Route Name</Label>
               <Input id="routeName" name="routeName" defaultValue={editEntry?.route_name ?? ""} required />
+
+              <Label htmlFor="assignmentDate">Assignment Date</Label>
+              <Input
+                id="assignmentDate"
+                name="assignmentDate"
+                type="date"
+                defaultValue={editEntry?.assignment_date ?? new Date().toISOString().slice(0, 10)}
+                required
+              />
 
               <Label htmlFor="shift">Shift</Label>
               <select id="shift" name="shift" defaultValue={editEntry?.shift ?? "general"} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm">
@@ -371,6 +377,7 @@ export default async function RoutesPage(props: Props) {
                   <TableHead>Driver</TableHead>
                   <TableHead>Company</TableHead>
                   <TableHead>Route Name</TableHead>
+                  <TableHead>Date</TableHead>
                   <TableHead>Shift</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -382,6 +389,7 @@ export default async function RoutesPage(props: Props) {
                     <TableCell>{entry.driver_name}</TableCell>
                     <TableCell>{entry.company_name ?? "-"}</TableCell>
                     <TableCell>{entry.route_name}</TableCell>
+                    <TableCell>{new Date(entry.assignment_date).toLocaleDateString()}</TableCell>
                     <TableCell className="capitalize">{entry.shift}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -402,7 +410,7 @@ export default async function RoutesPage(props: Props) {
                 ))}
                 {visibleEntries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground">
                       No route assignments found.
                     </TableCell>
                   </TableRow>

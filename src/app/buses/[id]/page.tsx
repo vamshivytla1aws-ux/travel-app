@@ -314,6 +314,44 @@ export default async function BusDetailPage(props: Props) {
 
         <Card>
           <CardHeader>
+            <CardTitle>Route Assignment History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Route</TableHead>
+                  <TableHead>Shift</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Driver</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detail.routeAssignments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                      No route assignments found for this bus.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  detail.routeAssignments.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell>{new Date(entry.assignment_date).toLocaleDateString()}</TableCell>
+                      <TableCell>{entry.route_name}</TableCell>
+                      <TableCell className="capitalize">{entry.shift}</TableCell>
+                      <TableCell>{entry.company_name ?? "-"}</TableCell>
+                      <TableCell>{entry.driver_name}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Daily Odometer & Litres Update</CardTitle>
           </CardHeader>
           <CardContent>
