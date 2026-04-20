@@ -71,7 +71,7 @@ async function updateDriverProfile(formData: FormData) {
 
   revalidatePath(`/drivers/${driverId}`);
   revalidatePath("/drivers");
-  redirect(`/drivers/${driverId}?updated=1`);
+  redirect(`/drivers/${driverId}?updated=${Date.now()}`);
 }
 
 async function uploadDriverPhoto(formData: FormData) {
@@ -96,7 +96,7 @@ async function uploadDriverPhoto(formData: FormData) {
 
   revalidatePath(`/drivers/${driverId}`);
   revalidatePath("/drivers");
-  redirect(`/drivers/${driverId}?photoUploaded=1`);
+  redirect(`/drivers/${driverId}?photoUploaded=${Date.now()}`);
 }
 
 async function uploadDriverDocument(formData: FormData) {
@@ -122,7 +122,7 @@ async function uploadDriverDocument(formData: FormData) {
   await logAuditEvent({ session, action: "create", entityType: "driver_document", entityId: driverId, details: { documentType, documentName } });
 
   revalidatePath(`/drivers/${driverId}`);
-  redirect(`/drivers/${driverId}?docUploaded=1`);
+  redirect(`/drivers/${driverId}?docUploaded=${Date.now()}`);
 }
 
 async function deleteDriverDocument(formData: FormData) {
@@ -139,7 +139,7 @@ async function deleteDriverDocument(formData: FormData) {
   await query(`DELETE FROM driver_documents WHERE id = $1 AND driver_id = $2`, [documentId, driverId]);
   await logAuditEvent({ session, action: "delete", entityType: "driver_document", entityId: documentId, details: { driverId } });
   revalidatePath(`/drivers/${driverId}`);
-  redirect(`/drivers/${driverId}?docDeleted=1`);
+  redirect(`/drivers/${driverId}?docDeleted=${Date.now()}`);
 }
 
 type Props = {
@@ -158,7 +158,7 @@ export default async function DriverProfilePage(props: Props) {
   return (
     <AppShell>
       <div className="space-y-4">
-        {searchParams.docUploaded === "1" ? (
+        {searchParams.docUploaded ? (
           <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
             Driver document uploaded successfully.
           </div>
@@ -168,17 +168,17 @@ export default async function DriverProfilePage(props: Props) {
             Driver phone or license number already exists.
           </div>
         ) : null}
-        {searchParams.docDeleted === "1" ? (
+        {searchParams.docDeleted ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
             Driver document deleted successfully.
           </div>
         ) : null}
-        {searchParams.updated === "1" ? (
+        {searchParams.updated ? (
           <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
             Driver profile updated successfully.
           </div>
         ) : null}
-        {searchParams.photoUploaded === "1" ? (
+        {searchParams.photoUploaded ? (
           <div className="rounded-md border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-700">
             Driver photo uploaded successfully.
           </div>

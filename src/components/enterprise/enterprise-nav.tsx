@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CarFront, ClipboardList, Gauge, KeyRound, MapPinned, Route, Timer, Truck, Users } from "lucide-react";
+import { CarFront, ClipboardList, Gauge, KeyRound, MapPinned, Route, Timer, Truck, Users, Fuel } from "lucide-react";
 import { cn } from "@/lib/ui-core";
 import { AppModule } from "@/lib/auth";
 
@@ -14,6 +14,8 @@ const navItems = [
   { href: "/employees", label: "Employees", icon: Users, module: "employees" as AppModule },
   { href: "/routes", label: "Routes", icon: Route, module: "routes" as AppModule },
   { href: "/tracking", label: "Tracking", icon: MapPinned, module: "tracking" as AppModule },
+  { href: "/fuel-entry", label: "Fuel Entry", icon: Fuel, module: "fuel-entry" as AppModule },
+  { href: "/fuel-trucks", label: "Fuel Tankers", icon: Fuel, module: "fuel-truck" as AppModule },
   { href: "/admin/users", label: "Users", icon: KeyRound, module: "user-admin" as AppModule },
   { href: "/logs", label: "Logs", icon: ClipboardList, module: "logs" as AppModule },
 ];

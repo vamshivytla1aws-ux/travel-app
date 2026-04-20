@@ -40,7 +40,7 @@ async function uploadBusDocument(formData: FormData) {
   await logAuditEvent({ session, action: "create", entityType: "bus_document", entityId: busId, details: { documentType, documentName } });
 
   revalidatePath(`/buses/${busId}`);
-  redirect(`/buses/${busId}?docUploaded=1`);
+  redirect(`/buses/${busId}?docUploaded=${Date.now()}`);
 }
 
 async function deleteBusDocument(formData: FormData) {
@@ -57,7 +57,7 @@ async function deleteBusDocument(formData: FormData) {
   await query(`DELETE FROM bus_documents WHERE id = $1 AND bus_id = $2`, [documentId, busId]);
   await logAuditEvent({ session, action: "delete", entityType: "bus_document", entityId: documentId, details: { busId } });
   revalidatePath(`/buses/${busId}`);
-  redirect(`/buses/${busId}?docDeleted=1`);
+  redirect(`/buses/${busId}?docDeleted=${Date.now()}`);
 }
 
 async function addDailyMileageEntry(formData: FormData) {
@@ -100,7 +100,7 @@ async function addDailyMileageEntry(formData: FormData) {
   });
   await logAuditEvent({ session, action: "create", entityType: "fuel_entry", entityId: busId, details: { odometerStart, odometerEnd, litersFilled, companyName } });
   revalidatePath(`/buses/${busId}`);
-  redirect(`/buses/${busId}?fuelSaved=1`);
+  redirect(`/buses/${busId}?fuelSaved=${Date.now()}`);
 }
 
 type Props = {
@@ -119,7 +119,7 @@ export default async function BusDetailPage(props: Props) {
   return (
     <AppShell>
       <div className="space-y-4">
-        {searchParams.fuelSaved === "1" ? (
+        {searchParams.fuelSaved ? (
           <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
             Daily mileage details saved.
           </div>
@@ -129,12 +129,12 @@ export default async function BusDetailPage(props: Props) {
             Duplicate daily mileage entry detected for today. Same values were already saved.
           </div>
         ) : null}
-        {searchParams.docUploaded === "1" ? (
+        {searchParams.docUploaded ? (
           <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
             Bus document uploaded successfully.
           </div>
         ) : null}
-        {searchParams.docDeleted === "1" ? (
+        {searchParams.docDeleted ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
             Bus document deleted successfully.
           </div>

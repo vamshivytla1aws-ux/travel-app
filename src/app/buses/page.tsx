@@ -64,7 +64,7 @@ async function createBus(formData: FormData) {
   );
   await logAuditEvent({ session, action: "create", entityType: "bus", entityId: result.rows[0].id, details: { busNumber, registrationNumber } });
   revalidatePath("/buses");
-  redirect("/buses?created=1");
+  redirect(`/buses?created=${Date.now()}`);
 }
 
 async function deleteBus(formData: FormData) {
@@ -77,7 +77,7 @@ async function deleteBus(formData: FormData) {
   await query(`UPDATE buses SET status = 'inactive', updated_at = NOW() WHERE id = $1`, [busId]);
   await logAuditEvent({ session, action: "delete", entityType: "bus", entityId: busId });
   revalidatePath("/buses");
-  redirect("/buses?deleted=1");
+  redirect(`/buses?deleted=${Date.now()}`);
 }
 
 async function updateBusStatus(formData: FormData) {
@@ -92,7 +92,7 @@ async function updateBusStatus(formData: FormData) {
   await query(`UPDATE buses SET status = $1, updated_at = NOW() WHERE id = $2`, [status, busId]);
   await logAuditEvent({ session, action: "update", entityType: "bus_status", entityId: busId, details: { status } });
   revalidatePath("/buses");
-  redirect("/buses?updated=1");
+  redirect(`/buses?updated=${Date.now()}`);
 }
 
 export default async function BusesPage(props: Props) {
@@ -109,17 +109,17 @@ export default async function BusesPage(props: Props) {
         icon={BusFront}
         tag="Fleet"
       />
-      {searchParams.updated === "1" ? (
+      {searchParams.updated ? (
         <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
           Bus status updated successfully.
         </div>
       ) : null}
-      {searchParams.created === "1" ? (
+      {searchParams.created ? (
         <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
           Bus created successfully.
         </div>
       ) : null}
-      {searchParams.deleted === "1" ? (
+      {searchParams.deleted ? (
         <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
           Bus deleted successfully.
         </div>

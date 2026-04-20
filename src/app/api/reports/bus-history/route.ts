@@ -1,5 +1,5 @@
 import PDFDocument from "pdfkit";
-import { getSession } from "@/lib/auth";
+import { requireApiModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
 
 type ExportRow = {
@@ -17,9 +17,9 @@ function formatDate(value: string) {
 }
 
 export async function GET(request: Request) {
-  const session = await getSession();
+  const session = await requireApiModuleAccess("fuel-entry");
   if (!session) {
-    return new Response("Unauthorized", { status: 401 });
+    return new Response("Forbidden", { status: 403 });
   }
 
   const url = new URL(request.url);

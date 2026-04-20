@@ -14,6 +14,22 @@ import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 
+function parseModuleAccessFromFormData(formData: FormData): (typeof APP_MODULES)[number][] {
+  const selectedFromCheckboxes = formData
+    .getAll("moduleAccess")
+    .map((value) => String(value).trim())
+    .filter((value) => APP_MODULES.includes(value as (typeof APP_MODULES)[number]));
+
+  const selectedFromCsv = String(formData.get("accessCsv") ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => APP_MODULES.includes(value as (typeof APP_MODULES)[number]));
+
+  const unique = Array.from(new Set([...selectedFromCheckboxes, ...selectedFromCsv]));
+  if (unique.length === 0) return ["dashboard"];
+  return unique as (typeof APP_MODULES)[number][];
+}
+
 async function createUser(formData: FormData) {
   "use server";
   const session = await requireSession(["admin"]);
@@ -23,12 +39,8 @@ async function createUser(formData: FormData) {
   const fullName = String(formData.get("fullName"));
   const email = String(formData.get("email")).toLowerCase();
   const password = String(formData.get("password"));
-  const role = String(formData.get("role")) as "admin" | "dispatcher" | "fuel_manager" | "viewer";
-  const accessCsv = String(formData.get("accessCsv") ?? "");
-  const moduleAccess = accessCsv
-    .split(",")
-    .map((value) => value.trim())
-    .filter((value) => APP_MODULES.includes(value as (typeof APP_MODULES)[number]));
+  const role = String(formData.get("role")) as "admin" | "dispatcher" | "fuel_manager" | "viewer" | "updater";
+  const moduleAccess = parseModuleAccessFromFormData(formData);
 
   const existing = await query<{ id: number }>(`SELECT id FROM users WHERE email = $1 LIMIT 1`, [email]);
   if ((existing.rowCount ?? 0) > 0) redirect("/admin/users?error=duplicate");
@@ -50,7 +62,7 @@ async function createUser(formData: FormData) {
   });
 
   revalidatePath("/admin/users");
-  redirect("/admin/users?created=1");
+  redirect(`/admin/users?created=${Date.now()}`);
 }
 
 async function updateUserAccess(formData: FormData) {
@@ -60,12 +72,12 @@ async function updateUserAccess(formData: FormData) {
   await ensureTransportEnhancements();
 
   const userId = Number(formData.get("userId"));
-  const role = String(formData.get("role")) as "admin" | "dispatcher" | "fuel_manager" | "viewer";
-  const moduleAccess = formData
-    .getAll("moduleAccess")
-    .map((value) => String(value))
-    .filter((value) => APP_MODULES.includes(value as (typeof APP_MODULES)[number]));
+  const role = String(formData.get("role")) as "admin" | "dispatcher" | "fuel_manager" | "viewer" | "updater";
+  const moduleAccess = parseModuleAccessFromFormData(formData);
   if (!userId) return;
+  if (userId === session.id && role !== "admin") {
+    redirect("/admin/users?error=self-demote");
+  }
 
   await query(`UPDATE users SET role = $1, module_access = $2, updated_at = NOW() WHERE id = $3`, [
     role,
@@ -80,7 +92,7 @@ async function updateUserAccess(formData: FormData) {
     details: { role, moduleAccess },
   });
   revalidatePath("/admin/users");
-  redirect("/admin/users?updated=1");
+  redirect(`/admin/users?updated=${Date.now()}`);
 }
 
 async function deactivateUser(formData: FormData) {
@@ -89,6 +101,9 @@ async function deactivateUser(formData: FormData) {
   await requireModuleAccess("user-admin");
   const userId = Number(formData.get("userId"));
   if (!userId) return;
+  if (userId === session.id) {
+    redirect("/admin/users?error=self-deactivate");
+  }
 
   await query(`UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1`, [userId]);
   await logAuditEvent({
@@ -98,7 +113,7 @@ async function deactivateUser(formData: FormData) {
     entityId: userId,
   });
   revalidatePath("/admin/users");
-  redirect("/admin/users?deleted=1");
+  redirect(`/admin/users?deleted=${Date.now()}`);
 }
 
 type Props = {
@@ -123,9 +138,11 @@ export default async function UsersAdminPage(props: Props) {
     <AppShell>
       <EnterprisePageHeader title="User Access Control" subtitle="Admin managed users, roles and dashboard access" icon={KeyRound} tag="Admin" />
       {searchParams.error === "duplicate" ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">User email already exists.</div> : null}
-      {searchParams.created === "1" ? <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">User created successfully.</div> : null}
-      {searchParams.updated === "1" ? <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">User access updated successfully.</div> : null}
-      {searchParams.deleted === "1" ? <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">User deactivated successfully.</div> : null}
+      {searchParams.error === "self-demote" ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">You cannot remove your own admin role.</div> : null}
+      {searchParams.error === "self-deactivate" ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">You cannot deactivate your own account.</div> : null}
+      {searchParams.created ? <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">User created successfully.</div> : null}
+      {searchParams.updated ? <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">User access updated successfully.</div> : null}
+      {searchParams.deleted ? <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">User deactivated successfully.</div> : null}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader><CardTitle>Create User</CardTitle></CardHeader>
@@ -140,6 +157,7 @@ export default async function UsersAdminPage(props: Props) {
                 <option value="dispatcher">dispatcher</option>
                 <option value="fuel_manager">fuel_manager</option>
                 <option value="viewer">viewer</option>
+                <option value="updater">updater</option>
               </select>
               <Label>Dashboard Access</Label>
               <div className="grid gap-1 rounded border p-2 text-sm">
@@ -178,6 +196,7 @@ export default async function UsersAdminPage(props: Props) {
                             <option value="dispatcher">dispatcher</option>
                             <option value="fuel_manager">fuel_manager</option>
                             <option value="viewer">viewer</option>
+                            <option value="updater">updater</option>
                           </select>
                           <input
                             name="accessCsv"

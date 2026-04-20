@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth";
+import { requireApiModuleAccess } from "@/lib/auth";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 import { query } from "@/lib/db";
 
@@ -8,14 +8,16 @@ type Params = {
 };
 
 export async function GET(request: Request, props: Params) {
-  await requireSession();
-  await ensureTransportEnhancements();
-
   const { entity, id } = await props.params;
   const documentId = Number(id);
   if (!documentId || (entity !== "bus" && entity !== "driver")) {
     return NextResponse.json({ error: "Invalid document request" }, { status: 400 });
   }
+  const session = await requireApiModuleAccess(entity === "bus" ? "buses" : "drivers");
+  if (!session) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  await ensureTransportEnhancements();
 
   const table = entity === "bus" ? "bus_documents" : "driver_documents";
   const result = await query<{

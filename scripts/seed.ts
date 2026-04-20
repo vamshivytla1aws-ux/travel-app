@@ -39,7 +39,7 @@ async function run() {
     const adminHash = await bcrypt.hash("Admin@123", 10);
     await client.query(
       `INSERT INTO users(full_name, email, password_hash, role, module_access) VALUES
-      ('System Admin', 'admin@transport.local', $1, 'admin', ARRAY['dashboard','buses','trips','drivers','employees','routes','tracking','fuel-entry','user-admin','logs'])`,
+      ('System Admin', 'admin@transport.local', $1, 'admin', ARRAY['dashboard','buses','trips','drivers','employees','routes','tracking','fuel-entry','fuel-truck','user-admin','logs'])`,
       [adminHash],
     );
 
@@ -221,6 +221,70 @@ async function run() {
           ],
         );
       }
+    }
+
+    const truckResult = await client.query<{ id: number }>(
+      `INSERT INTO fuel_trucks(
+        truck_code, truck_name, registration_number, tank_capacity_liters, current_available_liters, low_stock_threshold_liters, status
+      )
+       VALUES
+       ('FT-001', 'Main Diesel Truck', 'KA01FT1001', 12000, 6500, 1500, 'active'),
+       ('FT-002', 'Backup Diesel Truck', 'KA01FT1002', 10000, 2200, 1200, 'active')
+       RETURNING id`,
+    );
+    const fuelTruckIds = truckResult.rows.map((row) => row.id);
+
+    for (const fuelTruckId of fuelTruckIds) {
+      for (let d = 0; d < 5; d += 1) {
+        const qtyIn = randomFloat(900, 2200);
+        const rate = randomFloat(88, 97);
+        const total = Number((qtyIn * rate).toFixed(2));
+        await client.query(
+          `INSERT INTO fuel_truck_refills(
+             fuel_truck_id, refill_date, refill_time, odometer_reading, fuel_station_name, vendor_name,
+             quantity_liters, rate_per_liter, total_amount, bill_number, payment_mode, driver_name
+           )
+           VALUES($1, CURRENT_DATE - ($2 || ' days')::interval, ($3 || ':00')::time, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           RETURNING id`,
+          [
+            fuelTruckId,
+            d,
+            `${String(7 + d).padStart(2, "0")}:${String(randomInt(0, 50)).padStart(2, "0")}`,
+            randomFloat(10_000, 50_000),
+            `Station ${randomInt(1, 8)}`,
+            `Vendor ${randomInt(1, 6)}`,
+            qtyIn,
+            rate,
+            total,
+            `BILL-${randomInt(1000, 9999)}`,
+            ["cash", "card", "upi"][randomInt(0, 2)],
+            `Driver ${randomInt(1, 30)}`,
+          ],
+        );
+      }
+    }
+
+    for (let n = 0; n < 120; n += 1) {
+      const fuelTruckId = fuelTruckIds[n % fuelTruckIds.length];
+      await client.query(
+        `INSERT INTO fuel_issues(
+           fuel_truck_id, bus_id, issue_date, issue_time, liters_issued, issued_by_name, bus_driver_name, route_reference, remarks
+         )
+         VALUES(
+           $1, $2, CURRENT_DATE - ($3 || ' days')::interval, ($4 || ':00')::time, $5, $6, $7, $8, $9
+         )`,
+        [
+          fuelTruckId,
+          busIds[n % busIds.length],
+          randomInt(0, 6),
+          `${String(randomInt(6, 20)).padStart(2, "0")}:${String(randomInt(0, 59)).padStart(2, "0")}`,
+          randomFloat(20, 140),
+          "Fuel Supervisor",
+          `Driver ${randomInt(1, 120)}`,
+          `R-${String(randomInt(1, 20)).padStart(3, "0")}`,
+          "Daily issue",
+        ],
+      );
     }
 
     await client.query("COMMIT");

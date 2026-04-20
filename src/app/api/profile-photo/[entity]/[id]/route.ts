@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth";
+import { requireApiModuleAccess } from "@/lib/auth";
 import { normalizeProfilePhotoMime } from "@/lib/image-mime";
 import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
@@ -9,14 +9,16 @@ type Params = {
 };
 
 export async function GET(_request: Request, props: Params) {
-  await requireSession();
-  await ensureTransportEnhancements();
-
   const { entity, id } = await props.params;
   const entityId = Number(id);
   if (!entityId || (entity !== "driver" && entity !== "employee")) {
     return NextResponse.json({ error: "Invalid photo request" }, { status: 400 });
   }
+  const session = await requireApiModuleAccess(entity === "driver" ? "drivers" : "employees");
+  if (!session) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  await ensureTransportEnhancements();
 
   const table = entity === "driver" ? "drivers" : "employees";
   const result = await query<{

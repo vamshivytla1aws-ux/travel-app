@@ -5,7 +5,7 @@ import { CarFront } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,19 @@ import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 import { DriversService } from "@/services/drivers.service";
 
 const driversService = new DriversService();
+const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 50, 100] as const;
+
+function withParams(
+  base: Record<string, string | undefined>,
+  updates: Record<string, string | undefined>,
+): string {
+  const params = new URLSearchParams();
+  const merged = { ...base, ...updates };
+  Object.entries(merged).forEach(([key, value]) => {
+    if (value && value.trim().length > 0) params.set(key, value);
+  });
+  return `/drivers?${params.toString()}`;
+}
 
 async function createDriver(formData: FormData) {
   "use server";
@@ -67,7 +80,7 @@ async function createDriver(formData: FormData) {
   );
   await logAuditEvent({ session, action: "create", entityType: "driver", entityId: result.rows[0].id, details: { phone, licenseNumber } });
   revalidatePath("/drivers");
-  redirect("/drivers?created=1");
+  redirect(`/drivers?created=${Date.now()}`);
 }
 
 async function deleteDriver(formData: FormData) {
@@ -80,11 +93,19 @@ async function deleteDriver(formData: FormData) {
   await query(`UPDATE drivers SET is_active = false, updated_at = NOW() WHERE id = $1`, [driverId]);
   await logAuditEvent({ session, action: "delete", entityType: "driver", entityId: driverId });
   revalidatePath("/drivers");
-  redirect("/drivers?deleted=1");
+  redirect(`/drivers?deleted=${Date.now()}`);
 }
 
 type Props = {
-  searchParams: Promise<{ error?: string; created?: string; deleted?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    created?: string;
+    deleted?: string;
+    q?: string;
+    company?: string;
+    page?: string;
+    pageSize?: string;
+  }>;
 };
 
 export default async function DriversPage(props: Props) {
@@ -93,6 +114,41 @@ export default async function DriversPage(props: Props) {
   await ensureTransportEnhancements();
   const searchParams = await props.searchParams;
   const drivers = await driversService.listDrivers();
+  const query = (searchParams.q ?? "").trim().toLowerCase();
+  const company = (searchParams.company ?? "").trim().toLowerCase();
+  const requestedPageSize = Number(searchParams.pageSize ?? "10");
+  const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize as (typeof PAGE_SIZE_OPTIONS)[number])
+    ? requestedPageSize
+    : 10;
+
+  const filteredDrivers = drivers.filter((driver) => {
+    const matchesSearch =
+      !query ||
+      driver.fullName.toLowerCase().includes(query) ||
+      driver.phone.toLowerCase().includes(query) ||
+      driver.licenseNumber.toLowerCase().includes(query);
+    const companyValue = (driver.companyName ?? "").trim().toLowerCase();
+    const matchesCompany = !company || companyValue === company;
+    return matchesSearch && matchesCompany;
+  });
+
+  const companies = Array.from(
+    new Set(drivers.map((driver) => (driver.companyName ?? "").trim()).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b));
+
+  const totalItems = filteredDrivers.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const parsedPage = Number(searchParams.page ?? "1");
+  const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? Math.min(parsedPage, totalPages) : 1;
+  const startIndex = (currentPage - 1) * pageSize;
+  const visibleDrivers = filteredDrivers.slice(startIndex, startIndex + pageSize);
+  const baseParams = {
+    q: searchParams.q,
+    company: searchParams.company,
+    pageSize: String(pageSize),
+  };
+  const pageStart = Math.max(1, currentPage - 2);
+  const pageEnd = Math.min(totalPages, currentPage + 2);
 
   return (
     <AppShell>
@@ -107,12 +163,12 @@ export default async function DriversPage(props: Props) {
           Driver phone or license number already exists.
         </div>
       ) : null}
-      {searchParams.created === "1" ? (
+      {searchParams.created ? (
         <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
           Driver created successfully.
         </div>
       ) : null}
-      {searchParams.deleted === "1" ? (
+      {searchParams.deleted ? (
         <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
           Driver deleted successfully.
         </div>
@@ -140,12 +196,66 @@ export default async function DriversPage(props: Props) {
         <Card className="lg:col-span-2 border-emerald-200/70 dark:border-emerald-900">
           <CardHeader><CardTitle>Drivers</CardTitle></CardHeader>
           <CardContent>
+            <form method="get" className="mb-4 grid gap-3 rounded-md border p-3 md:grid-cols-4">
+              <div className="md:col-span-2">
+                <Label htmlFor="q">Search Driver</Label>
+                <Input
+                  id="q"
+                  name="q"
+                  placeholder="Name, phone, or license"
+                  defaultValue={searchParams.q ?? ""}
+                />
+              </div>
+              <div>
+                <Label htmlFor="company">Company</Label>
+                <select
+                  id="company"
+                  name="company"
+                  defaultValue={searchParams.company ?? ""}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">All companies</option>
+                  {companies.map((companyName) => (
+                    <option key={companyName} value={companyName}>
+                      {companyName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="pageSize">Items per page</Label>
+                <div className="flex gap-2">
+                  <select
+                    id="pageSize"
+                    name="pageSize"
+                    defaultValue={String(pageSize)}
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                  <Button type="submit">Apply</Button>
+                </div>
+              </div>
+              <div className="md:col-span-4 flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  Showing {totalItems === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, totalItems)} of{" "}
+                  {totalItems} drivers
+                </span>
+                <Link className="text-blue-600 hover:underline" href="/drivers">
+                  Clear filters
+                </Link>
+              </div>
+            </form>
             <Table>
               <TableHeader><TableRow><TableHead>S.No</TableHead><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Company</TableHead><TableHead>License</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
               <TableBody>
-                {drivers.slice(0, 100).map((driver, index) => (
+                {visibleDrivers.map((driver, index) => (
                   <TableRow key={driver.id}>
-                    <TableCell>{index + 1}</TableCell>
+                    <TableCell>{startIndex + index + 1}</TableCell>
                     <TableCell>
                       <Link className="text-blue-600 hover:underline" href={`/drivers/${driver.id}`}>
                         {driver.fullName}
@@ -166,8 +276,50 @@ export default async function DriversPage(props: Props) {
                     </TableCell>
                   </TableRow>
                 ))}
+                {visibleDrivers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      No drivers found for the selected search/filter.
+                    </TableCell>
+                  </TableRow>
+                ) : null}
               </TableBody>
             </Table>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {currentPage <= 1 ? (
+                  <span className={`${buttonVariants({ variant: "outline" })} pointer-events-none opacity-50`}>Previous</span>
+                ) : (
+                  <Link className={buttonVariants({ variant: "outline" })} href={withParams(baseParams, { page: String(Math.max(1, currentPage - 1)) })}>
+                    Previous
+                  </Link>
+                )}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: pageEnd - pageStart + 1 }, (_, i) => pageStart + i).map((pageNumber) => (
+                    <Link
+                      key={pageNumber}
+                      className={buttonVariants({
+                        variant: pageNumber === currentPage ? "default" : "outline",
+                        size: "sm",
+                      })}
+                      href={withParams(baseParams, { page: String(pageNumber) })}
+                    >
+                      {pageNumber}
+                    </Link>
+                  ))}
+                </div>
+                {currentPage >= totalPages ? (
+                  <span className={`${buttonVariants({ variant: "outline" })} pointer-events-none opacity-50`}>Next</span>
+                ) : (
+                  <Link className={buttonVariants({ variant: "outline" })} href={withParams(baseParams, { page: String(Math.min(totalPages, currentPage + 1)) })}>
+                    Next
+                  </Link>
+                )}
+              </div>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -61,4 +61,9 @@ export async function ensureDocumentTables() {
       ADD COLUMN IF NOT EXISTS file_size_bytes INTEGER,
       ADD COLUMN IF NOT EXISTS file_data BYTEA;
   `);
+
+  // Backward compatibility: older schemas used file_url as required.
+  // Current uploads store binary data in file_data and may leave file_url empty.
+  await query(`ALTER TABLE bus_documents ALTER COLUMN file_url DROP NOT NULL;`);
+  await query(`ALTER TABLE driver_documents ALTER COLUMN file_url DROP NOT NULL;`);
 }

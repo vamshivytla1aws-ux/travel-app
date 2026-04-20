@@ -3,7 +3,15 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 const cookieName = "etms_session";
-const secret = new TextEncoder().encode(process.env.AUTH_SECRET ?? "replace-this-secret");
+const defaultSecret = "replace-this-secret";
+
+function resolveAuthSecret(): Uint8Array {
+  const value = process.env.AUTH_SECRET ?? defaultSecret;
+  if (process.env.NODE_ENV === "production" && value === defaultSecret) {
+    throw new Error("AUTH_SECRET must be set in production.");
+  }
+  return new TextEncoder().encode(value);
+}
 
 export const APP_MODULES = [
   "dashboard",
@@ -14,6 +22,7 @@ export const APP_MODULES = [
   "routes",
   "tracking",
   "fuel-entry",
+  "fuel-truck",
   "user-admin",
   "logs",
 ] as const;
@@ -23,7 +32,7 @@ export type AppModule = (typeof APP_MODULES)[number];
 export type SessionUser = {
   id: number;
   email: string;
-  role: "admin" | "dispatcher" | "fuel_manager" | "viewer";
+  role: "admin" | "dispatcher" | "fuel_manager" | "viewer" | "updater";
   fullName: string;
   moduleAccess: AppModule[];
 };
@@ -43,7 +52,7 @@ export async function createSession(user: SessionUser): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("12h")
-    .sign(secret);
+    .sign(resolveAuthSecret());
 }
 
 export async function setSessionCookie(token: string) {
@@ -69,7 +78,7 @@ export async function getSession(): Promise<SessionUser | null> {
   if (!token) return null;
 
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, resolveAuthSecret());
     const parsed = payload as unknown as Partial<SessionUser>;
     return {
       id: Number(parsed.id),
@@ -83,10 +92,23 @@ export async function getSession(): Promise<SessionUser | null> {
   }
 }
 
+export async function requireApiModuleAccess(module: AppModule): Promise<SessionUser | null> {
+  const session = await getSession();
+  if (!session) return null;
+  if (!hasModuleAccess(session, module)) return null;
+  return session;
+}
+
 export async function requireSession(roles?: SessionUser["role"][]) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (roles && !roles.includes(session.role)) redirect("/unauthorized");
+  if (roles && !roles.includes(session.role)) {
+    // Updater users are module-scoped editors; allow them through role gates
+    // and let requireModuleAccess() enforce page-level access.
+    if (session.role !== "updater") {
+      redirect("/unauthorized");
+    }
+  }
   return session;
 }
 

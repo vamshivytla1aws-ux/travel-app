@@ -5,7 +5,7 @@ import { query } from "@/lib/db";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
-  const email = String(formData.get("email") ?? "");
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
   const userResult = await query<{
@@ -13,14 +13,20 @@ export async function POST(request: Request) {
     full_name: string;
     email: string;
     password_hash: string;
-    role: "admin" | "dispatcher" | "fuel_manager" | "viewer";
+    role: "admin" | "dispatcher" | "fuel_manager" | "viewer" | "updater";
     module_access: string[] | null;
-  }>(`SELECT id, full_name, email, password_hash, role::text, module_access FROM users WHERE email = $1`, [email]);
+  }>(
+    `SELECT id, full_name, email, password_hash, role::text, module_access
+     FROM users
+     WHERE lower(email) = lower($1) AND is_active = true`,
+    [email],
+  );
 
   const user = userResult.rows[0];
 
   const fallbackAllowed =
     process.env.NODE_ENV !== "production" &&
+    process.env.ALLOW_DEV_FALLBACK_LOGIN === "true" &&
     email === "admin@transport.local" &&
     password === "Admin@123";
 

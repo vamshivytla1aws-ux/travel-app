@@ -36,7 +36,13 @@ async function main() {
   try {
     files = (await readdir(migrationsDir))
       .filter((f) => f.endsWith(".sql"))
-      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      .sort((a, b) => {
+        const aIsCanonicalSchema = a === "schema.sql";
+        const bIsCanonicalSchema = b === "schema.sql";
+        if (aIsCanonicalSchema && !bIsCanonicalSchema) return -1;
+        if (bIsCanonicalSchema && !aIsCanonicalSchema) return 1;
+        return a.localeCompare(b, undefined, { numeric: true });
+      });
   } catch (e) {
     console.error(`Cannot read ${migrationsDir}. Create db/migrations and add .sql files.`, e);
     process.exitCode = 1;

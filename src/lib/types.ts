@@ -78,3 +78,71 @@ export interface FuelEntry {
   fuelStation: string | null;
   companyName: string | null;
 }
+
+export interface FuelTruck {
+  id: number;
+  truckCode: string;
+  truckName: string;
+  registrationNumber: string;
+  tankCapacityLiters: number;
+  currentAvailableLiters: number;
+  lowStockThresholdLiters: number;
+  status: "active" | "inactive";
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FuelTruckRefill {
+  id: number;
+  fuelTruckId: number;
+  refillDate: string;
+  refillTime: string;
+  odometerReading: number | null;
+  fuelStationName: string | null;
+  vendorName: string | null;
+  quantityLiters: number;
+  ratePerLiter: number;
+  totalAmount: number;
+  billNumber: string | null;
+  paymentMode: string | null;
+  driverName: string | null;
+  notes: string | null;
+  receiptFileName: string | null;
+  createdBy: number | null;
+  createdAt: string;
+}
+
+export interface FuelIssue {
+  id: number;
+  fuelTruckId: number;
+  busId: number;
+  busNumber: string | null;
+  registrationNumber: string | null;
+  issueDate: string;
+  issueTime: string;
+  litersIssued: number;
+  issuedByName: string | null;
+  busDriverName: string | null;
+  routeReference: string | null;
+  remarks: string | null;
+  createdBy: number | null;
+  createdAt: string;
+}
+
+export interface FuelTruckLedgerEntry {
+  id: number;
+  fuelTruckId: number;
+  transactionType: "REFILL" | "ISSUE" | "ADJUSTMENT";
+  referenceId: number | null;
+  referenceType: string | null;
+  transactionDate: string;
+  transactionTime: string;
+  openingStock: number;
+  quantityIn: number;
+  quantityOut: number;
+  closingStock: number;
+  remarks: string | null;
+  createdBy: number | null;
+  createdAt: string;
+}

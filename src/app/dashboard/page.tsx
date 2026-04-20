@@ -5,15 +5,20 @@ import { Gauge } from "lucide-react";
 import { FuelTrendChart } from "@/components/fuel-trend-chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardService } from "@/services/dashboard.service";
+import { FuelTruckService } from "@/services/fuel-truck.service";
 import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 
 const dashboardService = new DashboardService();
+const fuelTruckService = new FuelTruckService();
 
 export default async function DashboardPage() {
   await requireSession();
   await requireModuleAccess("dashboard");
-  const data = await dashboardService.getSummary();
+  const [data, fuelTruckSummary] = await Promise.all([
+    dashboardService.getSummary(),
+    fuelTruckService.getSummary(),
+  ]);
 
   return (
     <AppShell>
@@ -66,6 +71,18 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent className="text-2xl font-bold">{data.tripStats.in_progress}</CardContent>
           </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Fuel Tankers</CardTitle>
+            </CardHeader>
+            <CardContent className="text-2xl font-bold">{fuelTruckSummary.truckStocks.length}</CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Fuel Tanker Low Alerts</CardTitle>
+            </CardHeader>
+            <CardContent className="text-2xl font-bold">{fuelTruckSummary.lowStock.length}</CardContent>
+          </Card>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
@@ -115,6 +132,37 @@ export default async function DashboardPage() {
             ))}
           </CardContent>
         </Card>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Fuel Tanker Stock Snapshot</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {fuelTruckSummary.truckStocks.slice(0, 8).map((stock) => (
+                <div key={stock.truckId} className="flex items-center justify-between rounded border p-2">
+                  <span>{stock.truckCode}</span>
+                  <span className="font-semibold">{stock.currentStock.toFixed(2)} L</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Fuel Tanker Transactions Today</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex items-center justify-between rounded border p-2">
+                <span>Refilled Today</span>
+                <span className="font-semibold">{fuelTruckSummary.today.refilledLiters.toFixed(2)} L</span>
+              </div>
+              <div className="flex items-center justify-between rounded border p-2">
+                <span>Issued Today</span>
+                <span className="font-semibold">{fuelTruckSummary.today.issuedLiters.toFixed(2)} L</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </AppShell>
   );

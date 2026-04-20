@@ -17,6 +17,19 @@ import { query } from "@/lib/db";
 import { EmployeesService } from "@/services/employees.service";
 
 const employeesService = new EmployeesService();
+const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 50, 100] as const;
+
+function withParams(
+  base: Record<string, string | undefined>,
+  updates: Record<string, string | undefined>,
+): string {
+  const params = new URLSearchParams();
+  const merged = { ...base, ...updates };
+  Object.entries(merged).forEach(([key, value]) => {
+    if (value && value.trim().length > 0) params.set(key, value);
+  });
+  return `/employees?${params.toString()}`;
+}
 
 async function createEmployee(formData: FormData) {
   "use server";
@@ -61,7 +74,7 @@ async function createEmployee(formData: FormData) {
   );
   await logAuditEvent({ session, action: "create", entityType: "employee", entityId: result.rows[0].id, details: { employeeCode, email } });
   revalidatePath("/employees");
-  redirect("/employees?created=1");
+  redirect(`/employees?created=${Date.now()}`);
 }
 
 async function deleteEmployee(formData: FormData) {
@@ -74,11 +87,19 @@ async function deleteEmployee(formData: FormData) {
   await query(`UPDATE employees SET is_active = false, updated_at = NOW() WHERE id = $1`, [employeeId]);
   await logAuditEvent({ session, action: "delete", entityType: "employee", entityId: employeeId });
   revalidatePath("/employees");
-  redirect("/employees?deleted=1");
+  redirect(`/employees?deleted=${Date.now()}`);
 }
 
 type Props = {
-  searchParams: Promise<{ error?: string; created?: string; deleted?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    created?: string;
+    deleted?: string;
+    q?: string;
+    company?: string;
+    page?: string;
+    pageSize?: string;
+  }>;
 };
 
 export default async function EmployeesPage(props: Props) {
@@ -86,6 +107,42 @@ export default async function EmployeesPage(props: Props) {
   await requireModuleAccess("employees");
   const searchParams = await props.searchParams;
   const employees = await employeesService.listEmployees();
+  const queryText = (searchParams.q ?? "").trim().toLowerCase();
+  const company = (searchParams.company ?? "").trim().toLowerCase();
+  const requestedPageSize = Number(searchParams.pageSize ?? "10");
+  const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize as (typeof PAGE_SIZE_OPTIONS)[number])
+    ? requestedPageSize
+    : 10;
+
+  const filteredEmployees = employees.filter((employee) => {
+    const matchesSearch =
+      !queryText ||
+      employee.fullName.toLowerCase().includes(queryText) ||
+      employee.employeeCode.toLowerCase().includes(queryText) ||
+      (employee.phone ?? "").toLowerCase().includes(queryText) ||
+      employee.department.toLowerCase().includes(queryText);
+    const companyValue = (employee.companyName ?? "").trim().toLowerCase();
+    const matchesCompany = !company || companyValue === company;
+    return matchesSearch && matchesCompany;
+  });
+
+  const companies = Array.from(
+    new Set(employees.map((employee) => (employee.companyName ?? "").trim()).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b));
+
+  const totalItems = filteredEmployees.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const parsedPage = Number(searchParams.page ?? "1");
+  const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? Math.min(parsedPage, totalPages) : 1;
+  const startIndex = (currentPage - 1) * pageSize;
+  const visibleEmployees = filteredEmployees.slice(startIndex, startIndex + pageSize);
+  const baseParams = {
+    q: searchParams.q,
+    company: searchParams.company,
+    pageSize: String(pageSize),
+  };
+  const pageStart = Math.max(1, currentPage - 2);
+  const pageEnd = Math.min(totalPages, currentPage + 2);
 
   return (
     <AppShell>
@@ -100,12 +157,12 @@ export default async function EmployeesPage(props: Props) {
           Employee code or email already exists.
         </div>
       ) : null}
-      {searchParams.created === "1" ? (
+      {searchParams.created ? (
         <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
           Employee created successfully.
         </div>
       ) : null}
-      {searchParams.deleted === "1" ? (
+      {searchParams.deleted ? (
         <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
           Employee deleted successfully.
         </div>
@@ -140,12 +197,66 @@ export default async function EmployeesPage(props: Props) {
         <Card className="lg:col-span-2 border-blue-200/70 dark:border-blue-900">
           <CardHeader><CardTitle>Employees</CardTitle></CardHeader>
           <CardContent>
+            <form method="get" className="mb-4 grid gap-3 rounded-md border p-3 md:grid-cols-4">
+              <div className="md:col-span-2">
+                <Label htmlFor="q">Search Employee</Label>
+                <Input
+                  id="q"
+                  name="q"
+                  placeholder="Name, code, phone, or department"
+                  defaultValue={searchParams.q ?? ""}
+                />
+              </div>
+              <div>
+                <Label htmlFor="company">Company</Label>
+                <select
+                  id="company"
+                  name="company"
+                  defaultValue={searchParams.company ?? ""}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">All companies</option>
+                  {companies.map((companyName) => (
+                    <option key={companyName} value={companyName}>
+                      {companyName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="pageSize">Items per page</Label>
+                <div className="flex gap-2">
+                  <select
+                    id="pageSize"
+                    name="pageSize"
+                    defaultValue={String(pageSize)}
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                  <Button type="submit">Apply</Button>
+                </div>
+              </div>
+              <div className="md:col-span-4 flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  Showing {totalItems === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, totalItems)} of{" "}
+                  {totalItems} employees
+                </span>
+                <Link className="text-blue-600 hover:underline" href="/employees">
+                  Clear filters
+                </Link>
+              </div>
+            </form>
             <Table>
               <TableHeader><TableRow><TableHead>S.No</TableHead><TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Department</TableHead><TableHead>Phone</TableHead><TableHead>Company</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
               <TableBody>
-                {employees.slice(0, 100).map((employee, index) => (
+                {visibleEmployees.map((employee, index) => (
                   <TableRow key={employee.id}>
-                    <TableCell>{index + 1}</TableCell>
+                    <TableCell>{startIndex + index + 1}</TableCell>
                     <TableCell>{employee.employeeCode}</TableCell>
                     <TableCell>
                       <Link className="text-blue-600 hover:underline" href={`/employees/${employee.id}`}>
@@ -167,8 +278,57 @@ export default async function EmployeesPage(props: Props) {
                     </TableCell>
                   </TableRow>
                 ))}
+                {visibleEmployees.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                      No employees found for the selected search/filter.
+                    </TableCell>
+                  </TableRow>
+                ) : null}
               </TableBody>
             </Table>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {currentPage <= 1 ? (
+                  <span className="inline-flex h-8 items-center rounded-md border px-3 text-sm opacity-50">Previous</span>
+                ) : (
+                  <Link
+                    className="inline-flex h-8 items-center rounded-md border px-3 text-sm hover:bg-muted"
+                    href={withParams(baseParams, { page: String(Math.max(1, currentPage - 1)) })}
+                  >
+                    Previous
+                  </Link>
+                )}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: pageEnd - pageStart + 1 }, (_, i) => pageStart + i).map((pageNumber) => (
+                    <Link
+                      key={pageNumber}
+                      className={
+                        pageNumber === currentPage
+                          ? "inline-flex h-7 min-w-7 items-center justify-center rounded-md bg-primary px-2 text-xs text-primary-foreground"
+                          : "inline-flex h-7 min-w-7 items-center justify-center rounded-md border px-2 text-xs hover:bg-muted"
+                      }
+                      href={withParams(baseParams, { page: String(pageNumber) })}
+                    >
+                      {pageNumber}
+                    </Link>
+                  ))}
+                </div>
+                {currentPage >= totalPages ? (
+                  <span className="inline-flex h-8 items-center rounded-md border px-3 text-sm opacity-50">Next</span>
+                ) : (
+                  <Link
+                    className="inline-flex h-8 items-center rounded-md border px-3 text-sm hover:bg-muted"
+                    href={withParams(baseParams, { page: String(Math.min(totalPages, currentPage + 1)) })}
+                  >
+                    Next
+                  </Link>
+                )}
+              </div>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+            </div>
           </CardContent>
         </Card>
       </div>

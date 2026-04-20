@@ -29,7 +29,7 @@ async function createTrip(formData: FormData) {
   });
   await logAuditEvent({ session, action: "create", entityType: "trip" });
   revalidatePath("/trips");
-  redirect("/trips?created=1");
+  redirect(`/trips?created=${Date.now()}`);
 }
 
 async function startTrip(formData: FormData) {
@@ -101,7 +101,7 @@ export default async function TripsPage(props: Props) {
           tag="Trip Control"
         />
 
-        {searchParams.created === "1" ? (
+        {searchParams.created ? (
           <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
             Trip planned successfully.
           </div>

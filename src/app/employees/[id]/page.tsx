@@ -78,7 +78,7 @@ async function updateEmployeeProfile(formData: FormData) {
 
   revalidatePath(`/employees/${employeeId}`);
   revalidatePath("/employees");
-  redirect(`/employees/${employeeId}?updated=1`);
+  redirect(`/employees/${employeeId}?updated=${Date.now()}`);
 }
 
 async function uploadEmployeePhoto(formData: FormData) {
@@ -103,7 +103,7 @@ async function uploadEmployeePhoto(formData: FormData) {
 
   revalidatePath(`/employees/${employeeId}`);
   revalidatePath("/employees");
-  redirect(`/employees/${employeeId}?photoUploaded=1`);
+  redirect(`/employees/${employeeId}?photoUploaded=${Date.now()}`);
 }
 
 type Props = {
@@ -124,12 +124,12 @@ export default async function EmployeeProfilePage(props: Props) {
   return (
     <AppShell>
       <div className="space-y-4">
-        {searchParams.updated === "1" ? (
+        {searchParams.updated ? (
           <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
             Employee profile updated successfully.
           </div>
         ) : null}
-        {searchParams.photoUploaded === "1" ? (
+        {searchParams.photoUploaded ? (
           <div className="rounded-md border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-700">
             Employee photo uploaded successfully.
           </div>
