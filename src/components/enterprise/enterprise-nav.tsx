@@ -55,8 +55,8 @@ export function EnterpriseNav({ allowedModules }: { allowedModules: AppModule[] 
   );
 
   return (
-    <nav className="overflow-x-auto rounded border border-slate-700 bg-[#101422]">
-      <div className="flex min-w-max items-center px-1 py-1">
+    <nav className="rounded border border-slate-700 bg-[#101422]">
+      <div className="flex flex-wrap items-center gap-1 px-1 py-1">
         {flatItems.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;

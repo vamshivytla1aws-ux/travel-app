@@ -26,7 +26,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
         <div className={`${enterpriseContainer} space-y-2 py-2`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
-              <h1 className="text-lg font-semibold text-white">Employee Transport</h1>
+              <h1 className="text-lg font-semibold text-white">Jai Bhavani Travels Tracking System</h1>
             </div>
             <div className="flex items-center gap-3 text-sm">
               <ThemeToggleButton />
