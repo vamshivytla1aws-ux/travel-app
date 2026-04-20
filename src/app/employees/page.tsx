@@ -192,7 +192,7 @@ export default async function EmployeesPage(props: Props) {
         <Card className="lg:col-span-2 border-blue-200/70 dark:border-blue-900">
           <CardHeader><CardTitle>Employees</CardTitle></CardHeader>
           <CardContent>
-            <form method="get" className="sticky top-20 z-10 mb-4 grid gap-3 rounded-md border bg-background/95 p-3 backdrop-blur md:grid-cols-4">
+            <form method="get" className="mb-4 grid gap-3 rounded-md border bg-background p-3 md:grid-cols-4">
               <div className="md:col-span-2">
                 <Label htmlFor="q">Search Employee</Label>
                 <Input
@@ -253,7 +253,7 @@ export default async function EmployeesPage(props: Props) {
               </div>
             ) : null}
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-background"><TableRow><TableHead>S.No</TableHead><TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Department</TableHead><TableHead>Phone</TableHead><TableHead>Company</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>S.No</TableHead><TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Department</TableHead><TableHead>Phone</TableHead><TableHead>Company</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
               <TableBody>
                 {visibleEmployees.map((employee, index) => (
                   <TableRow key={employee.id}>

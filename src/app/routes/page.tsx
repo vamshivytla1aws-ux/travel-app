@@ -106,7 +106,7 @@ export default async function RoutesPage(props: Props) {
         <Card className="lg:col-span-2 border-violet-200/70 dark:border-violet-900">
           <CardHeader><CardTitle>Routes</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            <form className="sticky top-20 z-10 grid gap-2 rounded-md border bg-background/95 p-3 backdrop-blur md:grid-cols-4">
+            <form className="grid gap-2 rounded-md border bg-background p-3 md:grid-cols-4">
               <Input name="q" defaultValue={searchParams.q ?? ""} placeholder="Search code/name/start/end" />
               <select name="pageSize" defaultValue={String(pageSize)} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm">
                 {PAGE_SIZE_OPTIONS.map((size) => (
@@ -126,7 +126,7 @@ export default async function RoutesPage(props: Props) {
               </div>
             ) : null}
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-background">
+              <TableHeader>
                 <TableRow><TableHead>Code</TableHead><TableHead>Name</TableHead><TableHead>Distance</TableHead></TableRow>
               </TableHeader>
               <TableBody>

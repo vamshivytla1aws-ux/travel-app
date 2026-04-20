@@ -56,7 +56,7 @@ export default async function LogsPage(props: Props) {
           <CardTitle>Log Portal</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form className="sticky top-20 z-10 grid gap-3 rounded-md border bg-background/95 p-3 backdrop-blur md:grid-cols-5">
+          <form className="grid gap-3 rounded-md border bg-background p-3 md:grid-cols-5">
             <Input name="entity" placeholder="Entity (fuel_entry, user, trip)" defaultValue={entity} />
             <Input name="action" placeholder="Action (create, update, delete)" defaultValue={action} />
             <select name="pageSize" defaultValue={String(pageSize)} className="h-9 rounded-md border border-input bg-transparent px-3 text-sm">
@@ -77,7 +77,7 @@ export default async function LogsPage(props: Props) {
             </div>
           ) : null}
           <Table>
-            <TableHeader className="sticky top-0 z-10 bg-background">
+            <TableHeader>
               <TableRow>
                 <TableHead>Time</TableHead>
                 <TableHead>User</TableHead>

@@ -347,7 +347,7 @@ export default async function FuelTruckDetailPage(props: Props) {
             </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>
@@ -414,7 +414,7 @@ export default async function FuelTruckDetailPage(props: Props) {
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-background">
+              <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Bus</TableHead>

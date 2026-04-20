@@ -402,7 +402,7 @@ export default async function FuelTrucksPage(props: Props) {
             <CardTitle>Fuel Tanker List</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <form className="sticky top-20 z-10 grid gap-2 rounded-md border bg-background/95 p-3 backdrop-blur md:grid-cols-4">
+            <form className="grid gap-2 rounded-md border bg-background p-3 md:grid-cols-4">
               <Input name="q" placeholder="Search code/name/registration" defaultValue={searchParams.q ?? ""} />
               <select name="status" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" defaultValue={searchParams.status ?? ""}>
                 <option value="">All status</option>
@@ -424,7 +424,7 @@ export default async function FuelTrucksPage(props: Props) {
               </div>
             ) : null}
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-background">
+              <TableHeader>
                 <TableRow>
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
@@ -511,7 +511,7 @@ export default async function FuelTrucksPage(props: Props) {
             <CardTitle>Reports & Ledger Filters</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form className="sticky top-20 z-10 grid gap-2 rounded-md border bg-background/95 p-3 backdrop-blur md:grid-cols-7">
+            <form className="grid gap-2 rounded-md border bg-background p-3 md:grid-cols-7">
               <Input name="fromDate" type="date" defaultValue={searchParams.fromDate ?? ""} />
               <Input name="toDate" type="date" defaultValue={searchParams.toDate ?? ""} />
               <select name="fuelTruckId" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" defaultValue={searchParams.fuelTruckId ?? ""}>
@@ -542,7 +542,7 @@ export default async function FuelTrucksPage(props: Props) {
                 </CardHeader>
                 <CardContent>
                   <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-background">
+                    <TableHeader>
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Truck</TableHead>
@@ -577,7 +577,7 @@ export default async function FuelTrucksPage(props: Props) {
                 </CardHeader>
                 <CardContent>
                   <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-background">
+                    <TableHeader>
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Truck</TableHead>
