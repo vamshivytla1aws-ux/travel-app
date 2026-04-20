@@ -242,6 +242,7 @@ export async function ensureTransportEnhancements() {
       UNIQUE(bus_id, trip_date, shift_label)
     );
   `);
+  await query(`ALTER TABLE trip_runs ADD COLUMN IF NOT EXISTS company_name VARCHAR(120);`);
 
   await query(`CREATE INDEX IF NOT EXISTS idx_trip_runs_date_status ON trip_runs(trip_date, status);`);
   await query(`

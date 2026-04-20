@@ -1,0 +1,2 @@
+ALTER TABLE trip_runs
+  ADD COLUMN IF NOT EXISTS company_name VARCHAR(120);

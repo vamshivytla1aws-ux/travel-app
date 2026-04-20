@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Timer } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -15,6 +16,7 @@ import { query } from "@/lib/db";
 import { TripsService } from "@/services/trips.service";
 
 const tripsService = new TripsService();
+const SHIFT_OPTIONS = ["general", "morning", "afternoon", "night", "unknown"] as const;
 
 async function createTrip(formData: FormData) {
   "use server";
@@ -25,11 +27,31 @@ async function createTrip(formData: FormData) {
     driverId: Number(formData.get("driverId")),
     routeId: Number(formData.get("routeId")),
     shiftLabel: String(formData.get("shiftLabel")),
+    companyName: String(formData.get("companyName") ?? ""),
     remarks: String(formData.get("remarks") ?? ""),
   });
   await logAuditEvent({ session, action: "create", entityType: "trip" });
   revalidatePath("/trips");
   redirect(`/trips?created=${Date.now()}`);
+}
+
+async function updateTrip(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher"]);
+  await requireModuleAccess("trips");
+  const tripId = Number(formData.get("tripId"));
+  await tripsService.updateTripPlan({
+    tripId,
+    busId: Number(formData.get("busId")),
+    driverId: Number(formData.get("driverId")),
+    routeId: Number(formData.get("routeId")),
+    shiftLabel: String(formData.get("shiftLabel")),
+    companyName: String(formData.get("companyName") ?? ""),
+    remarks: String(formData.get("remarks") ?? ""),
+  });
+  await logAuditEvent({ session, action: "update", entityType: "trip", entityId: tripId, details: { mode: "plan_edit" } });
+  revalidatePath("/trips");
+  redirect(`/trips?updated=${Date.now()}`);
 }
 
 async function startTrip(formData: FormData) {
@@ -71,7 +93,7 @@ async function cancelTrip(formData: FormData) {
 }
 
 type Props = {
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; updated?: string; editId?: string }>;
 };
 
 export default async function TripsPage(props: Props) {
@@ -90,6 +112,10 @@ export default async function TripsPage(props: Props) {
       `SELECT id, route_name FROM routes WHERE is_active = true ORDER BY route_name`,
     ),
   ]);
+  const editId = Number(searchParams.editId ?? "");
+  const editTrip = Number.isFinite(editId) && editId > 0
+    ? trips.find((trip) => trip.id === editId && trip.status === "planned") ?? null
+    : null;
 
   return (
     <AppShell>
@@ -106,19 +132,26 @@ export default async function TripsPage(props: Props) {
             Trip planned successfully.
           </div>
         ) : null}
+        {searchParams.updated ? (
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+            Trip plan updated successfully.
+          </div>
+        ) : null}
 
         <Card>
           <CardHeader>
-            <CardTitle>Plan New Trip</CardTitle>
+            <CardTitle>{editTrip ? "Edit Trip Plan" : "Plan New Trip"}</CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={createTrip} className="grid gap-3 md:grid-cols-5">
+            <form action={editTrip ? updateTrip : createTrip} className="grid gap-3 md:grid-cols-6">
+              {editTrip ? <input type="hidden" name="tripId" value={editTrip.id} /> : null}
               <div className="grid gap-1">
                 <Label htmlFor="busId">Bus</Label>
                 <select
                   id="busId"
                   name="busId"
                   className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                  defaultValue={editTrip ? String(editTrip.bus_id) : ""}
                   required
                 >
                   <option value="">Select bus</option>
@@ -135,6 +168,7 @@ export default async function TripsPage(props: Props) {
                   id="driverId"
                   name="driverId"
                   className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                  defaultValue={editTrip ? String(editTrip.driver_id) : ""}
                   required
                 >
                   <option value="">Select driver</option>
@@ -151,6 +185,7 @@ export default async function TripsPage(props: Props) {
                   id="routeId"
                   name="routeId"
                   className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                  defaultValue={editTrip ? String(editTrip.route_id) : ""}
                   required
                 >
                   <option value="">Select route</option>
@@ -163,14 +198,37 @@ export default async function TripsPage(props: Props) {
               </div>
               <div className="grid gap-1">
                 <Label htmlFor="shiftLabel">Shift</Label>
-                <Input id="shiftLabel" name="shiftLabel" defaultValue="Morning" required />
+                <select
+                  id="shiftLabel"
+                  name="shiftLabel"
+                  className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                  defaultValue={editTrip ? String(editTrip.shift_label).toLowerCase() : "morning"}
+                  required
+                >
+                  {SHIFT_OPTIONS.map((shift) => (
+                    <option key={shift} value={shift}>
+                      {shift.charAt(0).toUpperCase() + shift.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="companyName">Company Name</Label>
+                <Input id="companyName" name="companyName" placeholder="Optional company name" defaultValue={editTrip?.company_name ?? ""} />
               </div>
               <div className="grid gap-1">
                 <Label htmlFor="remarks">Remarks</Label>
-                <Input id="remarks" name="remarks" placeholder="Optional note" />
+                <Input id="remarks" name="remarks" placeholder="Optional note" defaultValue={editTrip?.remarks ?? ""} />
               </div>
-              <div className="md:col-span-5">
-                <button className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground">Create Trip</button>
+              <div className="md:col-span-6 flex items-center gap-2">
+                <button className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground">
+                  {editTrip ? "Update Trip" : "Create Trip"}
+                </button>
+                {editTrip ? (
+                  <Link href="/trips" className="inline-flex h-9 items-center rounded-md border border-input px-4 text-sm">
+                    Cancel Edit
+                  </Link>
+                ) : null}
               </div>
             </form>
           </CardContent>
@@ -189,6 +247,7 @@ export default async function TripsPage(props: Props) {
                   <TableHead>Driver</TableHead>
                   <TableHead>Route</TableHead>
                   <TableHead>Shift</TableHead>
+                  <TableHead>Company</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Metrics</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -197,7 +256,7 @@ export default async function TripsPage(props: Props) {
               <TableBody>
                 {trips.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
                       No trips planned today.
                     </TableCell>
                   </TableRow>
@@ -209,6 +268,7 @@ export default async function TripsPage(props: Props) {
                       <TableCell>{trip.driver_name}</TableCell>
                       <TableCell>{trip.route_name}</TableCell>
                       <TableCell>{trip.shift_label}</TableCell>
+                      <TableCell>{trip.company_name ?? "-"}</TableCell>
                       <TableCell>
                         <Badge
                           variant={
@@ -236,6 +296,9 @@ export default async function TripsPage(props: Props) {
                       <TableCell className="text-right">
                         {trip.status === "planned" ? (
                           <div className="flex justify-end gap-2">
+                            <Link href={`/trips?editId=${trip.id}`} className="inline-flex h-8 items-center rounded border px-3 text-xs">
+                              Edit
+                            </Link>
                             <form action={startTrip} className="flex items-center gap-2">
                               <input type="hidden" name="tripId" value={trip.id} />
                               <Input

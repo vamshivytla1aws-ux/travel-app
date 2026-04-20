@@ -9,7 +9,11 @@ export class TripsService {
     const result = await query<{
       id: number;
       trip_date: string;
+      bus_id: number;
+      driver_id: number;
+      route_id: number;
       shift_label: string;
+      company_name: string | null;
       status: TripStatus;
       bus_number: string;
       driver_name: string;
@@ -26,7 +30,11 @@ export class TripsService {
       `SELECT
         tr.id,
         tr.trip_date::text,
+        tr.bus_id,
+        tr.driver_id,
+        tr.route_id,
         tr.shift_label,
+        tr.company_name,
         tr.status::text as status,
         b.bus_number,
         d.full_name as driver_name,
@@ -54,18 +62,52 @@ export class TripsService {
     driverId: number;
     routeId: number;
     shiftLabel: string;
+    companyName?: string;
     remarks?: string;
   }) {
     await ensureTransportEnhancements();
     await query(
-      `INSERT INTO trip_runs (trip_date, shift_label, bus_id, driver_id, route_id, status, remarks)
-       VALUES (CURRENT_DATE, $1, $2, $3, $4, 'planned', $5)
+      `INSERT INTO trip_runs (trip_date, shift_label, bus_id, driver_id, route_id, company_name, status, remarks)
+       VALUES (CURRENT_DATE, $1, $2, $3, $4, $5, 'planned', $6)
        ON CONFLICT (bus_id, trip_date, shift_label) DO UPDATE SET
          driver_id = EXCLUDED.driver_id,
          route_id = EXCLUDED.route_id,
+         company_name = EXCLUDED.company_name,
          remarks = EXCLUDED.remarks,
          updated_at = NOW()`,
-      [input.shiftLabel, input.busId, input.driverId, input.routeId, input.remarks ?? null],
+      [input.shiftLabel, input.busId, input.driverId, input.routeId, input.companyName ?? null, input.remarks ?? null],
+    );
+  }
+
+  async updateTripPlan(input: {
+    tripId: number;
+    busId: number;
+    driverId: number;
+    routeId: number;
+    shiftLabel: string;
+    companyName?: string;
+    remarks?: string;
+  }) {
+    await ensureTransportEnhancements();
+    await query(
+      `UPDATE trip_runs
+       SET bus_id = $1,
+           driver_id = $2,
+           route_id = $3,
+           shift_label = $4,
+           company_name = $5,
+           remarks = $6,
+           updated_at = NOW()
+       WHERE id = $7 AND status = 'planned'`,
+      [
+        input.busId,
+        input.driverId,
+        input.routeId,
+        input.shiftLabel,
+        input.companyName ?? null,
+        input.remarks ?? null,
+        input.tripId,
+      ],
     );
   }
 
