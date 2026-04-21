@@ -2,7 +2,6 @@ import { ReactNode } from "react";
 import Link from "next/link";
 import { EnterpriseNav } from "@/components/enterprise/enterprise-nav";
 import { EnterpriseBreadcrumbs } from "@/components/enterprise/enterprise-breadcrumbs";
-import { ThemeToggleButton } from "@/components/enterprise/theme-toggle-button";
 import { WebOnly } from "@/components/enterprise/web-only";
 import { APP_MODULES, clearSessionCookie, getSession, type AppModule } from "@/lib/auth";
 import { enterpriseContainer } from "@/lib/ui-core";
@@ -31,7 +30,6 @@ export async function AppShell({ children }: { children: ReactNode }) {
             </div>
             <WebOnly>
               <div className="flex items-center gap-3 text-sm">
-                <ThemeToggleButton />
                 {session ? (
                   <>
                     <span className="text-slate-300">{session.fullName}</span>
@@ -39,7 +37,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
                       <Button
                         type="submit"
                         size="sm"
-                        className="border border-amber-600/50 bg-amber-400 font-semibold !text-slate-900 shadow-sm hover:bg-amber-300 hover:!text-slate-950 dark:bg-amber-400 dark:!text-slate-900 dark:hover:bg-amber-300"
+                        className="border border-amber-600/50 bg-amber-400 font-semibold !text-slate-900 shadow-sm hover:bg-amber-300 hover:!text-slate-950"
                       >
                         Logout
                       </Button>

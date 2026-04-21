@@ -19,15 +19,14 @@ export default function LoginPage({ searchParams }: Props) {
         <CardContent>
           {invalid && (
             <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-              Invalid email or password. The prefilled demo user only works on local dev; production
-              needs a row in <code className="rounded bg-red-100 px-1">users</code> (seed or SQL).
+              Invalid email or password.
             </p>
           )}
           <form action="/api/auth/login" method="post" className="grid gap-3">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" defaultValue="admin@transport.local" required />
+            <Input id="email" name="email" type="email" required />
             <Label htmlFor="password">Password</Label>
-            <Input id="password" name="password" type="password" defaultValue="Admin@123" required />
+            <Input id="password" name="password" type="password" required />
             <Button type="submit">Login</Button>
           </form>
         </CardContent>
