@@ -239,14 +239,52 @@ export class BusesRepository {
       );
       if ((existing.rowCount ?? 0) === 0) return false;
 
-      await client.query(`DELETE FROM fuel_issues WHERE bus_id = $1`, [id]);
-      await client.query(`DELETE FROM trip_runs WHERE bus_id = $1`, [id]);
-      await client.query(`DELETE FROM gps_logs WHERE bus_id = $1`, [id]);
-      await client.query(`DELETE FROM fuel_entries WHERE bus_id = $1`, [id]);
-      await client.query(`DELETE FROM maintenance_records WHERE bus_id = $1`, [id]);
-      await client.query(`DELETE FROM route_planner_entries WHERE bus_id = $1`, [id]);
-      await client.query(`DELETE FROM bus_documents WHERE bus_id = $1`, [id]);
-      await client.query(`DELETE FROM bus_assignments WHERE bus_id = $1`, [id]);
+      const candidateTables = [
+        "fuel_issues",
+        "trip_runs",
+        "gps_logs",
+        "fuel_entries",
+        "maintenance_records",
+        "route_planner_entries",
+        "bus_documents",
+        "bus_assignments",
+      ] as const;
+
+      const existingTablesResult = await client.query<{ tablename: string }>(
+        `
+          SELECT tablename
+          FROM pg_tables
+          WHERE schemaname = 'public'
+            AND tablename = ANY($1::text[])
+        `,
+        [candidateTables],
+      );
+      const existingTables = new Set(existingTablesResult.rows.map((row) => row.tablename));
+
+      if (existingTables.has("fuel_issues")) {
+        await client.query(`DELETE FROM fuel_issues WHERE bus_id = $1`, [id]);
+      }
+      if (existingTables.has("trip_runs")) {
+        await client.query(`DELETE FROM trip_runs WHERE bus_id = $1`, [id]);
+      }
+      if (existingTables.has("gps_logs")) {
+        await client.query(`DELETE FROM gps_logs WHERE bus_id = $1`, [id]);
+      }
+      if (existingTables.has("fuel_entries")) {
+        await client.query(`DELETE FROM fuel_entries WHERE bus_id = $1`, [id]);
+      }
+      if (existingTables.has("maintenance_records")) {
+        await client.query(`DELETE FROM maintenance_records WHERE bus_id = $1`, [id]);
+      }
+      if (existingTables.has("route_planner_entries")) {
+        await client.query(`DELETE FROM route_planner_entries WHERE bus_id = $1`, [id]);
+      }
+      if (existingTables.has("bus_documents")) {
+        await client.query(`DELETE FROM bus_documents WHERE bus_id = $1`, [id]);
+      }
+      if (existingTables.has("bus_assignments")) {
+        await client.query(`DELETE FROM bus_assignments WHERE bus_id = $1`, [id]);
+      }
 
       const deleted = await client.query(`DELETE FROM buses WHERE id = $1`, [id]);
       return (deleted.rowCount ?? 0) > 0;

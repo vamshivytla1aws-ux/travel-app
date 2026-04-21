@@ -20,7 +20,7 @@ import {
 import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
-import { query, withTransaction } from "@/lib/db";
+import { query } from "@/lib/db";
 import { BusesService } from "@/services/buses.service";
 
 const busesService = new BusesService();
@@ -74,23 +74,8 @@ async function deleteBus(formData: FormData) {
   const busId = Number(formData.get("busId"));
   if (!busId) return;
 
-  const deleted = await withTransaction(async (client) => {
-    const existing = await client.query<{ id: number }>(`SELECT id FROM buses WHERE id = $1 LIMIT 1`, [busId]);
-    if ((existing.rowCount ?? 0) === 0) return false;
-
-    await client.query(`DELETE FROM fuel_issues WHERE bus_id = $1`, [busId]);
-    await client.query(`DELETE FROM trip_runs WHERE bus_id = $1`, [busId]);
-    await client.query(`DELETE FROM gps_logs WHERE bus_id = $1`, [busId]);
-    await client.query(`DELETE FROM fuel_entries WHERE bus_id = $1`, [busId]);
-    await client.query(`DELETE FROM maintenance_records WHERE bus_id = $1`, [busId]);
-    await client.query(`DELETE FROM route_planner_entries WHERE bus_id = $1`, [busId]);
-    await client.query(`DELETE FROM bus_documents WHERE bus_id = $1`, [busId]);
-    await client.query(`DELETE FROM bus_assignments WHERE bus_id = $1`, [busId]);
-
-    const result = await client.query(`DELETE FROM buses WHERE id = $1`, [busId]);
-    return (result.rowCount ?? 0) > 0;
-  });
-  if (!deleted) return;
+  const result = await busesService.deleteBus(busId);
+  if ("error" in result && result.error === "not_found") return;
 
   await logAuditEvent({ session, action: "delete", entityType: "bus", entityId: busId });
   revalidatePath("/buses");
