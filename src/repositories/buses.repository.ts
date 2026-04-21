@@ -260,16 +260,7 @@ export class BusesRepository {
         [candidateTables],
       );
       const existingTables = new Set(existingTablesResult.rows.map((row) => row.tablename));
-      let assignmentIds: number[] = [];
       if (existingTables.has("bus_assignments")) {
-        const assignments = await client.query<{ id: number }>(
-          `SELECT id FROM bus_assignments WHERE bus_id = $1`,
-          [id],
-        );
-        assignmentIds = assignments.rows.map((row) => Number(row.id)).filter((v) => Number.isFinite(v));
-      }
-
-      if (assignmentIds.length > 0) {
         const auxExistingResult = await client.query<{ tablename: string }>(
           `
             SELECT tablename
@@ -283,20 +274,35 @@ export class BusesRepository {
 
         if (auxExisting.has("employee_assignments")) {
           await client.query(
-            `DELETE FROM employee_assignments WHERE bus_assignment_id = ANY($1::bigint[])`,
-            [assignmentIds],
+            `
+              DELETE FROM employee_assignments ea
+              USING bus_assignments ba
+              WHERE ea.bus_assignment_id = ba.id
+                AND ba.bus_id = $1
+            `,
+            [id],
           );
         }
         if (auxExisting.has("gps_logs")) {
           await client.query(
-            `DELETE FROM gps_logs WHERE assignment_id = ANY($1::bigint[])`,
-            [assignmentIds],
+            `
+              DELETE FROM gps_logs g
+              USING bus_assignments ba
+              WHERE g.assignment_id = ba.id
+                AND ba.bus_id = $1
+            `,
+            [id],
           );
         }
         if (auxExisting.has("trip_runs")) {
           await client.query(
-            `DELETE FROM trip_runs WHERE assignment_id = ANY($1::bigint[])`,
-            [assignmentIds],
+            `
+              DELETE FROM trip_runs tr
+              USING bus_assignments ba
+              WHERE tr.assignment_id = ba.id
+                AND ba.bus_id = $1
+            `,
+            [id],
           );
         }
       }
