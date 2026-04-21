@@ -87,6 +87,14 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
   });
   const [autoEndDate, setAutoEndDate] = useState(Boolean(values?.tenureYears ?? initialYears));
 
+  const dateRangeError = useMemo(() => {
+    const start = parseDateAtUtc(formValues.loanStartDate);
+    const end = parseDateAtUtc(formValues.loanEndDate);
+    if (!start || !end) return null;
+    if (end <= start) return "Loan End Date must be after Loan Start Date.";
+    return null;
+  }, [formValues.loanStartDate, formValues.loanEndDate]);
+
   useEffect(() => {
     if (!autoEndDate) return;
     const start = parseDateAtUtc(formValues.loanStartDate);
@@ -123,6 +131,22 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
       formValues.status,
     ],
   );
+
+  function recalculateTimelineFields() {
+    const start = parseDateAtUtc(formValues.loanStartDate);
+    const years = asNumber(formValues.tenureYears);
+    if (!start || years <= 0) return;
+
+    const target = new Date(start.getTime());
+    const wholeYears = Math.trunc(years);
+    const remainderYears = years - wholeYears;
+    const extraMonths = Math.round(remainderYears * 12);
+    target.setUTCFullYear(target.getUTCFullYear() + wholeYears);
+    target.setUTCMonth(target.getUTCMonth() + extraMonths);
+
+    setAutoEndDate(true);
+    setFormValues((v) => ({ ...v, loanEndDate: formatDateAtUtc(target) }));
+  }
 
   return (
     <form action={action} className="grid gap-4">
@@ -204,7 +228,16 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
         <p className="text-xs font-medium text-muted-foreground uppercase md:col-span-4">Loan Timeline</p>
         <div className="grid gap-1">
           <Label htmlFor="loanStartDate">Loan Start Date</Label>
-          <Input id="loanStartDate" name="loanStartDate" type="date" required value={formValues.loanStartDate} onChange={(e) => setFormValues((v) => ({ ...v, loanStartDate: e.target.value }))} />
+          <Input
+            id="loanStartDate"
+            name="loanStartDate"
+            type="date"
+            required
+            aria-invalid={Boolean(dateRangeError)}
+            value={formValues.loanStartDate}
+            onChange={(e) => setFormValues((v) => ({ ...v, loanStartDate: e.target.value }))}
+          />
+          {dateRangeError ? <p className="text-xs text-red-600">{dateRangeError}</p> : null}
         </div>
         <div className="grid gap-1">
           <Label htmlFor="tenureYears">Years</Label>
@@ -220,6 +253,9 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
               setFormValues((v) => ({ ...v, tenureYears: e.target.value }));
             }}
           />
+          <Button type="button" variant="outline" size="sm" className="mt-1 w-fit" onClick={recalculateTimelineFields}>
+            Recalculate
+          </Button>
         </div>
         <div className="grid gap-1">
           <Label htmlFor="loanEndDate">Loan End Date</Label>
@@ -228,6 +264,7 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
             name="loanEndDate"
             type="date"
             required
+            aria-invalid={Boolean(dateRangeError)}
             value={formValues.loanEndDate}
             onChange={(e) => {
               const nextEndDate = e.target.value;
@@ -239,6 +276,7 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
               }));
             }}
           />
+          {dateRangeError ? <p className="text-xs text-red-600">{dateRangeError}</p> : null}
           <p className="text-xs text-muted-foreground">
             Manual edit is enabled. Changing Years will auto-calculate this again.
           </p>
@@ -258,6 +296,9 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
               </option>
             ))}
           </select>
+          {normalizeFinanceStatus(formValues.status) === "closed" ? (
+            <p className="text-xs text-muted-foreground">Closed status selected: Next EMI Date will be cleared before submit.</p>
+          ) : null}
         </div>
       </div>
 
@@ -285,11 +326,11 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
         </div>
         <div className="grid gap-1">
           <Label>Next EMI Date</Label>
-          <Input value={derived.nextEmiDate ?? ""} readOnly />
+          <Input value={normalizeFinanceStatus(formValues.status) === "closed" ? "" : (derived.nextEmiDate ?? "")} readOnly />
         </div>
       </div>
 
-      <Button type="submit">{submitLabel}</Button>
+      <Button type="submit" disabled={Boolean(dateRangeError)}>{submitLabel}</Button>
     </form>
   );
 }
