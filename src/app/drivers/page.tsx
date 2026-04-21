@@ -30,7 +30,8 @@ function withParams(
   Object.entries(merged).forEach(([key, value]) => {
     if (value && value.trim().length > 0) params.set(key, value);
   });
-  return `/drivers?${params.toString()}`;
+  const serialized = params.toString();
+  return serialized ? `/drivers?${serialized}` : "/drivers";
 }
 
 async function createDriver(formData: FormData) {
@@ -106,6 +107,7 @@ type Props = {
     company?: string;
     page?: string;
     pageSize?: string;
+    create?: string;
   }>;
 };
 
@@ -150,6 +152,15 @@ export default async function DriversPage(props: Props) {
   };
   const pageStart = Math.max(1, currentPage - 2);
   const pageEnd = Math.min(totalPages, currentPage + 2);
+  const showCreateModal = String(searchParams.create ?? "") === "1";
+  const listBaseHref = withParams(
+    { q: searchParams.q, company: searchParams.company, pageSize: String(pageSize), page: searchParams.page },
+    { create: undefined },
+  );
+  const createHref = withParams(
+    { q: searchParams.q, company: searchParams.company, pageSize: String(pageSize), page: searchParams.page },
+    { create: "1" },
+  );
 
   return (
     <AppShell>
@@ -168,28 +179,15 @@ export default async function DriversPage(props: Props) {
       {searchParams.deleted ? (
         <StatusAlert className="mb-4" tone="warning" message="Driver deactivated successfully." />
       ) : null}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="border-emerald-200/70 bg-emerald-50/40 dark:border-emerald-900 dark:bg-emerald-950/20">
-          <CardHeader><CardTitle>Create Driver</CardTitle></CardHeader>
-          <CardContent>
-            <form action={createDriver} className="grid gap-2">
-              <Label htmlFor="fullName">Name</Label><Input id="fullName" name="fullName" required />
-              <Label htmlFor="phone">Phone</Label><Input id="phone" name="phone" required />
-              <Label htmlFor="companyName">Company Name</Label><Input id="companyName" name="companyName" required />
-              <Label htmlFor="licenseNumber">License</Label><Input id="licenseNumber" name="licenseNumber" required />
-              <Label htmlFor="bankName">Bank Name</Label><Input id="bankName" name="bankName" />
-              <Label htmlFor="bankAccountNumber">Bank Account Number</Label><Input id="bankAccountNumber" name="bankAccountNumber" />
-              <Label htmlFor="bankIfsc">IFSC</Label><Input id="bankIfsc" name="bankIfsc" />
-              <Label htmlFor="pfAccountNumber">PF Account</Label><Input id="pfAccountNumber" name="pfAccountNumber" />
-              <Label htmlFor="uanNumber">UAN</Label><Input id="uanNumber" name="uanNumber" />
-              <Label htmlFor="licenseExpiry">License Expiry</Label><Input id="licenseExpiry" name="licenseExpiry" type="date" required />
-              <Label htmlFor="experienceYears">Experience (Years)</Label><Input id="experienceYears" name="experienceYears" type="number" required />
-              <Button type="submit">Save</Button>
-            </form>
-          </CardContent>
-        </Card>
-        <Card className="lg:col-span-2 border-emerald-200/70 dark:border-emerald-900">
-          <CardHeader><CardTitle>Drivers</CardTitle></CardHeader>
+      <Card className="border-emerald-200/70 dark:border-emerald-900">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle>Drivers</CardTitle>
+              <Link href={createHref} className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
+                Create Driver
+              </Link>
+            </div>
+          </CardHeader>
           <CardContent>
             <form method="get" className="mb-4 grid gap-3 rounded-md border bg-background p-3 md:grid-cols-4">
               <div className="md:col-span-2">
@@ -322,8 +320,38 @@ export default async function DriversPage(props: Props) {
               </span>
             </div>
           </CardContent>
-        </Card>
-      </div>
+      </Card>
+
+      {showCreateModal ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-12">
+          <Card className="max-h-[85vh] w-full max-w-2xl overflow-y-auto border-emerald-200/70 dark:border-emerald-900">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle>Create Driver</CardTitle>
+                <Link href={listBaseHref} className="inline-flex h-9 items-center rounded-md border px-3 text-sm">
+                  Close
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form action={createDriver} className="grid gap-2">
+                <Label htmlFor="fullName">Name</Label><Input id="fullName" name="fullName" required />
+                <Label htmlFor="phone">Phone</Label><Input id="phone" name="phone" required />
+                <Label htmlFor="companyName">Company Name</Label><Input id="companyName" name="companyName" required />
+                <Label htmlFor="licenseNumber">License</Label><Input id="licenseNumber" name="licenseNumber" required />
+                <Label htmlFor="bankName">Bank Name</Label><Input id="bankName" name="bankName" />
+                <Label htmlFor="bankAccountNumber">Bank Account Number</Label><Input id="bankAccountNumber" name="bankAccountNumber" />
+                <Label htmlFor="bankIfsc">IFSC</Label><Input id="bankIfsc" name="bankIfsc" />
+                <Label htmlFor="pfAccountNumber">PF Account</Label><Input id="pfAccountNumber" name="pfAccountNumber" />
+                <Label htmlFor="uanNumber">UAN</Label><Input id="uanNumber" name="uanNumber" />
+                <Label htmlFor="licenseExpiry">License Expiry</Label><Input id="licenseExpiry" name="licenseExpiry" type="date" required />
+                <Label htmlFor="experienceYears">Experience (Years)</Label><Input id="experienceYears" name="experienceYears" type="number" required />
+                <Button type="submit">Save</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </AppShell>
   );
 }

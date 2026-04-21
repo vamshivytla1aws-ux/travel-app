@@ -27,6 +27,7 @@ type Props = {
     error?: string;
     q?: string;
     status?: string;
+    create?: string;
   }>;
 };
 
@@ -116,6 +117,14 @@ export default async function FinancePage(props: Props) {
       ? normalizeFinanceStatus(statusRaw)
       : undefined;
   const loans = await financeLoansService.listLoans(q, status);
+  const showCreateModal = String(searchParams.create ?? "") === "1";
+  const listBaseParams = new URLSearchParams();
+  if (searchParams.q) listBaseParams.set("q", String(searchParams.q));
+  if (searchParams.status) listBaseParams.set("status", String(searchParams.status));
+  const listBaseHref = `/finance${listBaseParams.toString() ? `?${listBaseParams.toString()}` : ""}`;
+  const createHrefParams = new URLSearchParams(listBaseParams);
+  createHrefParams.set("create", "1");
+  const createHref = `/finance?${createHrefParams.toString()}`;
 
   return (
     <AppShell>
@@ -130,19 +139,14 @@ export default async function FinancePage(props: Props) {
       {searchParams.deleted ? <StatusAlert className="mb-4" tone="warning" message="Loan record deleted successfully." /> : null}
       {searchParams.error ? <StatusAlert className="mb-4" tone="error" message={safeDecodeURIComponent(searchParams.error)} /> : null}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
+      <Card>
           <CardHeader>
-            <CardTitle>Add Finance / Loan Record</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <FinanceLoanForm action={createLoan} submitLabel="Create Loan" />
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Bus Loan Records</CardTitle>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle>Bus Loan Records</CardTitle>
+              <Link href={createHref} className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
+                Create Finance
+              </Link>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             <form className="grid gap-2 rounded-md border bg-background p-3 md:grid-cols-4">
@@ -163,6 +167,7 @@ export default async function FinancePage(props: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>S.No</TableHead>
                   <TableHead>Registration</TableHead>
                   <TableHead>Vehicle</TableHead>
                   <TableHead>Financier</TableHead>
@@ -178,8 +183,9 @@ export default async function FinancePage(props: Props) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loans.map((loan) => (
+                {loans.map((loan, index) => (
                   <TableRow key={loan.id}>
+                    <TableCell>{index + 1}</TableCell>
                     <TableCell>{loan.registrationNo}</TableCell>
                     <TableCell>{loan.vehicleTypeOrBusName}</TableCell>
                     <TableCell>{loan.financierBankName}</TableCell>
@@ -212,7 +218,7 @@ export default async function FinancePage(props: Props) {
                 ))}
                 {loans.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center text-muted-foreground">
+                    <TableCell colSpan={13} className="text-center text-muted-foreground">
                       No finance loan records found.
                     </TableCell>
                   </TableRow>
@@ -220,8 +226,25 @@ export default async function FinancePage(props: Props) {
               </TableBody>
             </Table>
           </CardContent>
-        </Card>
-      </div>
+      </Card>
+
+      {showCreateModal ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-12">
+          <Card className="max-h-[85vh] w-full max-w-4xl overflow-y-auto">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle>Create Finance / Loan Record</CardTitle>
+                <Link href={listBaseHref} className="inline-flex h-9 items-center rounded-md border px-3 text-sm">
+                  Close
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <FinanceLoanForm action={createLoan} submitLabel="Create Loan" />
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </AppShell>
   );
 }

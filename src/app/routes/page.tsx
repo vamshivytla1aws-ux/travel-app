@@ -184,6 +184,7 @@ type Props = {
     page?: string;
     pageSize?: string;
     editId?: string;
+    create?: string;
   }>;
 };
 
@@ -246,6 +247,17 @@ export default async function RoutesPage(props: Props) {
   const editEntry = Number.isFinite(editId) && editId > 0
     ? entriesResult.rows.find((entry) => entry.id === editId) ?? null
     : null;
+  const showCreateModal = String(searchParams.create ?? "") === "1";
+  const showFormModal = showCreateModal || Boolean(editEntry);
+  const queryBase = new URLSearchParams();
+  if (searchParams.q) queryBase.set("q", String(searchParams.q));
+  if (searchParams.shift) queryBase.set("shift", String(searchParams.shift));
+  if (searchParams.pageSize) queryBase.set("pageSize", String(searchParams.pageSize));
+  if (searchParams.page) queryBase.set("page", String(searchParams.page));
+  const listBaseHref = `/routes${queryBase.toString() ? `?${queryBase.toString()}` : ""}`;
+  const createHrefParams = new URLSearchParams(queryBase);
+  createHrefParams.set("create", "1");
+  const createHref = `/routes?${createHrefParams.toString()}`;
 
   const companies = Array.from(
     new Set(drivers.rows.map((driver) => (driver.company_name ?? "").trim()).filter(Boolean)),
@@ -270,81 +282,17 @@ export default async function RoutesPage(props: Props) {
       {searchParams.deleted ? <StatusAlert className="mb-4" tone="warning" message="Route assignment deleted." /> : null}
       {searchParams.error ? <StatusAlert className="mb-4" tone="error" message={safeDecodeURIComponent(searchParams.error)} /> : null}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="border-violet-200/70 bg-violet-50/40 dark:border-violet-900 dark:bg-violet-950/20">
+      <Card className="border-violet-200/70 dark:border-violet-900">
           <CardHeader>
-            <CardTitle>{editEntry ? "Update Route Assignment" : "Create Route Assignment"}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form action={editEntry ? updateRouteEntry : createRouteEntry} className="grid gap-2">
-              {editEntry ? <input type="hidden" name="routeId" value={editEntry.id} /> : null}
-
-              <Label htmlFor="busId">Bus Registration No</Label>
-              <select id="busId" name="busId" defaultValue={editEntry ? String(editEntry.bus_id) : ""} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" required>
-                <option value="">Select bus</option>
-                {buses.rows.map((bus) => (
-                  <option key={bus.id} value={bus.id}>
-                    {bus.registration_number}
-                  </option>
-                ))}
-              </select>
-
-              <Label htmlFor="driverId">Driver</Label>
-              <select id="driverId" name="driverId" defaultValue={editEntry ? String(editEntry.driver_id) : ""} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" required>
-                <option value="">Select driver</option>
-                {drivers.rows.map((driver) => (
-                  <option key={driver.id} value={driver.id}>
-                    {driver.full_name}
-                  </option>
-                ))}
-              </select>
-
-              <Label htmlFor="companyName">Company</Label>
-              <Input id="companyName" name="companyName" list="company-list" defaultValue={editEntry?.company_name ?? ""} placeholder="Editable company name" />
-              <datalist id="company-list">
-                {companies.map((company) => (
-                  <option key={company} value={company} />
-                ))}
-              </datalist>
-
-              <Label htmlFor="routeName">Route Name</Label>
-              <Input id="routeName" name="routeName" defaultValue={editEntry?.route_name ?? ""} required />
-
-              <Label htmlFor="assignmentDate">Assignment Date</Label>
-              <Input
-                id="assignmentDate"
-                name="assignmentDate"
-                type="date"
-                defaultValue={editEntry?.assignment_date ?? new Date().toISOString().slice(0, 10)}
-                required
-              />
-
-              <Label htmlFor="shift">Shift</Label>
-              <select id="shift" name="shift" defaultValue={editEntry?.shift ?? "general"} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm">
-                {SHIFT_OPTIONS.map((shift) => (
-                  <option key={shift} value={shift}>
-                    {shift.charAt(0).toUpperCase() + shift.slice(1)}
-                  </option>
-                ))}
-              </select>
-
-              <Button type="submit">{editEntry ? "Update Assignment" : "Create Assignment"}</Button>
-              {editEntry ? (
-                <Link href="/routes" className={`${buttonVariants({ variant: "outline" })} justify-center`}>
-                  Cancel Edit
-                </Link>
-              ) : null}
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2 border-violet-200/70 dark:border-violet-900">
-          <CardHeader>
-            <CardTitle>Route Assignments</CardTitle>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle>Route Assignments</CardTitle>
+              <Link href={createHref} className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
+                Create Route
+              </Link>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             <form className="grid gap-2 rounded-md border bg-background p-3 md:grid-cols-4">
-              {editEntry ? <input type="hidden" name="editId" value={String(editEntry.id)} /> : null}
               <Input name="q" defaultValue={searchParams.q ?? ""} placeholder="Search bus/driver/company/route" />
               <select name="shift" defaultValue={searchParams.shift ?? ""} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm">
                 <option value="">All shifts</option>
@@ -355,7 +303,7 @@ export default async function RoutesPage(props: Props) {
                 ))}
               </select>
               <Button type="submit" variant="outline">Apply</Button>
-              <Link href={editEntry ? `/routes?editId=${editEntry.id}` : "/routes"} className="inline-flex h-10 items-center justify-center rounded-md border border-input px-3 text-sm">
+              <Link href={listBaseHref} className="inline-flex h-10 items-center justify-center rounded-md border border-input px-3 text-sm">
                 Clear
               </Link>
             </form>
@@ -393,7 +341,14 @@ export default async function RoutesPage(props: Props) {
                     <TableCell className="capitalize">{entry.shift}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Link href={`/routes?editId=${entry.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                        <Link
+                          href={`/routes?${(() => {
+                            const params = new URLSearchParams(queryBase);
+                            params.set("editId", String(entry.id));
+                            return params.toString();
+                          })()}`}
+                          className={buttonVariants({ variant: "outline", size: "sm" })}
+                        >
                           Edit
                         </Link>
                         <form action={deleteRouteEntry}>
@@ -451,8 +406,78 @@ export default async function RoutesPage(props: Props) {
               </div>
             </div>
           </CardContent>
-        </Card>
-      </div>
+      </Card>
+
+      {showFormModal ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-12">
+          <Card className="max-h-[85vh] w-full max-w-3xl overflow-y-auto border-violet-200/70 dark:border-violet-900">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle>{editEntry ? "Update Route Assignment" : "Create Route Assignment"}</CardTitle>
+                <Link href={listBaseHref} className="inline-flex h-9 items-center rounded-md border px-3 text-sm">
+                  Close
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form action={editEntry ? updateRouteEntry : createRouteEntry} className="grid gap-2">
+                {editEntry ? <input type="hidden" name="routeId" value={editEntry.id} /> : null}
+
+                <Label htmlFor="busId">Bus Registration No</Label>
+                <select id="busId" name="busId" defaultValue={editEntry ? String(editEntry.bus_id) : ""} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" required>
+                  <option value="">Select bus</option>
+                  {buses.rows.map((bus) => (
+                    <option key={bus.id} value={bus.id}>
+                      {bus.registration_number}
+                    </option>
+                  ))}
+                </select>
+
+                <Label htmlFor="driverId">Driver</Label>
+                <select id="driverId" name="driverId" defaultValue={editEntry ? String(editEntry.driver_id) : ""} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" required>
+                  <option value="">Select driver</option>
+                  {drivers.rows.map((driver) => (
+                    <option key={driver.id} value={driver.id}>
+                      {driver.full_name}
+                    </option>
+                  ))}
+                </select>
+
+                <Label htmlFor="companyName">Company</Label>
+                <Input id="companyName" name="companyName" list="company-list" defaultValue={editEntry?.company_name ?? ""} placeholder="Editable company name" />
+                <datalist id="company-list">
+                  {companies.map((company) => (
+                    <option key={company} value={company} />
+                  ))}
+                </datalist>
+
+                <Label htmlFor="routeName">Route Name</Label>
+                <Input id="routeName" name="routeName" defaultValue={editEntry?.route_name ?? ""} required />
+
+                <Label htmlFor="assignmentDate">Assignment Date</Label>
+                <Input
+                  id="assignmentDate"
+                  name="assignmentDate"
+                  type="date"
+                  defaultValue={editEntry?.assignment_date ?? new Date().toISOString().slice(0, 10)}
+                  required
+                />
+
+                <Label htmlFor="shift">Shift</Label>
+                <select id="shift" name="shift" defaultValue={editEntry?.shift ?? "general"} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm">
+                  {SHIFT_OPTIONS.map((shift) => (
+                    <option key={shift} value={shift}>
+                      {shift.charAt(0).toUpperCase() + shift.slice(1)}
+                    </option>
+                  ))}
+                </select>
+
+                <Button type="submit">{editEntry ? "Update Assignment" : "Create Assignment"}</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </AppShell>
   );
 }

@@ -277,9 +277,6 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
             }}
           />
           {dateRangeError ? <p className="text-xs text-red-600">{dateRangeError}</p> : null}
-          <p className="text-xs text-muted-foreground">
-            Manual edit is enabled. Changing Years will auto-calculate this again.
-          </p>
         </div>
         <div className="grid gap-1">
           <Label htmlFor="status">Status</Label>
