@@ -12,6 +12,83 @@ export class BusesService {
     return busesRepository.list(search, status);
   }
 
+  async listBusesPaged(input: {
+    search?: string;
+    status?: "active" | "maintenance" | "inactive";
+    page?: number;
+    limit?: number;
+  }) {
+    const page = input.page ?? 1;
+    const limit = input.limit ?? 20;
+    const result = await busesRepository.listPaged(
+      input.search ?? "",
+      input.status,
+      page,
+      limit,
+    );
+    return {
+      items: result.items,
+      pagination: {
+        page,
+        limit,
+        total: result.total,
+        totalPages: Math.max(1, Math.ceil(result.total / Math.max(limit, 1))),
+      },
+    };
+  }
+
+  async createBus(input: {
+    busNumber: string;
+    registrationNumber: string;
+    make: string;
+    model: string;
+    seater: number;
+    odometerKm: number;
+    status?: "active" | "maintenance" | "inactive";
+  }) {
+    const existing = await query<{ id: number }>(
+      `SELECT id FROM buses WHERE bus_number = $1 OR registration_number = $2 LIMIT 1`,
+      [input.busNumber, input.registrationNumber],
+    );
+    if ((existing.rowCount ?? 0) > 0) {
+      return { error: "duplicate" as const };
+    }
+    const bus = await busesRepository.create(input);
+    return { bus };
+  }
+
+  async updateBus(
+    id: number,
+    input: {
+      busNumber: string;
+      registrationNumber: string;
+      make: string;
+      model: string;
+      seater: number;
+      odometerKm: number;
+      status: "active" | "maintenance" | "inactive";
+    },
+  ) {
+    const duplicate = await query<{ id: number }>(
+      `SELECT id FROM buses
+       WHERE (bus_number = $1 OR registration_number = $2) AND id <> $3
+       LIMIT 1`,
+      [input.busNumber, input.registrationNumber, id],
+    );
+    if ((duplicate.rowCount ?? 0) > 0) {
+      return { error: "duplicate" as const };
+    }
+    const bus = await busesRepository.update(id, input);
+    if (!bus) return { error: "not_found" as const };
+    return { bus };
+  }
+
+  async deleteBus(id: number) {
+    const ok = await busesRepository.hardDelete(id);
+    if (!ok) return { error: "not_found" as const };
+    return { success: true as const };
+  }
+
   async getBusDetail(id: number) {
     await ensureTransportEnhancements();
     await ensureDocumentTables();

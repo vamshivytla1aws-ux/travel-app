@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CarFront, ChevronDown, ClipboardList, Fuel, Gauge, KeyRound, MapPinned, Menu, Route, Timer, Truck, Users } from "lucide-react";
+import { CarFront, ChevronDown, ClipboardList, Fuel, Gauge, KeyRound, LogOut, MapPinned, Menu, Route, Timer, Truck, Users } from "lucide-react";
 import { cn } from "@/lib/ui-core";
 import { AppModule } from "@/lib/auth";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -37,7 +37,19 @@ const navGroups = [
   },
 ];
 
-export function EnterpriseNav({ allowedModules }: { allowedModules: AppModule[] }) {
+type EnterpriseNavProps = {
+  allowedModules: AppModule[];
+  userFullName?: string;
+  userRole?: "admin" | "dispatcher" | "fuel_manager" | "viewer" | "updater";
+};
+
+function formatRoleLabel(role?: EnterpriseNavProps["userRole"]) {
+  if (!role) return "Guest";
+  if (role === "fuel_manager") return "Fuel Manager";
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+export function EnterpriseNav({ allowedModules, userFullName, userRole }: EnterpriseNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [isNativeApp, setIsNativeApp] = useState(false);
@@ -87,14 +99,22 @@ export function EnterpriseNav({ allowedModules }: { allowedModules: AppModule[] 
           <Menu className="h-5 w-5" />
           <span className="sr-only">Open navigation</span>
         </SheetTrigger>
-        <SheetContent side="left" className="w-[85vw] max-w-[300px] border-slate-700 bg-[#101422] p-0 text-slate-200">
-          <SheetHeader className="border-b border-slate-700 px-4 py-3">
-            <SheetTitle className="text-sm text-slate-200">Navigation</SheetTitle>
+        <SheetContent
+          side="left"
+          overlayClassName="bg-black/55 supports-backdrop-filter:backdrop-blur-sm"
+          className="w-[82vw] max-w-[340px] border-slate-700 bg-[#101422] p-0 text-slate-200"
+        >
+          <SheetHeader className="border-b border-slate-700 bg-[#141a2a] px-4 py-4">
+            <SheetTitle className="text-base text-white">Jai Bhavani Travels</SheetTitle>
+            <p className="text-xs text-slate-400">
+              {formatRoleLabel(userRole)}
+              {userFullName ? ` • ${userFullName}` : ""}
+            </p>
           </SheetHeader>
-          <nav className="space-y-4 p-3">
+          <nav className="space-y-3 p-3">
             {nonAdminGroups.map((group) => (
-              <div key={group.label} className="space-y-1">
-                <div className="px-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">{group.label}</div>
+              <div key={group.label} className="space-y-1.5">
+                <div className="px-2 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">{group.label}</div>
                 {group.items.map((item) => {
                   const active = pathname.startsWith(item.href);
                   const Icon = item.icon;
@@ -104,8 +124,10 @@ export function EnterpriseNav({ allowedModules }: { allowedModules: AppModule[] 
                       href={item.href}
                       onClick={() => setOpen(false)}
                       className={cn(
-                        "flex items-center gap-2 rounded px-3 py-2 text-sm font-medium transition-colors",
-                        active ? "bg-[#1a1f31] text-yellow-300" : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
+                        "flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        active
+                          ? "bg-[#1f2942] text-yellow-300 shadow-[inset_0_0_0_1px_rgba(250,204,21,0.35)]"
+                          : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
                       )}
                     >
                       <Icon className="h-4 w-4" />
@@ -116,13 +138,17 @@ export function EnterpriseNav({ allowedModules }: { allowedModules: AppModule[] 
               </div>
             ))}
             {adminGroup ? (
-              <div className="space-y-1 border-t border-slate-700 pt-3">
+              <div className="space-y-1.5 border-t border-slate-700 pt-3">
+                <div className="px-2 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">Admin</div>
                 <button
                   type="button"
                   onClick={() => setAdminExpanded((value) => !value)}
+                  aria-expanded={adminExpanded}
                   className={cn(
-                    "flex w-full items-center justify-between rounded px-3 py-2 text-sm font-medium transition-colors",
-                    adminActive ? "bg-[#1a1f31] text-yellow-300" : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
+                    "flex min-h-11 w-full items-center justify-between rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                    adminExpanded || adminActive
+                      ? "border-slate-500 bg-[#1a243d] text-yellow-300"
+                      : "border-slate-700 text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
                   )}
                 >
                   <span className="flex items-center gap-2">
@@ -142,8 +168,10 @@ export function EnterpriseNav({ allowedModules }: { allowedModules: AppModule[] 
                           href={item.href}
                           onClick={() => setOpen(false)}
                           className={cn(
-                            "flex items-center gap-2 rounded px-3 py-2 text-sm transition-colors",
-                            active ? "bg-[#1a1f31] text-yellow-300" : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
+                            "flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                            active
+                              ? "bg-[#1f2942] text-yellow-300 shadow-[inset_0_0_0_1px_rgba(250,204,21,0.35)]"
+                              : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
                           )}
                         >
                           <ItemIcon className="h-4 w-4" />
@@ -153,6 +181,18 @@ export function EnterpriseNav({ allowedModules }: { allowedModules: AppModule[] 
                     })}
                   </div>
                 ) : null}
+              </div>
+            ) : null}
+            {userRole ? (
+              <div className="space-y-1.5 border-t border-slate-700 pt-3">
+                <Link
+                  href="/api/auth/logout"
+                  onClick={() => setOpen(false)}
+                  className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-rose-200 transition-colors hover:bg-rose-900/30 hover:text-rose-100"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </Link>
               </div>
             ) : null}
           </nav>

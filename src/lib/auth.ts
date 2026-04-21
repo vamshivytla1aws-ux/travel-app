@@ -113,6 +113,14 @@ export async function requireAdminSession() {
 
 export function hasModuleAccess(session: SessionUser, module: AppModule): boolean {
   if (session.role === "admin") return true;
+  if (
+    session.role !== "viewer" &&
+    (session.moduleAccess.length === 0 ||
+      (session.moduleAccess.length === 1 && session.moduleAccess[0] === "dashboard"))
+  ) {
+    // Backward-compatible fallback for legacy sessions created before module mapping was populated.
+    return true;
+  }
   return session.moduleAccess.includes(module);
 }
 

@@ -20,10 +20,23 @@ function applyThemeToDom(mode: ThemeMode) {
   root.classList.toggle("dark", mode === "dark");
 }
 
+function isNativePlatform(): boolean {
+  if (typeof globalThis === "undefined") return false;
+  const maybeCapacitor = (globalThis as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+  return maybeCapacitor?.isNativePlatform?.() === true;
+}
+
 export function useThemeToggle() {
   const [theme, setTheme] = useState<ThemeMode>("light");
 
   useEffect(() => {
+    if (isNativePlatform()) {
+      applyThemeToDom("light");
+      localStorage.setItem(themeStorageKey, "light");
+      setTheme("light");
+      return;
+    }
+
     const fromStorage = localStorage.getItem(themeStorageKey);
     const resolvedTheme: ThemeMode =
       fromStorage === "light" || fromStorage === "dark" ? fromStorage : getSystemTheme();
@@ -32,6 +45,13 @@ export function useThemeToggle() {
   }, []);
 
   const toggleTheme = useCallback(() => {
+    if (isNativePlatform()) {
+      applyThemeToDom("light");
+      localStorage.setItem(themeStorageKey, "light");
+      setTheme("light");
+      return;
+    }
+
     setTheme((prev) => {
       const next = prev === "dark" ? "light" : "dark";
       applyThemeToDom(next);

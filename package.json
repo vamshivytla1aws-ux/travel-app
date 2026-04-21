@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "db:seed": "tsx scripts/seed.ts",
+    "db:clear-sample": "tsx scripts/clear-sample-data.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:setup": "psql \"$DATABASE_URL\" -f schema.sql && npm run db:seed",
     "cap:sync": "npx cap sync",

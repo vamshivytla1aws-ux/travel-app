@@ -20,7 +20,6 @@ import {
 import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
-import { query } from "@/lib/db";
 import { BusesService } from "@/services/buses.service";
 
 const busesService = new BusesService();
@@ -74,7 +73,8 @@ async function deleteBus(formData: FormData) {
   const busId = Number(formData.get("busId"));
   if (!busId) return;
 
-  await query(`UPDATE buses SET status = 'inactive', updated_at = NOW() WHERE id = $1`, [busId]);
+  const result = await busesService.deleteBus(busId);
+  if ("error" in result && result.error === "not_found") return;
   await logAuditEvent({ session, action: "delete", entityType: "bus", entityId: busId });
   revalidatePath("/buses");
   redirect(`/buses?deleted=${Date.now()}`);
