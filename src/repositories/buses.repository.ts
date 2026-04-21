@@ -260,6 +260,46 @@ export class BusesRepository {
         [candidateTables],
       );
       const existingTables = new Set(existingTablesResult.rows.map((row) => row.tablename));
+      let assignmentIds: number[] = [];
+      if (existingTables.has("bus_assignments")) {
+        const assignments = await client.query<{ id: number }>(
+          `SELECT id FROM bus_assignments WHERE bus_id = $1`,
+          [id],
+        );
+        assignmentIds = assignments.rows.map((row) => Number(row.id)).filter((v) => Number.isFinite(v));
+      }
+
+      if (assignmentIds.length > 0) {
+        const auxExistingResult = await client.query<{ tablename: string }>(
+          `
+            SELECT tablename
+            FROM pg_tables
+            WHERE schemaname = 'public'
+              AND tablename = ANY($1::text[])
+          `,
+          [["employee_assignments", "gps_logs", "trip_runs"]],
+        );
+        const auxExisting = new Set(auxExistingResult.rows.map((row) => row.tablename));
+
+        if (auxExisting.has("employee_assignments")) {
+          await client.query(
+            `DELETE FROM employee_assignments WHERE bus_assignment_id = ANY($1::bigint[])`,
+            [assignmentIds],
+          );
+        }
+        if (auxExisting.has("gps_logs")) {
+          await client.query(
+            `DELETE FROM gps_logs WHERE assignment_id = ANY($1::bigint[])`,
+            [assignmentIds],
+          );
+        }
+        if (auxExisting.has("trip_runs")) {
+          await client.query(
+            `DELETE FROM trip_runs WHERE assignment_id = ANY($1::bigint[])`,
+            [assignmentIds],
+          );
+        }
+      }
 
       if (existingTables.has("fuel_issues")) {
         await client.query(`DELETE FROM fuel_issues WHERE bus_id = $1`, [id]);
