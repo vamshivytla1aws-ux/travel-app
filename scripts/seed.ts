@@ -39,7 +39,7 @@ async function run() {
     const adminHash = await bcrypt.hash("Admin@123", 10);
     await client.query(
       `INSERT INTO users(full_name, email, password_hash, role, module_access) VALUES
-      ('System Admin', 'admin@transport.local', $1, 'admin', ARRAY['dashboard','buses','trips','drivers','employees','routes','tracking','fuel-entry','fuel-truck','user-admin','logs'])`,
+      ('System Admin', 'admin@transport.local', $1, 'admin', ARRAY['dashboard','buses','trips','drivers','employees','routes','tracking','fuel-truck','finance','user-admin','logs'])`,
       [adminHash],
     );
 

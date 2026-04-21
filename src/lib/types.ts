@@ -146,3 +146,32 @@ export interface FuelTruckLedgerEntry {
   createdBy: number | null;
   createdAt: string;
 }
+
+export interface FinanceLoan {
+  id: number;
+  registrationNo: string;
+  vehicleTypeOrBusName: string;
+  purchaseDate: string;
+  vendorDealer: string | null;
+  financierBankName: string;
+  loanAccountNumber: string;
+  loanType: string | null;
+  interestRate: number;
+  totalBusCost: number;
+  downPayment: number;
+  loanAmountTaken: number;
+  processingFee: number;
+  insuranceAmountFinanced: number;
+  emiAmount: number;
+  loanStartDate: string;
+  loanEndDate: string;
+  totalTenureMonths: number;
+  monthsPaid: number;
+  monthsLeft: number;
+  outstandingPrincipal: number;
+  outstandingInterest: number;
+  nextEmiDate: string | null;
+  status: "active" | "closed" | "overdue" | "repossessed";
+  createdAt: string;
+  updatedAt: string;
+}

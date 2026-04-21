@@ -22,6 +22,7 @@ export const APP_MODULES = [
   "routes",
   "tracking",
   "fuel-truck",
+  "finance",
   "user-admin",
   "logs",
 ] as const;

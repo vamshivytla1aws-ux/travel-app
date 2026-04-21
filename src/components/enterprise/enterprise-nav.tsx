@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CarFront, ChevronDown, ClipboardList, Fuel, Gauge, KeyRound, LogOut, MapPinned, Menu, Route, Timer, Truck, Users } from "lucide-react";
+import { CarFront, ChevronDown, ClipboardList, Fuel, Gauge, KeyRound, Landmark, LogOut, MapPinned, Menu, Route, Timer, Truck, Users } from "lucide-react";
 import { cn } from "@/lib/ui-core";
 import { AppModule } from "@/lib/auth";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -26,6 +26,7 @@ const navGroups = [
     label: "Fuel",
     items: [
       { href: "/fuel-trucks", label: "Fuel Tankers", icon: Fuel, module: "fuel-truck" as AppModule },
+      { href: "/finance", label: "Finance", icon: Landmark, module: "finance" as AppModule },
     ],
   },
   {

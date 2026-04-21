@@ -29,6 +29,7 @@ export function middleware(request: NextRequest) {
     "/drivers",
     "/routes",
     "/tracking",
+    "/finance",
   ];
   const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
 
