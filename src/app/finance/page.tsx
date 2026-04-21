@@ -163,9 +163,9 @@ export default async function FinancePage(props: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Registration No</TableHead>
-                  <TableHead>Bus Name / Vehicle Type</TableHead>
-                  <TableHead>Financier / Bank</TableHead>
+                  <TableHead>Registration</TableHead>
+                  <TableHead>Vehicle</TableHead>
+                  <TableHead>Financier</TableHead>
                   <TableHead>Loan Amount</TableHead>
                   <TableHead>EMI</TableHead>
                   <TableHead>Months Paid</TableHead>

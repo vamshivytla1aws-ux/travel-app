@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { calculateFinanceDerivedFields, FINANCE_STATUSES, normalizeFinanceStatus } from "@/lib/finance";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,7 @@ type FinanceLoanFormValues = {
   emiAmount: string;
   loanStartDate: string;
   loanEndDate: string;
+  tenureYears: string;
   status: string;
 };
 
@@ -40,7 +41,30 @@ function asNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function parseDateAtUtc(value: string): Date | null {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDateAtUtc(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function inferYearsFromDates(startDate: string, endDate: string): string {
+  const start = parseDateAtUtc(startDate);
+  const end = parseDateAtUtc(endDate);
+  if (!start || !end || end <= start) return "";
+  const months =
+    (end.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+    (end.getUTCMonth() - start.getUTCMonth()) +
+    (end.getUTCDate() >= start.getUTCDate() ? 1 : 0);
+  const years = Math.max(0, Number((months / 12).toFixed(2)));
+  return years ? String(years) : "";
+}
+
 export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: Props) {
+  const initialYears = inferYearsFromDates(values?.loanStartDate ?? "", values?.loanEndDate ?? "");
   const [formValues, setFormValues] = useState<FinanceLoanFormValues>({
     registrationNo: values?.registrationNo ?? "",
     vehicleTypeOrBusName: values?.vehicleTypeOrBusName ?? "",
@@ -58,8 +82,29 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
     emiAmount: values?.emiAmount ?? "",
     loanStartDate: values?.loanStartDate ?? "",
     loanEndDate: values?.loanEndDate ?? "",
+    tenureYears: values?.tenureYears ?? initialYears,
     status: normalizeFinanceStatus(values?.status ?? "active"),
   });
+  const [autoEndDate, setAutoEndDate] = useState(Boolean(values?.tenureYears ?? initialYears));
+
+  useEffect(() => {
+    if (!autoEndDate) return;
+    const start = parseDateAtUtc(formValues.loanStartDate);
+    const years = asNumber(formValues.tenureYears);
+    if (!start || years <= 0) return;
+
+    const target = new Date(start.getTime());
+    const wholeYears = Math.trunc(years);
+    const remainderYears = years - wholeYears;
+    const extraMonths = Math.round(remainderYears * 12);
+    target.setUTCFullYear(target.getUTCFullYear() + wholeYears);
+    target.setUTCMonth(target.getUTCMonth() + extraMonths);
+
+    const nextEndDate = formatDateAtUtc(target);
+    if (nextEndDate !== formValues.loanEndDate) {
+      setFormValues((v) => ({ ...v, loanEndDate: nextEndDate }));
+    }
+  }, [autoEndDate, formValues.loanStartDate, formValues.tenureYears, formValues.loanEndDate]);
 
   const derived = useMemo(
     () =>
@@ -90,11 +135,11 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-2">
         <p className="text-xs font-medium text-muted-foreground uppercase md:col-span-2">Vehicle / Purchase Details</p>
         <div className="grid gap-1">
-          <Label htmlFor="registrationNo">Registration No</Label>
+          <Label htmlFor="registrationNo">Registration</Label>
           <Input id="registrationNo" name="registrationNo" required value={formValues.registrationNo} onChange={(e) => setFormValues((v) => ({ ...v, registrationNo: e.target.value }))} />
         </div>
         <div className="grid gap-1">
-          <Label htmlFor="vehicleTypeOrBusName">Vehicle Type / Bus Name</Label>
+          <Label htmlFor="vehicleTypeOrBusName">Vehicle</Label>
           <Input id="vehicleTypeOrBusName" name="vehicleTypeOrBusName" required value={formValues.vehicleTypeOrBusName} onChange={(e) => setFormValues((v) => ({ ...v, vehicleTypeOrBusName: e.target.value }))} />
         </div>
         <div className="grid gap-1">
@@ -110,7 +155,7 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-2">
         <p className="text-xs font-medium text-muted-foreground uppercase md:col-span-2">Loan Details</p>
         <div className="grid gap-1">
-          <Label htmlFor="financierBankName">Financier / Bank Name</Label>
+          <Label htmlFor="financierBankName">Financier</Label>
           <Input id="financierBankName" name="financierBankName" required value={formValues.financierBankName} onChange={(e) => setFormValues((v) => ({ ...v, financierBankName: e.target.value }))} />
         </div>
         <div className="grid gap-1">
@@ -155,15 +200,48 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
-        <p className="text-xs font-medium text-muted-foreground uppercase md:col-span-3">Loan Timeline</p>
+      <div className="grid gap-3 rounded-md border p-3 md:grid-cols-4">
+        <p className="text-xs font-medium text-muted-foreground uppercase md:col-span-4">Loan Timeline</p>
         <div className="grid gap-1">
           <Label htmlFor="loanStartDate">Loan Start Date</Label>
           <Input id="loanStartDate" name="loanStartDate" type="date" required value={formValues.loanStartDate} onChange={(e) => setFormValues((v) => ({ ...v, loanStartDate: e.target.value }))} />
         </div>
         <div className="grid gap-1">
+          <Label htmlFor="tenureYears">Years</Label>
+          <Input
+            id="tenureYears"
+            name="tenureYears"
+            type="number"
+            min={0}
+            step="0.01"
+            value={formValues.tenureYears}
+            onChange={(e) => {
+              setAutoEndDate(true);
+              setFormValues((v) => ({ ...v, tenureYears: e.target.value }));
+            }}
+          />
+        </div>
+        <div className="grid gap-1">
           <Label htmlFor="loanEndDate">Loan End Date</Label>
-          <Input id="loanEndDate" name="loanEndDate" type="date" required value={formValues.loanEndDate} onChange={(e) => setFormValues((v) => ({ ...v, loanEndDate: e.target.value }))} />
+          <Input
+            id="loanEndDate"
+            name="loanEndDate"
+            type="date"
+            required
+            value={formValues.loanEndDate}
+            onChange={(e) => {
+              const nextEndDate = e.target.value;
+              setAutoEndDate(false);
+              setFormValues((v) => ({
+                ...v,
+                loanEndDate: nextEndDate,
+                tenureYears: inferYearsFromDates(v.loanStartDate, nextEndDate),
+              }));
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Manual edit is enabled. Changing Years will auto-calculate this again.
+          </p>
         </div>
         <div className="grid gap-1">
           <Label htmlFor="status">Status</Label>
