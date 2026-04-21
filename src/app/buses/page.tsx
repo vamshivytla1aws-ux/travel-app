@@ -20,6 +20,7 @@ import {
 import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
+import { query } from "@/lib/db";
 import { BusesService } from "@/services/buses.service";
 
 const busesService = new BusesService();
