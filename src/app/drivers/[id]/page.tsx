@@ -21,7 +21,7 @@ const driversService = new DriversService();
 
 async function updateDriverProfile(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("drivers");
   await ensureTransportEnhancements();
 
@@ -77,7 +77,7 @@ async function updateDriverProfile(formData: FormData) {
 
 async function uploadDriverPhoto(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("drivers");
   await ensureTransportEnhancements();
 
@@ -102,7 +102,7 @@ async function uploadDriverPhoto(formData: FormData) {
 
 async function uploadDriverDocument(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("drivers");
   await ensureTransportEnhancements();
   await ensureDocumentTables();
@@ -128,7 +128,7 @@ async function uploadDriverDocument(formData: FormData) {
 
 async function deleteDriverDocument(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("drivers");
   await ensureTransportEnhancements();
   await ensureDocumentTables();

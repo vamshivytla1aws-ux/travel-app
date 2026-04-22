@@ -23,7 +23,7 @@ const fuelTruckService = new FuelTruckService();
 
 async function uploadBusDocument(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("buses");
   await ensureTransportEnhancements();
   await ensureDocumentTables();
@@ -48,7 +48,7 @@ async function uploadBusDocument(formData: FormData) {
 
 async function deleteBusDocument(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("buses");
   await ensureTransportEnhancements();
   await ensureDocumentTables();
@@ -65,7 +65,7 @@ async function deleteBusDocument(formData: FormData) {
 
 async function addDailyMileageEntry(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
   await requireModuleAccess("buses");
   await ensureTransportEnhancements();
 
@@ -147,7 +147,7 @@ async function addDailyMileageEntry(formData: FormData) {
 
 async function updateManualFuelHistoryEntry(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
   await requireModuleAccess("buses");
   await ensureTransportEnhancements();
 

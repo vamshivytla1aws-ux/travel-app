@@ -40,7 +40,7 @@ type Props = {
 
 async function createBus(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("buses");
 
   const busNumber = String(formData.get("busNumber"));
@@ -71,7 +71,7 @@ async function createBus(formData: FormData) {
 
 async function deleteBus(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("buses");
   const busId = Number(formData.get("busId"));
   if (!busId) return;
@@ -86,7 +86,7 @@ async function deleteBus(formData: FormData) {
 
 async function updateBusStatus(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("buses");
 
   const busId = Number(formData.get("busId"));

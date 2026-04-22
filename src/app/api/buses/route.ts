@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (!["admin", "dispatcher"].includes(session.role)) {
+  if (!["admin", "dispatcher", "updater"].includes(session.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

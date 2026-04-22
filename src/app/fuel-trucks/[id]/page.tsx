@@ -28,7 +28,7 @@ function optionalNumber(formData: FormData, key: string): number | null {
 
 async function updateFuelTruck(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
   await requireModuleAccess("fuel-truck");
   const id = Number(formData.get("id"));
   if (!id) return;
@@ -64,7 +64,7 @@ async function updateFuelTruck(formData: FormData) {
 
 async function addTruckRefill(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
   await requireModuleAccess("fuel-truck");
 
   const id = Number(formData.get("fuelTruckId"));
@@ -117,7 +117,7 @@ async function addTruckRefill(formData: FormData) {
 
 async function addTruckIssue(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
   await requireModuleAccess("fuel-truck");
 
   const id = Number(formData.get("fuelTruckId"));
@@ -163,7 +163,7 @@ async function addTruckIssue(formData: FormData) {
 
 async function updateTruckIssue(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
   await requireModuleAccess("fuel-truck");
   const fuelTruckId = Number(formData.get("fuelTruckId"));
   const issueId = Number(formData.get("issueId"));

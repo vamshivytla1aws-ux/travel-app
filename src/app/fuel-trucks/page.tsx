@@ -33,7 +33,7 @@ function optionalNumber(formData: FormData, key: string): number | null {
 
 async function createFuelTruck(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
   await requireModuleAccess("fuel-truck");
 
   try {
@@ -66,7 +66,7 @@ async function createFuelTruck(formData: FormData) {
 
 async function addRefill(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
   await requireModuleAccess("fuel-truck");
 
   const receiptFile = formData.get("receipt");
@@ -121,7 +121,7 @@ async function addRefill(formData: FormData) {
 
 async function addIssue(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
   await requireModuleAccess("fuel-truck");
 
   try {
@@ -191,7 +191,7 @@ type Props = {
 
 async function deleteRefillReportEntry(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
   await requireModuleAccess("fuel-truck");
   const refillId = Number(formData.get("refillId"));
   if (!refillId) return;
@@ -215,7 +215,7 @@ async function deleteRefillReportEntry(formData: FormData) {
 
 async function deleteIssueReportEntry(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
   await requireModuleAccess("fuel-truck");
   const issueId = Number(formData.get("issueId"));
   if (!issueId) return;

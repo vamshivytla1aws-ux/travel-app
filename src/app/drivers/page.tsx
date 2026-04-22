@@ -37,7 +37,7 @@ function withParams(
 
 async function createDriver(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("drivers");
   await ensureTransportEnhancements();
   const phone = String(formData.get("phone"));
@@ -88,7 +88,7 @@ async function createDriver(formData: FormData) {
 
 async function deleteDriver(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("drivers");
   const driverId = Number(formData.get("driverId"));
   if (!driverId) return;

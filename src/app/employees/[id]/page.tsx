@@ -19,7 +19,7 @@ const employeesService = new EmployeesService();
 
 async function updateEmployeeProfile(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("employees");
   await ensureTransportEnhancements();
 
@@ -83,7 +83,7 @@ async function updateEmployeeProfile(formData: FormData) {
 
 async function uploadEmployeePhoto(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("employees");
   await ensureTransportEnhancements();
 

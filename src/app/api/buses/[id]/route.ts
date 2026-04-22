@@ -28,7 +28,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (!["admin", "dispatcher"].includes(session.role)) {
+  if (!["admin", "dispatcher", "updater"].includes(session.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -93,7 +93,7 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
   if (!session) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (!["admin", "dispatcher"].includes(session.role)) {
+  if (!["admin", "dispatcher", "updater"].includes(session.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

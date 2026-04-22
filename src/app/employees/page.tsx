@@ -36,7 +36,7 @@ function withParams(
 
 async function createEmployee(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("employees");
   const employeeCode = String(formData.get("employeeCode"));
   const email = String(formData.get("email") ?? "").trim() || null;
@@ -82,7 +82,7 @@ async function createEmployee(formData: FormData) {
 
 async function deleteEmployee(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("employees");
   const employeeId = Number(formData.get("employeeId"));
   if (!employeeId) return;

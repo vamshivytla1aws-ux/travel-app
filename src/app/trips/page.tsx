@@ -21,7 +21,7 @@ const SHIFT_OPTIONS = ["general", "morning", "afternoon", "night", "unknown"] as
 
 async function createTrip(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("trips");
   await tripsService.createTrip({
     busId: Number(formData.get("busId")),
@@ -38,7 +38,7 @@ async function createTrip(formData: FormData) {
 
 async function updateTrip(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("trips");
   const tripId = Number(formData.get("tripId"));
   await tripsService.updateTripPlan({
@@ -57,7 +57,7 @@ async function updateTrip(formData: FormData) {
 
 async function startTrip(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("trips");
   const tripId = Number(formData.get("tripId"));
   await tripsService.startTrip({
@@ -70,7 +70,7 @@ async function startTrip(formData: FormData) {
 
 async function completeTrip(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("trips");
   const tripId = Number(formData.get("tripId"));
   await tripsService.completeTrip({
@@ -85,7 +85,7 @@ async function completeTrip(formData: FormData) {
 
 async function cancelTrip(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher"]);
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("trips");
   const tripId = Number(formData.get("tripId"));
   await tripsService.cancelTrip(tripId);
