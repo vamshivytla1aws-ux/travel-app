@@ -6,6 +6,7 @@ type BusOption = {
   id: number;
   busNumber: string;
   registrationNumber: string;
+  latestOdometerKm?: number | null;
 };
 
 type Props = {
@@ -13,9 +14,10 @@ type Props = {
   id?: string;
   buses: BusOption[];
   required?: boolean;
+  oldOdometerTargetId?: string;
 };
 
-export function BusSearchSelect({ name, id, buses, required = false }: Props) {
+export function BusSearchSelect({ name, id, buses, required = false, oldOdometerTargetId }: Props) {
   const generatedId = useId();
   const inputId = id ?? `bus-search-${generatedId}`;
   const listboxId = `${inputId}-listbox`;
@@ -42,6 +44,10 @@ export function BusSearchSelect({ name, id, buses, required = false }: Props) {
   function selectBus(bus: BusOption) {
     setSelectedId(bus.id);
     setQuery(`${bus.busNumber} (${bus.registrationNumber})`);
+    if (oldOdometerTargetId && bus.latestOdometerKm != null) {
+      const target = document.getElementById(oldOdometerTargetId) as HTMLInputElement | null;
+      if (target) target.value = String(bus.latestOdometerKm);
+    }
   }
 
   return (
