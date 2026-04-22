@@ -1,3 +1,6 @@
+ "use client";
+
+import { useState } from "react";
 import { BusSearchSelect } from "@/components/fuel-trucks/bus-search-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -89,10 +92,52 @@ function sectionTitle(title: string) {
 }
 
 export function DriverIntakeForm({ defaults, buses, submitLabel }: Props) {
+  const [sameAsPresentAddress, setSameAsPresentAddress] = useState(false);
+  const [presentAddress, setPresentAddress] = useState({
+    village: defaults.presentVillage,
+    landmark: defaults.presentLandmark,
+    postOffice: defaults.presentPostOffice,
+    mandal: defaults.presentMandal,
+    policeStation: defaults.presentPoliceStation,
+    district: defaults.presentDistrict,
+    state: defaults.presentState,
+    pinCode: defaults.presentPinCode,
+  });
+  const [permanentAddress, setPermanentAddress] = useState({
+    village: defaults.permanentVillage,
+    landmark: defaults.permanentLandmark,
+    postOffice: defaults.permanentPostOffice,
+    mandal: defaults.permanentMandal,
+    policeStation: defaults.permanentPoliceStation,
+    district: defaults.permanentDistrict,
+    state: defaults.permanentState,
+    pinCode: defaults.permanentPinCode,
+  });
+
   const selectedBus = buses.find((bus) => String(bus.id) === defaults.vehicleBusId);
   const odometerDefault =
     defaults.presentReadingKm ||
     (selectedBus?.latestOdometerKm != null ? String(selectedBus.latestOdometerKm) : "");
+
+  function applySameAddress(nextChecked: boolean) {
+    setSameAsPresentAddress(nextChecked);
+    if (nextChecked) {
+      setPermanentAddress({ ...presentAddress });
+    }
+  }
+
+  function handlePresentChange(
+    key: keyof typeof presentAddress,
+    value: string,
+  ) {
+    setPresentAddress((prev) => {
+      const next = { ...prev, [key]: value };
+      if (sameAsPresentAddress) {
+        setPermanentAddress({ ...next });
+      }
+      return next;
+    });
+  }
 
   return (
     <div className="space-y-4">
@@ -187,26 +232,37 @@ export function DriverIntakeForm({ defaults, buses, submitLabel }: Props) {
 
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-4">
         {sectionTitle("Present Address")}
-        <div className="grid gap-1"><Label htmlFor="presentVillage">Village</Label><Input id="presentVillage" name="presentVillage" defaultValue={defaults.presentVillage} /></div>
-        <div className="grid gap-1"><Label htmlFor="presentLandmark">Land Mark</Label><Input id="presentLandmark" name="presentLandmark" defaultValue={defaults.presentLandmark} /></div>
-        <div className="grid gap-1"><Label htmlFor="presentPostOffice">Post Office</Label><Input id="presentPostOffice" name="presentPostOffice" defaultValue={defaults.presentPostOffice} /></div>
-        <div className="grid gap-1"><Label htmlFor="presentMandal">Mandal</Label><Input id="presentMandal" name="presentMandal" defaultValue={defaults.presentMandal} /></div>
-        <div className="grid gap-1"><Label htmlFor="presentPoliceStation">Police Station</Label><Input id="presentPoliceStation" name="presentPoliceStation" defaultValue={defaults.presentPoliceStation} /></div>
-        <div className="grid gap-1"><Label htmlFor="presentDistrict">District</Label><Input id="presentDistrict" name="presentDistrict" defaultValue={defaults.presentDistrict} /></div>
-        <div className="grid gap-1"><Label htmlFor="presentState">State</Label><Input id="presentState" name="presentState" defaultValue={defaults.presentState} /></div>
-        <div className="grid gap-1"><Label htmlFor="presentPinCode">Pin Code No</Label><Input id="presentPinCode" name="presentPinCode" defaultValue={defaults.presentPinCode} /></div>
+        <div className="grid gap-1"><Label htmlFor="presentVillage">Village</Label><Input id="presentVillage" name="presentVillage" value={presentAddress.village} onChange={(e) => handlePresentChange("village", e.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor="presentLandmark">Land Mark</Label><Input id="presentLandmark" name="presentLandmark" value={presentAddress.landmark} onChange={(e) => handlePresentChange("landmark", e.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor="presentPostOffice">Post Office</Label><Input id="presentPostOffice" name="presentPostOffice" value={presentAddress.postOffice} onChange={(e) => handlePresentChange("postOffice", e.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor="presentMandal">Mandal</Label><Input id="presentMandal" name="presentMandal" value={presentAddress.mandal} onChange={(e) => handlePresentChange("mandal", e.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor="presentPoliceStation">Police Station</Label><Input id="presentPoliceStation" name="presentPoliceStation" value={presentAddress.policeStation} onChange={(e) => handlePresentChange("policeStation", e.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor="presentDistrict">District</Label><Input id="presentDistrict" name="presentDistrict" value={presentAddress.district} onChange={(e) => handlePresentChange("district", e.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor="presentState">State</Label><Input id="presentState" name="presentState" value={presentAddress.state} onChange={(e) => handlePresentChange("state", e.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor="presentPinCode">Pin Code No</Label><Input id="presentPinCode" name="presentPinCode" value={presentAddress.pinCode} onChange={(e) => handlePresentChange("pinCode", e.target.value)} /></div>
       </div>
 
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-4">
         {sectionTitle("Permanent Address")}
-        <div className="grid gap-1"><Label htmlFor="permanentVillage">Village</Label><Input id="permanentVillage" name="permanentVillage" defaultValue={defaults.permanentVillage} /></div>
-        <div className="grid gap-1"><Label htmlFor="permanentLandmark">Land Mark</Label><Input id="permanentLandmark" name="permanentLandmark" defaultValue={defaults.permanentLandmark} /></div>
-        <div className="grid gap-1"><Label htmlFor="permanentPostOffice">Post Office</Label><Input id="permanentPostOffice" name="permanentPostOffice" defaultValue={defaults.permanentPostOffice} /></div>
-        <div className="grid gap-1"><Label htmlFor="permanentMandal">Mandal</Label><Input id="permanentMandal" name="permanentMandal" defaultValue={defaults.permanentMandal} /></div>
-        <div className="grid gap-1"><Label htmlFor="permanentPoliceStation">Police Station</Label><Input id="permanentPoliceStation" name="permanentPoliceStation" defaultValue={defaults.permanentPoliceStation} /></div>
-        <div className="grid gap-1"><Label htmlFor="permanentDistrict">District</Label><Input id="permanentDistrict" name="permanentDistrict" defaultValue={defaults.permanentDistrict} /></div>
-        <div className="grid gap-1"><Label htmlFor="permanentState">State</Label><Input id="permanentState" name="permanentState" defaultValue={defaults.permanentState} /></div>
-        <div className="grid gap-1"><Label htmlFor="permanentPinCode">Pin Code No</Label><Input id="permanentPinCode" name="permanentPinCode" defaultValue={defaults.permanentPinCode} /></div>
+        <div className="col-span-full flex items-center gap-2 rounded-md border border-dashed p-2">
+          <input
+            id="sameAsPresentAddress"
+            type="checkbox"
+            checked={sameAsPresentAddress}
+            onChange={(e) => applySameAddress(e.target.checked)}
+          />
+          <Label htmlFor="sameAsPresentAddress" className="cursor-pointer">
+            Same as Present Address
+          </Label>
+        </div>
+        <div className="grid gap-1"><Label htmlFor="permanentVillage">Village</Label><Input id="permanentVillage" name="permanentVillage" value={permanentAddress.village} onChange={(e) => setPermanentAddress((prev) => ({ ...prev, village: e.target.value }))} /></div>
+        <div className="grid gap-1"><Label htmlFor="permanentLandmark">Land Mark</Label><Input id="permanentLandmark" name="permanentLandmark" value={permanentAddress.landmark} onChange={(e) => setPermanentAddress((prev) => ({ ...prev, landmark: e.target.value }))} /></div>
+        <div className="grid gap-1"><Label htmlFor="permanentPostOffice">Post Office</Label><Input id="permanentPostOffice" name="permanentPostOffice" value={permanentAddress.postOffice} onChange={(e) => setPermanentAddress((prev) => ({ ...prev, postOffice: e.target.value }))} /></div>
+        <div className="grid gap-1"><Label htmlFor="permanentMandal">Mandal</Label><Input id="permanentMandal" name="permanentMandal" value={permanentAddress.mandal} onChange={(e) => setPermanentAddress((prev) => ({ ...prev, mandal: e.target.value }))} /></div>
+        <div className="grid gap-1"><Label htmlFor="permanentPoliceStation">Police Station</Label><Input id="permanentPoliceStation" name="permanentPoliceStation" value={permanentAddress.policeStation} onChange={(e) => setPermanentAddress((prev) => ({ ...prev, policeStation: e.target.value }))} /></div>
+        <div className="grid gap-1"><Label htmlFor="permanentDistrict">District</Label><Input id="permanentDistrict" name="permanentDistrict" value={permanentAddress.district} onChange={(e) => setPermanentAddress((prev) => ({ ...prev, district: e.target.value }))} /></div>
+        <div className="grid gap-1"><Label htmlFor="permanentState">State</Label><Input id="permanentState" name="permanentState" value={permanentAddress.state} onChange={(e) => setPermanentAddress((prev) => ({ ...prev, state: e.target.value }))} /></div>
+        <div className="grid gap-1"><Label htmlFor="permanentPinCode">Pin Code No</Label><Input id="permanentPinCode" name="permanentPinCode" value={permanentAddress.pinCode} onChange={(e) => setPermanentAddress((prev) => ({ ...prev, pinCode: e.target.value }))} /></div>
       </div>
 
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
