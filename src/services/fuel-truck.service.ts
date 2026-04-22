@@ -70,6 +70,22 @@ type AddIssueInput = {
   userId?: number | null;
 };
 
+type UpdateIssueInput = {
+  issueId: number;
+  issueDate: string;
+  issueTime: string;
+  litersIssued: number;
+  odometerBeforeKm?: number | null;
+  odometerAfterKm?: number | null;
+  amount?: number;
+  companyName?: string;
+  issuedByName?: string;
+  busDriverName?: string;
+  routeReference?: string;
+  remarks?: string;
+  userId?: number | null;
+};
+
 type ReportFilters = {
   fromDate?: string;
   toDate?: string;
@@ -160,6 +176,18 @@ function mapLedger(row: FuelTruckLedgerRow): FuelTruckLedgerEntry {
 }
 
 export class FuelTruckService {
+  async getLatestOdometerByBusIds(busIds: number[]) {
+    await ensureTransportEnhancements();
+    if (!busIds.length) return new Map<number, number>();
+    const result = await query<{ id: number; odometer_km: string }>(
+      `SELECT id, odometer_km::text
+       FROM buses
+       WHERE id = ANY($1::bigint[])`,
+      [busIds],
+    );
+    return new Map(result.rows.map((row) => [row.id, Number(row.odometer_km)]));
+  }
+
   async listFuelTrucks(search = "", status?: "active" | "inactive") {
     await ensureTransportEnhancements();
     const rows = await fuelTruckRepository.list(search, status);
@@ -477,6 +505,125 @@ export class FuelTruckService {
       );
 
       return { issueId, openingStock: opening, closingStock: closing };
+    });
+  }
+
+  async updateIssue(input: UpdateIssueInput) {
+    await ensureTransportEnhancements();
+    if (!Number.isFinite(input.litersIssued) || input.litersIssued <= 0) {
+      throw new Error("Issued liters must be positive");
+    }
+    if ((input.amount ?? 0) < 0) throw new Error("Amount cannot be negative");
+    if (
+      input.odometerBeforeKm != null &&
+      input.odometerAfterKm != null &&
+      input.odometerAfterKm < input.odometerBeforeKm
+    ) {
+      throw new Error("Odometer end must be greater than or equal to start");
+    }
+
+    return withTransaction(async (client) => {
+      const issueResult = await client.query<{
+        id: number;
+        fuel_truck_id: number;
+        bus_id: number;
+        liters_issued: string;
+      }>(
+        `SELECT id, fuel_truck_id, bus_id, liters_issued::text
+         FROM fuel_issues
+         WHERE id = $1
+         FOR UPDATE`,
+        [input.issueId],
+      );
+      const existing = issueResult.rows[0];
+      if (!existing) throw new Error("Issue record not found");
+
+      const truckResult = await client.query<{
+        id: number;
+        status: "active" | "inactive";
+        current_available_liters: string;
+      }>(
+        `SELECT id, status, current_available_liters::text
+         FROM fuel_trucks
+         WHERE id = $1
+         FOR UPDATE`,
+        [existing.fuel_truck_id],
+      );
+      const truck = truckResult.rows[0];
+      if (!truck) throw new Error("Fuel truck not found");
+      if (truck.status !== "active") throw new Error("Fuel truck is inactive");
+
+      const currentStock = Number(truck.current_available_liters);
+      const previousLiters = Number(existing.liters_issued);
+      const delta = Number((input.litersIssued - previousLiters).toFixed(2));
+      if (delta > 0 && delta > currentStock) throw new Error("Issued liters exceed available stock");
+      const nextStock = Number((currentStock - delta).toFixed(2));
+
+      await client.query(
+        `UPDATE fuel_issues
+         SET issue_date = $1,
+             issue_time = $2,
+             liters_issued = $3,
+             odometer_before_km = $4,
+             odometer_after_km = $5,
+             amount = $6,
+             company_name = $7,
+             issued_by_name = $8,
+             bus_driver_name = $9,
+             route_reference = $10,
+             remarks = $11
+         WHERE id = $12`,
+        [
+          input.issueDate,
+          input.issueTime,
+          input.litersIssued,
+          input.odometerBeforeKm ?? null,
+          input.odometerAfterKm ?? null,
+          input.amount ?? 0,
+          input.companyName?.trim() || null,
+          input.issuedByName?.trim() || null,
+          input.busDriverName?.trim() || null,
+          input.routeReference?.trim() || null,
+          input.remarks?.trim() || null,
+          input.issueId,
+        ],
+      );
+
+      if (delta !== 0) {
+        await client.query(
+          `UPDATE fuel_trucks
+           SET current_available_liters = $1, updated_by = $2, updated_at = NOW()
+           WHERE id = $3`,
+          [nextStock, input.userId ?? null, existing.fuel_truck_id],
+        );
+
+        await client.query(
+          `INSERT INTO fuel_truck_ledger(
+            fuel_truck_id, transaction_type, reference_id, reference_type, transaction_date, transaction_time,
+            opening_stock, quantity_in, quantity_out, closing_stock, remarks, created_by
+          )
+           VALUES($1,'ADJUSTMENT',$2,'fuel_issues',CURRENT_DATE,CURRENT_TIME,$3,$4,$5,$6,$7,$8)`,
+          [
+            existing.fuel_truck_id,
+            input.issueId,
+            currentStock,
+            delta < 0 ? Math.abs(delta) : 0,
+            delta > 0 ? delta : 0,
+            nextStock,
+            `Issue edit adjustment (issue #${input.issueId})`,
+            input.userId ?? null,
+          ],
+        );
+      }
+
+      if (input.odometerAfterKm != null) {
+        await client.query(
+          `UPDATE buses SET odometer_km = $1, updated_at = NOW() WHERE id = $2`,
+          [input.odometerAfterKm, existing.bus_id],
+        );
+      }
+
+      return { issueId: input.issueId, fuelTruckId: existing.fuel_truck_id, busId: existing.bus_id };
     });
   }
 
