@@ -6,8 +6,8 @@ export async function GET() {
   await requireSession();
 
   const [buses, drivers, routes] = await Promise.all([
-    query<{ id: number; bus_number: string; registration_number: string }>(
-      `SELECT id, bus_number, registration_number
+    query<{ id: number; bus_number: string; registration_number: string; odometer_km: string }>(
+      `SELECT id, bus_number, registration_number, odometer_km::text
        FROM buses
        WHERE status = 'active'
        ORDER BY registration_number`,
@@ -27,7 +27,12 @@ export async function GET() {
   ]);
 
   return NextResponse.json({
-    buses: buses.rows.map((b) => ({ id: b.id, busNumber: b.bus_number, registrationNumber: b.registration_number })),
+    buses: buses.rows.map((b) => ({
+      id: b.id,
+      busNumber: b.bus_number,
+      registrationNumber: b.registration_number,
+      odometerKm: Number(b.odometer_km),
+    })),
     drivers: drivers.rows.map((d) => ({ id: d.id, fullName: d.full_name, companyName: d.company_name })),
     routes: routes.rows,
   });

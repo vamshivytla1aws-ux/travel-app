@@ -22,6 +22,72 @@ export async function ensureTransportEnhancements() {
   await query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS profile_photo_name VARCHAR(255);`);
   await query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS profile_photo_mime VARCHAR(120);`);
   await query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS profile_photo_data BYTEA;`);
+  await query(`
+    CREATE TABLE IF NOT EXISTS driver_profiles (
+      driver_id BIGINT PRIMARY KEY REFERENCES drivers(id) ON DELETE CASCADE,
+      blood_group VARCHAR(10),
+      father_name VARCHAR(120),
+      father_contact VARCHAR(20),
+      mother_name VARCHAR(120),
+      mother_contact VARCHAR(20),
+      spouse_name VARCHAR(120),
+      spouse_contact VARCHAR(20),
+      child_1_name VARCHAR(120),
+      child_2_name VARCHAR(120),
+      pan_or_voter_id VARCHAR(40),
+      aadhaar_no VARCHAR(20),
+      vehicle_bus_id BIGINT REFERENCES buses(id),
+      vehicle_registration_no VARCHAR(40),
+      present_reading_km NUMERIC(12,2),
+      badge_no VARCHAR(40),
+      badge_validity DATE,
+      education VARCHAR(120),
+      date_of_birth DATE,
+      marital_status VARCHAR(40),
+      religion VARCHAR(80),
+      present_village VARCHAR(120),
+      present_landmark VARCHAR(180),
+      present_post_office VARCHAR(120),
+      present_mandal VARCHAR(120),
+      present_police_station VARCHAR(120),
+      present_district VARCHAR(120),
+      present_state VARCHAR(120),
+      present_pin_code VARCHAR(20),
+      permanent_village VARCHAR(120),
+      permanent_landmark VARCHAR(180),
+      permanent_post_office VARCHAR(120),
+      permanent_mandal VARCHAR(120),
+      permanent_police_station VARCHAR(120),
+      permanent_district VARCHAR(120),
+      permanent_state VARCHAR(120),
+      permanent_pin_code VARCHAR(20),
+      reference1_name VARCHAR(120),
+      reference1_relationship VARCHAR(120),
+      reference1_contact VARCHAR(20),
+      reference2_name VARCHAR(120),
+      reference2_relationship VARCHAR(120),
+      reference2_contact VARCHAR(20),
+      present_salary NUMERIC(12,2),
+      salary_expectation NUMERIC(12,2),
+      salary_offered NUMERIC(12,2),
+      joining_date DATE,
+      candidate_signature_text VARCHAR(160),
+      candidate_signature_date DATE,
+      appointee_signature_text VARCHAR(160),
+      approval_authority_signature_text VARCHAR(160),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      CONSTRAINT driver_profiles_present_reading_check CHECK (present_reading_km IS NULL OR present_reading_km >= 0),
+      CONSTRAINT driver_profiles_salary_values_check CHECK (
+        (present_salary IS NULL OR present_salary >= 0) AND
+        (salary_expectation IS NULL OR salary_expectation >= 0) AND
+        (salary_offered IS NULL OR salary_offered >= 0)
+      )
+    );
+  `);
+  await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_driver_profiles_aadhaar_unique ON driver_profiles (aadhaar_no) WHERE aadhaar_no IS NOT NULL AND aadhaar_no <> '';`);
+  await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_driver_profiles_pan_voter_unique ON driver_profiles (pan_or_voter_id) WHERE pan_or_voter_id IS NOT NULL AND pan_or_voter_id <> '';`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_driver_profiles_vehicle_bus_id ON driver_profiles(vehicle_bus_id);`);
 
   await query(`ALTER TABLE employees ALTER COLUMN email DROP NOT NULL;`);
   await query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS company_name VARCHAR(120);`);

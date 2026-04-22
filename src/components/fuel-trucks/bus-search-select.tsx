@@ -15,15 +15,28 @@ type Props = {
   buses: BusOption[];
   required?: boolean;
   oldOdometerTargetId?: string;
+  registrationTargetId?: string;
+  defaultSelectedId?: number | null;
 };
 
-export function BusSearchSelect({ name, id, buses, required = false, oldOdometerTargetId }: Props) {
+export function BusSearchSelect({
+  name,
+  id,
+  buses,
+  required = false,
+  oldOdometerTargetId,
+  registrationTargetId,
+  defaultSelectedId = null,
+}: Props) {
   const generatedId = useId();
   const inputId = id ?? `bus-search-${generatedId}`;
   const listboxId = `${inputId}-listbox`;
   const textInputRef = useRef<HTMLInputElement | null>(null);
-  const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const initialSelected = defaultSelectedId ? buses.find((bus) => bus.id === defaultSelectedId) ?? null : null;
+  const [query, setQuery] = useState(
+    initialSelected ? `${initialSelected.busNumber} (${initialSelected.registrationNumber})` : "",
+  );
+  const [selectedId, setSelectedId] = useState<number | null>(defaultSelectedId);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -69,7 +82,19 @@ export function BusSearchSelect({ name, id, buses, required = false, oldOdometer
       const target = document.getElementById(oldOdometerTargetId) as HTMLInputElement | null;
       if (target) target.value = String(bus.latestOdometerKm);
     }
+    if (registrationTargetId) {
+      const target = document.getElementById(registrationTargetId) as HTMLInputElement | null;
+      if (target) target.value = bus.registrationNumber;
+    }
   }
+
+  useEffect(() => {
+    if (!defaultSelectedId) return;
+    const selected = buses.find((bus) => bus.id === defaultSelectedId);
+    if (!selected) return;
+    setSelectedId(selected.id);
+    setQuery(`${selected.busNumber} (${selected.registrationNumber})`);
+  }, [buses, defaultSelectedId]);
 
   useEffect(() => {
     const inputEl = textInputRef.current;

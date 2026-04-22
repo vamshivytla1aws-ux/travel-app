@@ -33,6 +33,61 @@ export interface Driver {
   experienceYears: number;
   hasProfilePhoto: boolean;
   isActive: boolean;
+  profile?: DriverProfile | null;
+}
+
+export interface DriverProfile {
+  driverId: number;
+  bloodGroup: string | null;
+  fatherName: string | null;
+  fatherContact: string | null;
+  motherName: string | null;
+  motherContact: string | null;
+  spouseName: string | null;
+  spouseContact: string | null;
+  child1Name: string | null;
+  child2Name: string | null;
+  panOrVoterId: string | null;
+  aadhaarNo: string | null;
+  vehicleBusId: number | null;
+  vehicleRegistrationNo: string | null;
+  presentReadingKm: number | null;
+  badgeNo: string | null;
+  badgeValidity: string | null;
+  education: string | null;
+  dateOfBirth: string | null;
+  maritalStatus: string | null;
+  religion: string | null;
+  presentVillage: string | null;
+  presentLandmark: string | null;
+  presentPostOffice: string | null;
+  presentMandal: string | null;
+  presentPoliceStation: string | null;
+  presentDistrict: string | null;
+  presentState: string | null;
+  presentPinCode: string | null;
+  permanentVillage: string | null;
+  permanentLandmark: string | null;
+  permanentPostOffice: string | null;
+  permanentMandal: string | null;
+  permanentPoliceStation: string | null;
+  permanentDistrict: string | null;
+  permanentState: string | null;
+  permanentPinCode: string | null;
+  reference1Name: string | null;
+  reference1Relationship: string | null;
+  reference1Contact: string | null;
+  reference2Name: string | null;
+  reference2Relationship: string | null;
+  reference2Contact: string | null;
+  presentSalary: number | null;
+  salaryExpectation: number | null;
+  salaryOffered: number | null;
+  joiningDate: string | null;
+  candidateSignatureText: string | null;
+  candidateSignatureDate: string | null;
+  appointeeSignatureText: string | null;
+  approvalAuthoritySignatureText: string | null;
 }
 
 export interface Employee {
