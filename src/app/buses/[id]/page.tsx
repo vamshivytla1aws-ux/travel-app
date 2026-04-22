@@ -199,6 +199,45 @@ async function updateManualFuelHistoryEntry(formData: FormData) {
   redirect(`/buses/${busId}?fuelUpdated=${Date.now()}`);
 }
 
+async function deleteFuelHistoryEntry(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
+  await requireModuleAccess("buses");
+  await ensureTransportEnhancements();
+
+  const busId = Number(formData.get("busId"));
+  const fuelEntryId = Number(formData.get("fuelEntryId"));
+  const fuelSource = String(formData.get("fuelSource") ?? "").toUpperCase();
+  if (!busId || !fuelEntryId) return;
+
+  if (fuelSource === "TANKER") {
+    const result = await fuelTruckService.deleteIssue(fuelEntryId, session.id);
+    await logAuditEvent({
+      session,
+      action: "delete",
+      entityType: "fuel_truck_issue",
+      entityId: fuelEntryId,
+      details: { busId: result.busId, fuelTruckId: result.fuelTruckId },
+    });
+    revalidatePath("/fuel-trucks");
+    revalidatePath("/dashboard");
+    revalidatePath(`/buses/${busId}`);
+    redirect(`/buses/${busId}?fuelDeleted=${Date.now()}`);
+  }
+
+  await query(`DELETE FROM fuel_entries WHERE id = $1 AND bus_id = $2`, [fuelEntryId, busId]);
+  await logAuditEvent({
+    session,
+    action: "delete",
+    entityType: "fuel_entry",
+    entityId: fuelEntryId,
+    details: { busId },
+  });
+  revalidatePath("/dashboard");
+  revalidatePath(`/buses/${busId}`);
+  redirect(`/buses/${busId}?fuelDeleted=${Date.now()}`);
+}
+
 async function createMaintenanceRecord(formData: FormData) {
   "use server";
   const session = await requireSession(["admin", "dispatcher", "updater"]);
@@ -306,6 +345,7 @@ type Props = {
     fuelSaved?: string;
     fuelError?: string;
     fuelUpdated?: string;
+    fuelDeleted?: string;
     docUploaded?: string;
     docDeleted?: string;
     maintenanceSaved?: string;
@@ -336,6 +376,7 @@ export default async function BusDetailPage(props: Props) {
       ? detail.fuelHistory.find((entry) => entry.source === "MANUAL" && entry.id === editFuelId) ?? null
       : null;
   const fuelTrucks = await fuelTruckService.listFuelTrucks("", "active");
+  const defaultOdometerStart = detail.latestFuel?.odometerAfterKm ?? detail.bus.odometerKm;
   const now = new Date();
   const defaultDate = now.toISOString().slice(0, 10);
   const defaultTime = now.toTimeString().slice(0, 5);
@@ -376,6 +417,11 @@ export default async function BusDetailPage(props: Props) {
         {searchParams.fuelUpdated ? (
           <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
             Fuel history updated successfully.
+          </div>
+        ) : null}
+        {searchParams.fuelDeleted ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+            Fuel history entry deleted successfully.
           </div>
         ) : null}
         {searchParams.docUploaded ? (
@@ -474,7 +520,14 @@ export default async function BusDetailPage(props: Props) {
               </div>
               <div className="grid gap-1">
                 <Label htmlFor="odometerStart">Odometer Start</Label>
-                <Input id="odometerStart" name="odometerStart" type="number" step="0.01" required />
+                <Input
+                  id="odometerStart"
+                  name="odometerStart"
+                  type="number"
+                  step="0.01"
+                  defaultValue={defaultOdometerStart}
+                  required
+                />
               </div>
               <div className="grid gap-1">
                 <Label htmlFor="odometerEnd">Odometer End</Label>
@@ -595,23 +648,39 @@ export default async function BusDetailPage(props: Props) {
                       <TableCell>{entry.companyName ?? "-"}</TableCell>
                       <TableCell>{entry.amount.toFixed(2)}</TableCell>
                       <TableCell className="text-right">
-                        {entry.source === "MANUAL" ? (
-                          <a
-                            href={`/buses/${detail.bus.id}?editFuelId=${entry.id}&editFuelSource=MANUAL`}
-                            className="text-blue-600 hover:underline"
-                          >
-                            Edit
-                          </a>
-                        ) : entry.fuelTruckId ? (
-                          <a
-                            href={`/fuel-trucks/${entry.fuelTruckId}?editIssueId=${entry.referenceId}`}
-                            className="text-blue-600 hover:underline"
-                          >
-                            Edit
-                          </a>
-                        ) : (
-                          "-"
-                        )}
+                        {(() => {
+                          const deleteId = entry.source === "TANKER" ? entry.referenceId : entry.id;
+                          if (!deleteId) return null;
+                          return (
+                        <div className="flex items-center justify-end gap-3">
+                          {entry.source === "MANUAL" ? (
+                            <a
+                              href={`/buses/${detail.bus.id}?editFuelId=${entry.id}&editFuelSource=MANUAL`}
+                              className="text-blue-600 hover:underline"
+                            >
+                              Edit
+                            </a>
+                          ) : entry.fuelTruckId ? (
+                            <a
+                              href={`/fuel-trucks/${entry.fuelTruckId}?editIssueId=${entry.referenceId}`}
+                              className="text-blue-600 hover:underline"
+                            >
+                              Edit
+                            </a>
+                          ) : null}
+                          <form action={deleteFuelHistoryEntry}>
+                            <input type="hidden" name="busId" value={detail.bus.id} />
+                            <input type="hidden" name="fuelEntryId" value={deleteId} />
+                            <input type="hidden" name="fuelSource" value={entry.source} />
+                            <ConfirmSubmitButton
+                              label="Delete"
+                              message="Delete this fuel history entry?"
+                              className="text-red-600 hover:underline"
+                            />
+                          </form>
+                        </div>
+                          );
+                        })()}
                       </TableCell>
                     </TableRow>
                   ))}
