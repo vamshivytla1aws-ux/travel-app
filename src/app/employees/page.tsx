@@ -5,6 +5,7 @@ import { Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
+import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -102,6 +103,7 @@ type Props = {
     page?: string;
     pageSize?: string;
     create?: string;
+    export?: string;
   }>;
 };
 
@@ -163,6 +165,23 @@ export default async function EmployeesPage(props: Props) {
         subtitle="Manage employee pickup/drop assignments and department coverage"
         icon={Users}
         tag="Workforce"
+        actions={
+          <ModuleExportLauncher
+            moduleKey="employees"
+            moduleLabel="Employees"
+            basePath="/employees"
+            searchParams={{
+              q: searchParams.q,
+              status: undefined,
+              export: searchParams.export,
+              company: searchParams.company,
+              page: searchParams.page,
+              pageSize: searchParams.pageSize,
+              create: searchParams.create,
+            }}
+            defaultQuery={searchParams.q ?? ""}
+          />
+        }
       />
       {searchParams.error === "duplicate" ? (
         <StatusAlert className="mb-4" tone="error" message="Employee code or email already exists." />

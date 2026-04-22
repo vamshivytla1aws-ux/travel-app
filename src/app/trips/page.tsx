@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Timer } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
+import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -93,7 +94,7 @@ async function cancelTrip(formData: FormData) {
 }
 
 type Props = {
-  searchParams: Promise<{ created?: string; updated?: string; editId?: string }>;
+  searchParams: Promise<{ created?: string; updated?: string; editId?: string; export?: string }>;
 };
 
 export default async function TripsPage(props: Props) {
@@ -125,6 +126,19 @@ export default async function TripsPage(props: Props) {
           subtitle="Plan, start, complete, and monitor today’s trips from one operational workspace"
           icon={Timer}
           tag="Trip Control"
+          actions={
+            <ModuleExportLauncher
+              moduleKey="trips"
+              moduleLabel="Trips"
+              basePath="/trips"
+              searchParams={{
+                export: searchParams.export,
+                created: searchParams.created,
+                updated: searchParams.updated,
+                editId: searchParams.editId,
+              }}
+            />
+          }
         />
 
         {searchParams.created ? (

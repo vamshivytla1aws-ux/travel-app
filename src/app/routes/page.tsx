@@ -5,6 +5,7 @@ import { Route } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
+import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -185,6 +186,7 @@ type Props = {
     pageSize?: string;
     editId?: string;
     create?: string;
+    export?: string;
   }>;
 };
 
@@ -275,6 +277,25 @@ export default async function RoutesPage(props: Props) {
         subtitle="Bus + driver assignment per shift (duplicate-friendly by design)"
         icon={Route}
         tag="Route Design"
+        actions={
+          <ModuleExportLauncher
+            moduleKey="routes"
+            moduleLabel="Routes"
+            basePath="/routes"
+            searchParams={{
+              q: searchParams.q,
+              status: searchParams.shift,
+              export: searchParams.export,
+              shift: searchParams.shift,
+              page: searchParams.page,
+              pageSize: searchParams.pageSize,
+              editId: searchParams.editId,
+              create: searchParams.create,
+            }}
+            defaultQuery={searchParams.q ?? ""}
+            defaultStatus={searchParams.shift ?? ""}
+          />
+        }
       />
 
       {searchParams.created ? <StatusAlert className="mb-4" tone="success" message="Route assignment created." /> : null}

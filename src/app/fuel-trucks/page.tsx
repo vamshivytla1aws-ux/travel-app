@@ -3,7 +3,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Fuel } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
+import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -169,6 +171,8 @@ type Props = {
     created?: string;
     refilled?: string;
     issued?: string;
+    refillDeleted?: string;
+    issueDeleted?: string;
     q?: string;
     status?: string;
     fromDate?: string;
@@ -180,9 +184,59 @@ type Props = {
     page?: string;
     pageSize?: string;
     action?: string;
+    export?: string;
     error?: string;
   }>;
 };
+
+async function deleteRefillReportEntry(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  await requireModuleAccess("fuel-truck");
+  const refillId = Number(formData.get("refillId"));
+  if (!refillId) return;
+  try {
+    const result = await fuelTruckService.deleteRefill(refillId, session.id);
+    await logAuditEvent({
+      session,
+      action: "delete",
+      entityType: "fuel_truck_refill",
+      entityId: refillId,
+      details: { fuelTruckId: result.fuelTruckId },
+    });
+    revalidatePath("/fuel-trucks");
+    revalidatePath("/dashboard");
+    redirect(`/fuel-trucks?refillDeleted=${Date.now()}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete refill entry";
+    redirect(`/fuel-trucks?error=${encodeURIComponent(message)}`);
+  }
+}
+
+async function deleteIssueReportEntry(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  await requireModuleAccess("fuel-truck");
+  const issueId = Number(formData.get("issueId"));
+  if (!issueId) return;
+  try {
+    const result = await fuelTruckService.deleteIssue(issueId, session.id);
+    await logAuditEvent({
+      session,
+      action: "delete",
+      entityType: "fuel_truck_issue",
+      entityId: issueId,
+      details: { fuelTruckId: result.fuelTruckId, busId: result.busId },
+    });
+    revalidatePath("/fuel-trucks");
+    revalidatePath("/dashboard");
+    if (result.busId) revalidatePath(`/buses/${result.busId}`);
+    redirect(`/fuel-trucks?issueDeleted=${Date.now()}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete issue entry";
+    redirect(`/fuel-trucks?error=${encodeURIComponent(message)}`);
+  }
+}
 
 export default async function FuelTrucksPage(props: Props) {
   await requireSession();
@@ -265,6 +319,29 @@ export default async function FuelTrucksPage(props: Props) {
           subtitle="Track fuel tanker stock, refill entries, diesel issue to buses, and auditable ledger"
           icon={Fuel}
           tag="Diesel Ops"
+          actions={
+            <ModuleExportLauncher
+              moduleKey="fuel-trucks"
+              moduleLabel="Fuel Tankers"
+              basePath="/fuel-trucks"
+              searchParams={{
+                q: searchParams.q,
+                status: searchParams.status,
+                from: searchParams.fromDate,
+                to: searchParams.toDate,
+                export: searchParams.export,
+                action: searchParams.action,
+                fuelTruckId: searchParams.fuelTruckId,
+                busId: searchParams.busId,
+                fuelStation: searchParams.fuelStation,
+                driver: searchParams.driver,
+                page: searchParams.page,
+                pageSize: searchParams.pageSize,
+              }}
+              defaultQuery={searchParams.q ?? ""}
+              defaultStatus={searchParams.status ?? ""}
+            />
+          }
         />
 
         {searchParams.created ? (
@@ -275,6 +352,12 @@ export default async function FuelTrucksPage(props: Props) {
         ) : null}
         {searchParams.issued ? (
           <StatusAlert tone="info" message="Diesel issue to bus recorded and stock updated." />
+        ) : null}
+        {searchParams.refillDeleted ? (
+          <StatusAlert tone="warning" message="Refill report entry deleted successfully." />
+        ) : null}
+        {searchParams.issueDeleted ? (
+          <StatusAlert tone="warning" message="Issue report entry deleted successfully." />
         ) : null}
         {searchParams.error ? (
           <StatusAlert tone="error" message={safeDecodeURIComponent(searchParams.error)} />
@@ -636,6 +719,7 @@ export default async function FuelTrucksPage(props: Props) {
                         <TableHead>Truck</TableHead>
                         <TableHead>Station</TableHead>
                         <TableHead className="text-right">Liters</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -645,11 +729,21 @@ export default async function FuelTrucksPage(props: Props) {
                           <TableCell>{row.truck_code}</TableCell>
                           <TableCell>{row.fuel_station_name ?? "-"}</TableCell>
                           <TableCell className="text-right">{Number(row.quantity_liters).toFixed(2)}</TableCell>
+                          <TableCell className="text-right">
+                            <form action={deleteRefillReportEntry}>
+                              <input type="hidden" name="refillId" value={row.id} />
+                              <ConfirmSubmitButton
+                                label="Delete"
+                                message="Delete this refill report entry?"
+                                className="text-red-600 hover:underline"
+                              />
+                            </form>
+                          </TableCell>
                         </TableRow>
                       ))}
                       {reports.refillReport.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground">
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
                             No refill records for current filters.
                           </TableCell>
                         </TableRow>
@@ -671,6 +765,7 @@ export default async function FuelTrucksPage(props: Props) {
                         <TableHead>Truck</TableHead>
                         <TableHead>Registration</TableHead>
                         <TableHead className="text-right">Liters</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -680,11 +775,21 @@ export default async function FuelTrucksPage(props: Props) {
                           <TableCell>{row.truck_code}</TableCell>
                           <TableCell>{row.registration_number ?? row.bus_number ?? "-"}</TableCell>
                           <TableCell className="text-right">{Number(row.liters_issued).toFixed(2)}</TableCell>
+                          <TableCell className="text-right">
+                            <form action={deleteIssueReportEntry}>
+                              <input type="hidden" name="issueId" value={row.id} />
+                              <ConfirmSubmitButton
+                                label="Delete"
+                                message="Delete this issue report entry?"
+                                className="text-red-600 hover:underline"
+                              />
+                            </form>
+                          </TableCell>
                         </TableRow>
                       ))}
                       {reports.issueReport.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground">
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
                             No issue records for current filters.
                           </TableCell>
                         </TableRow>

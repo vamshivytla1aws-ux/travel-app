@@ -627,6 +627,110 @@ export class FuelTruckService {
     });
   }
 
+  async deleteIssue(issueId: number, userId?: number | null) {
+    await ensureTransportEnhancements();
+    return withTransaction(async (client) => {
+      const issueResult = await client.query<{
+        id: number;
+        fuel_truck_id: number;
+        bus_id: number;
+        liters_issued: string;
+      }>(
+        `SELECT id, fuel_truck_id, bus_id, liters_issued::text
+         FROM fuel_issues
+         WHERE id = $1
+         FOR UPDATE`,
+        [issueId],
+      );
+      const issue = issueResult.rows[0];
+      if (!issue) throw new Error("Issue record not found");
+
+      const truckResult = await client.query<{ current_available_liters: string }>(
+        `SELECT current_available_liters::text
+         FROM fuel_trucks
+         WHERE id = $1
+         FOR UPDATE`,
+        [issue.fuel_truck_id],
+      );
+      const truck = truckResult.rows[0];
+      if (!truck) throw new Error("Fuel tanker not found");
+
+      const currentStock = Number(truck.current_available_liters);
+      const restoredLiters = Number(issue.liters_issued);
+      const nextStock = Number((currentStock + restoredLiters).toFixed(2));
+
+      await client.query(`DELETE FROM fuel_issues WHERE id = $1`, [issueId]);
+      await client.query(
+        `DELETE FROM fuel_truck_ledger
+         WHERE transaction_type = 'ISSUE'
+           AND reference_type = 'fuel_issues'
+           AND reference_id = $1`,
+        [issueId],
+      );
+      await client.query(
+        `UPDATE fuel_trucks
+         SET current_available_liters = $1, updated_by = $2, updated_at = NOW()
+         WHERE id = $3`,
+        [nextStock, userId ?? null, issue.fuel_truck_id],
+      );
+
+      return { fuelTruckId: issue.fuel_truck_id, busId: issue.bus_id };
+    });
+  }
+
+  async deleteRefill(refillId: number, userId?: number | null) {
+    await ensureTransportEnhancements();
+    return withTransaction(async (client) => {
+      const refillResult = await client.query<{
+        id: number;
+        fuel_truck_id: number;
+        quantity_liters: string;
+      }>(
+        `SELECT id, fuel_truck_id, quantity_liters::text
+         FROM fuel_truck_refills
+         WHERE id = $1
+         FOR UPDATE`,
+        [refillId],
+      );
+      const refill = refillResult.rows[0];
+      if (!refill) throw new Error("Refill record not found");
+
+      const truckResult = await client.query<{ current_available_liters: string }>(
+        `SELECT current_available_liters::text
+         FROM fuel_trucks
+         WHERE id = $1
+         FOR UPDATE`,
+        [refill.fuel_truck_id],
+      );
+      const truck = truckResult.rows[0];
+      if (!truck) throw new Error("Fuel tanker not found");
+
+      const currentStock = Number(truck.current_available_liters);
+      const refillLiters = Number(refill.quantity_liters);
+      const nextStock = Number((currentStock - refillLiters).toFixed(2));
+      if (nextStock < 0) {
+        throw new Error("Cannot delete this refill because issued fuel already consumed this stock.");
+      }
+
+      await client.query(`DELETE FROM fuel_truck_refills WHERE id = $1`, [refillId]);
+      await client.query(
+        `DELETE FROM fuel_truck_ledger
+         WHERE transaction_type = 'REFILL'
+           AND reference_type = 'fuel_truck_refills'
+           AND reference_id = $1`,
+        [refillId],
+      );
+      await client.query(
+        `UPDATE fuel_trucks
+         SET current_available_liters = $1, updated_by = $2, updated_at = NOW()
+         WHERE id = $3`,
+        [nextStock, userId ?? null, refill.fuel_truck_id],
+      );
+
+      return { fuelTruckId: refill.fuel_truck_id };
+    });
+  }
+
   async getSummary() {
     await ensureTransportEnhancements();
     const [stockRows, todayRows, recentRefills, recentIssues] = await Promise.all([
@@ -747,6 +851,8 @@ export class FuelTruckService {
     const [refillReport, issueReport, truckWiseStock, busWiseIssue, dailySummary, monthlySummary] =
       await Promise.all([
         query<{
+          id: number;
+          fuel_truck_id: number;
           truck_code: string;
           fuel_station_name: string | null;
           vendor_name: string | null;
@@ -754,7 +860,7 @@ export class FuelTruckService {
           total_amount: string;
           refill_date: string;
         }>(
-          `SELECT t.truck_code, r.fuel_station_name, r.vendor_name, r.quantity_liters::text, r.total_amount::text, r.refill_date::text
+          `SELECT r.id, r.fuel_truck_id, t.truck_code, r.fuel_station_name, r.vendor_name, r.quantity_liters::text, r.total_amount::text, r.refill_date::text
            FROM fuel_truck_refills r
            JOIN fuel_trucks t ON t.id = r.fuel_truck_id
            ${refillSql}
@@ -763,6 +869,8 @@ export class FuelTruckService {
           refillParams,
         ),
         query<{
+          id: number;
+          fuel_truck_id: number;
           truck_code: string;
           bus_id: number;
           registration_number: string | null;
@@ -770,7 +878,7 @@ export class FuelTruckService {
           liters_issued: string;
           issue_date: string;
         }>(
-          `SELECT t.truck_code, i.bus_id, b.registration_number, b.bus_number, i.liters_issued::text, i.issue_date::text
+          `SELECT i.id, i.fuel_truck_id, t.truck_code, i.bus_id, b.registration_number, b.bus_number, i.liters_issued::text, i.issue_date::text
            FROM fuel_issues i
            JOIN fuel_trucks t ON t.id = i.fuel_truck_id
            LEFT JOIN buses b ON b.id = i.bus_id

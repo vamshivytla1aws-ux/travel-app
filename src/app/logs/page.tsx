@@ -2,6 +2,7 @@ import { ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
+import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,7 @@ import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 
 type Props = {
-  searchParams: Promise<{ entity?: string; action?: string; page?: string; pageSize?: string }>;
+  searchParams: Promise<{ entity?: string; action?: string; page?: string; pageSize?: string; export?: string }>;
 };
 
 const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 50, 100] as const;
@@ -50,7 +51,28 @@ export default async function LogsPage(props: Props) {
 
   return (
     <AppShell>
-      <EnterprisePageHeader title="Activity Logs" subtitle="Track who changed what across operations" icon={ClipboardList} tag="Audit" />
+      <EnterprisePageHeader
+        title="Activity Logs"
+        subtitle="Track who changed what across operations"
+        icon={ClipboardList}
+        tag="Audit"
+        actions={
+          <ModuleExportLauncher
+            moduleKey="logs"
+            moduleLabel="Logs"
+            basePath="/logs"
+            searchParams={{
+              q: [entity, action].filter(Boolean).join(" ").trim() || undefined,
+              export: searchParams.export,
+              entity: searchParams.entity,
+              action: searchParams.action,
+              page: searchParams.page,
+              pageSize: searchParams.pageSize,
+            }}
+            defaultQuery={[entity, action].filter(Boolean).join(" ").trim()}
+          />
+        }
+      />
       <Card>
         <CardHeader>
           <CardTitle>Log Portal</CardTitle>

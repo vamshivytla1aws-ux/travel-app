@@ -5,6 +5,7 @@ import { Landmark } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
+import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { FinanceLoanForm } from "@/components/finance/finance-loan-form";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +30,7 @@ type Props = {
     q?: string;
     status?: string;
     create?: string;
+    export?: string;
   }>;
 };
 
@@ -145,6 +147,21 @@ export default async function FinancePage(props: Props) {
         subtitle="Bus loan finance lifecycle, outstanding balances and EMI timeline"
         icon={Landmark}
         tag="Finance"
+        actions={
+          <ModuleExportLauncher
+            moduleKey="finance"
+            moduleLabel="Finance"
+            basePath="/finance"
+            searchParams={{
+              q: searchParams.q,
+              status: searchParams.status,
+              export: searchParams.export,
+              create: searchParams.create,
+            }}
+            defaultQuery={searchParams.q ?? ""}
+            defaultStatus={searchParams.status ?? ""}
+          />
+        }
       />
 
       {searchParams.created ? <StatusAlert className="mb-4" tone="success" message="Loan record created successfully." /> : null}

@@ -5,6 +5,7 @@ import { CarFront } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
+import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -108,6 +109,7 @@ type Props = {
     page?: string;
     pageSize?: string;
     create?: string;
+    export?: string;
   }>;
 };
 
@@ -169,6 +171,23 @@ export default async function DriversPage(props: Props) {
         subtitle="Maintain licensed driver profiles and contact readiness"
         icon={CarFront}
         tag="Driver Ops"
+        actions={
+          <ModuleExportLauncher
+            moduleKey="drivers"
+            moduleLabel="Drivers"
+            basePath="/drivers"
+            searchParams={{
+              q: searchParams.q,
+              status: undefined,
+              export: searchParams.export,
+              company: searchParams.company,
+              page: searchParams.page,
+              pageSize: searchParams.pageSize,
+              create: searchParams.create,
+            }}
+            defaultQuery={searchParams.q ?? ""}
+          />
+        }
       />
       {searchParams.error === "duplicate" ? (
         <StatusAlert className="mb-4" tone="error" message="Driver phone or license number already exists." />

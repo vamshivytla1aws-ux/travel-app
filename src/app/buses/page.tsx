@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { BusesLiveCount } from "@/components/buses/buses-live-count";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
+import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ type Props = {
     created?: string;
     deleted?: string;
     error?: string;
+    export?: string;
   }>;
 };
 
@@ -110,6 +112,20 @@ export default async function BusesPage(props: Props) {
         subtitle="Search and filter fleet records with operational controls"
         icon={BusFront}
         tag="Fleet"
+        actions={
+          <ModuleExportLauncher
+            moduleKey="buses"
+            moduleLabel="Buses"
+            basePath="/buses"
+            searchParams={{
+              q: searchParams.q,
+              status: searchParams.status,
+              export: searchParams.export,
+            }}
+            defaultQuery={searchParams.q ?? ""}
+            defaultStatus={searchParams.status ?? ""}
+          />
+        }
       />
       {searchParams.updated ? (
         <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
@@ -241,76 +257,6 @@ export default async function BusesPage(props: Props) {
               ))}
             </TableBody>
           </Table>
-
-          <div className="rounded-lg border bg-muted/20 p-4">
-            <h3 className="mb-3 text-sm font-semibold">Export Bus History (PDF)</h3>
-            <form
-              action="/api/reports/bus-history"
-              method="get"
-              target="_blank"
-              className="grid gap-3 md:grid-cols-4"
-            >
-              <div className="grid gap-1">
-                <label htmlFor="busId" className="text-xs text-muted-foreground">
-                  Bus
-                </label>
-                <select
-                  id="busId"
-                  name="busId"
-                  className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-                  defaultValue="all"
-                >
-                  <option value="all">All Buses</option>
-                  {buses.map((bus) => (
-                    <option key={bus.id} value={bus.id}>
-                      {bus.busNumber}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid gap-1">
-                <label htmlFor="mode" className="text-xs text-muted-foreground">
-                  Report Mode
-                </label>
-                <select
-                  id="mode"
-                  name="mode"
-                  defaultValue="latest"
-                  className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-                >
-                  <option value="latest">Latest entry per bus</option>
-                  <option value="history">History by date range</option>
-                </select>
-              </div>
-              <div className="grid gap-1">
-                <label htmlFor="from" className="text-xs text-muted-foreground">
-                  From Date
-                </label>
-                <Input id="from" name="from" type="date" />
-              </div>
-              <div className="grid gap-1">
-                <label htmlFor="to" className="text-xs text-muted-foreground">
-                  To Date
-                </label>
-                <Input id="to" name="to" type="date" />
-              </div>
-
-              <div className="md:col-span-3 grid gap-2 md:grid-cols-3 text-sm">
-                <label className="flex items-center gap-2"><input type="checkbox" name="field" value="odometer_start" defaultChecked /> Odometer Start</label>
-                <label className="flex items-center gap-2"><input type="checkbox" name="field" value="odometer_end" defaultChecked /> Odometer End</label>
-                <label className="flex items-center gap-2"><input type="checkbox" name="field" value="kms_run" defaultChecked /> KM Run</label>
-                <label className="flex items-center gap-2"><input type="checkbox" name="field" value="fuel_filled" defaultChecked /> Litres Filled</label>
-                <label className="flex items-center gap-2"><input type="checkbox" name="field" value="mileage" defaultChecked /> Mileage (KM/L)</label>
-                <label className="flex items-center gap-2"><input type="checkbox" name="field" value="company_name" defaultChecked /> Company Name</label>
-              </div>
-
-              <div className="md:col-span-1 flex items-end">
-                <button className="h-9 w-full rounded-md bg-primary px-4 text-sm text-primary-foreground">
-                  Export PDF
-                </button>
-              </div>
-            </form>
-          </div>
         </CardContent>
       </Card>
     </AppShell>

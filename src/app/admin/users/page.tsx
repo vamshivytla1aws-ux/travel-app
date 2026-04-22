@@ -5,6 +5,7 @@ import { KeyRound } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
+import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -117,7 +118,7 @@ async function deactivateUser(formData: FormData) {
 }
 
 type Props = {
-  searchParams: Promise<{ created?: string; updated?: string; deleted?: string; error?: string }>;
+  searchParams: Promise<{ created?: string; updated?: string; deleted?: string; error?: string; export?: string }>;
 };
 
 export default async function UsersAdminPage(props: Props) {
@@ -136,7 +137,26 @@ export default async function UsersAdminPage(props: Props) {
 
   return (
     <AppShell>
-      <EnterprisePageHeader title="User Access Control" subtitle="Admin managed users, roles and dashboard access" icon={KeyRound} tag="Admin" />
+      <EnterprisePageHeader
+        title="User Access Control"
+        subtitle="Admin managed users, roles and dashboard access"
+        icon={KeyRound}
+        tag="Admin"
+        actions={
+          <ModuleExportLauncher
+            moduleKey="users"
+            moduleLabel="Users"
+            basePath="/admin/users"
+            searchParams={{
+              export: searchParams.export,
+              created: searchParams.created,
+              updated: searchParams.updated,
+              deleted: searchParams.deleted,
+              error: searchParams.error,
+            }}
+          />
+        }
+      />
       {searchParams.error === "duplicate" ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">User email already exists.</div> : null}
       {searchParams.error === "self-demote" ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">You cannot remove your own admin role.</div> : null}
       {searchParams.error === "self-deactivate" ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">You cannot deactivate your own account.</div> : null}

@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { DashboardLiveStats } from "@/components/dashboard/dashboard-live-stats";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
+import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { Gauge } from "lucide-react";
 import { FuelTrendChart } from "@/components/fuel-trend-chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +29,14 @@ export default async function DashboardPage() {
           subtitle="Fleet health, fuel trends, and recent transport activity"
           icon={Gauge}
           tag="Control Center"
+          actions={
+            <ModuleExportLauncher
+              moduleKey="overall"
+              moduleLabel="Overall"
+              basePath="/dashboard"
+              searchParams={{}}
+            />
+          }
         />
         <div className="-mt-5 px-1">
           <DashboardLiveStats />
