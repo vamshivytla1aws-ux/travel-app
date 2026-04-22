@@ -83,6 +83,10 @@ export async function ensureTransportEnhancements() {
       issue_date DATE NOT NULL DEFAULT CURRENT_DATE,
       issue_time TIME NOT NULL DEFAULT CURRENT_TIME,
       liters_issued NUMERIC(12,2) NOT NULL CHECK (liters_issued > 0),
+      odometer_before_km NUMERIC(12,2) CHECK (odometer_before_km >= 0),
+      odometer_after_km NUMERIC(12,2) CHECK (odometer_after_km >= 0),
+      amount NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (amount >= 0),
+      company_name VARCHAR(120),
       issued_by_name VARCHAR(120),
       bus_driver_name VARCHAR(120),
       route_reference VARCHAR(120),
@@ -91,6 +95,10 @@ export async function ensureTransportEnhancements() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+  await query(`ALTER TABLE fuel_issues ADD COLUMN IF NOT EXISTS odometer_before_km NUMERIC(12,2);`);
+  await query(`ALTER TABLE fuel_issues ADD COLUMN IF NOT EXISTS odometer_after_km NUMERIC(12,2);`);
+  await query(`ALTER TABLE fuel_issues ADD COLUMN IF NOT EXISTS amount NUMERIC(14,2) NOT NULL DEFAULT 0;`);
+  await query(`ALTER TABLE fuel_issues ADD COLUMN IF NOT EXISTS company_name VARCHAR(120);`);
   await query(`
     CREATE TABLE IF NOT EXISTS fuel_truck_ledger (
       id BIGSERIAL PRIMARY KEY,

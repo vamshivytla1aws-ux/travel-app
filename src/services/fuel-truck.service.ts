@@ -59,6 +59,10 @@ type AddIssueInput = {
   issueDate: string;
   issueTime: string;
   litersIssued: number;
+  odometerBeforeKm?: number | null;
+  odometerAfterKm?: number | null;
+  amount?: number;
+  companyName?: string;
   issuedByName?: string;
   busDriverName?: string;
   routeReference?: string;
@@ -123,6 +127,10 @@ function mapIssue(row: FuelIssueRow): FuelIssue {
     issueDate: row.issue_date,
     issueTime: row.issue_time,
     litersIssued: Number(row.liters_issued),
+    odometerBeforeKm: row.odometer_before_km ? Number(row.odometer_before_km) : null,
+    odometerAfterKm: row.odometer_after_km ? Number(row.odometer_after_km) : null,
+    amount: Number(row.amount),
+    companyName: row.company_name,
     issuedByName: row.issued_by_name,
     busDriverName: row.bus_driver_name,
     routeReference: row.route_reference,
@@ -372,6 +380,14 @@ export class FuelTruckService {
   async addIssue(input: AddIssueInput) {
     await ensureTransportEnhancements();
     if (input.litersIssued <= 0) throw new Error("Issued liters must be positive");
+    if ((input.amount ?? 0) < 0) throw new Error("Amount cannot be negative");
+    if (
+      input.odometerBeforeKm != null &&
+      input.odometerAfterKm != null &&
+      input.odometerAfterKm < input.odometerBeforeKm
+    ) {
+      throw new Error("Odometer end must be greater than or equal to start");
+    }
 
     return withTransaction(async (client) => {
       const truckResult = await client.query<{
@@ -403,10 +419,10 @@ export class FuelTruckService {
 
       const issueResult = await client.query<{ id: number }>(
         `INSERT INTO fuel_issues(
-          fuel_truck_id, bus_id, issue_date, issue_time, liters_issued, issued_by_name, bus_driver_name,
+          fuel_truck_id, bus_id, issue_date, issue_time, liters_issued, odometer_before_km, odometer_after_km, amount, company_name, issued_by_name, bus_driver_name,
           route_reference, remarks, created_by
         )
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
          RETURNING id`,
         [
           input.fuelTruckId,
@@ -414,6 +430,10 @@ export class FuelTruckService {
           input.issueDate,
           input.issueTime,
           input.litersIssued,
+          input.odometerBeforeKm ?? null,
+          input.odometerAfterKm ?? null,
+          input.amount ?? 0,
+          input.companyName?.trim() || null,
           input.issuedByName?.trim() || null,
           input.busDriverName?.trim() || null,
           input.routeReference?.trim() || null,
@@ -429,6 +449,13 @@ export class FuelTruckService {
          WHERE id = $3`,
         [closing, input.userId ?? null, input.fuelTruckId],
       );
+
+      if (input.odometerAfterKm != null) {
+        await client.query(
+          `UPDATE buses SET odometer_km = $1, updated_at = NOW() WHERE id = $2`,
+          [input.odometerAfterKm, input.busId],
+        );
+      }
 
       await client.query(
         `INSERT INTO fuel_truck_ledger(

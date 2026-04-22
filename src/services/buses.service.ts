@@ -140,8 +140,8 @@ export class BusesService {
       [id],
     );
 
-    const latestFuel = await fuelRepository.latestByBus(id);
-    const fuelHistory = await fuelRepository.listHistoryByBus(id, 12);
+    const fuelHistory = await fuelRepository.listUnifiedHistoryByBus(id, 20);
+    const latestFuel = fuelHistory[0] ?? null;
     const busDocuments = await query<{
       id: number;
       document_type: string;
@@ -182,7 +182,10 @@ export class BusesService {
     const todayMileage =
       latestFuel != null
         ? Number(
-            (latestFuel.odometerAfterKm - latestFuel.odometerBeforeKm).toFixed(2),
+            (
+              (latestFuel.odometerAfterKm ?? 0) -
+              (latestFuel.odometerBeforeKm ?? 0)
+            ).toFixed(2),
           )
         : 0;
 

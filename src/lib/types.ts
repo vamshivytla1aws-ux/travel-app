@@ -122,12 +122,32 @@ export interface FuelIssue {
   issueDate: string;
   issueTime: string;
   litersIssued: number;
+  odometerBeforeKm: number | null;
+  odometerAfterKm: number | null;
+  amount: number;
+  companyName: string | null;
   issuedByName: string | null;
   busDriverName: string | null;
   routeReference: string | null;
   remarks: string | null;
   createdBy: number | null;
   createdAt: string;
+}
+
+export interface BusFuelHistoryItem {
+  source: "TANKER" | "MANUAL";
+  id: number;
+  referenceId: number;
+  busId: number;
+  filledAt: string;
+  issueDate: string | null;
+  issueTime: string | null;
+  odometerBeforeKm: number | null;
+  odometerAfterKm: number | null;
+  liters: number;
+  amount: number;
+  companyName: string | null;
+  fuelStation: string | null;
 }
 
 export interface FuelTruckLedgerEntry {

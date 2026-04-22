@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,9 +15,11 @@ import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 import { BusesService } from "@/services/buses.service";
 import { FuelService } from "@/services/fuel.service";
+import { FuelTruckService } from "@/services/fuel-truck.service";
 
 const busesService = new BusesService();
 const fuelService = new FuelService();
+const fuelTruckService = new FuelTruckService();
 
 async function uploadBusDocument(formData: FormData) {
   "use server";
@@ -71,7 +74,46 @@ async function addDailyMileageEntry(formData: FormData) {
   const odometerEnd = Number(formData.get("odometerEnd"));
   const litersFilled = Number(formData.get("litersFilled"));
   const companyName = String(formData.get("companyName"));
+  const mode = String(formData.get("entryMode") ?? "manual");
+  const fuelTruckId = Number(formData.get("fuelTruckId"));
+  const amount = Number(formData.get("amount") ?? 0);
+  const issueDate = String(formData.get("issueDate") ?? "").trim();
+  const issueTime = String(formData.get("issueTime") ?? "").trim();
   if (!busId || !litersFilled) return;
+  if (odometerEnd < odometerStart) {
+    redirect(`/buses/${busId}?fuelError=odometer`);
+  }
+
+  if (mode === "tanker") {
+    if (!fuelTruckId || !issueDate || !issueTime) {
+      redirect(`/buses/${busId}?fuelError=tankerMissing`);
+    }
+    await requireModuleAccess("fuel-truck");
+    const issueResult = await fuelTruckService.addIssue({
+      fuelTruckId,
+      busId,
+      issueDate,
+      issueTime,
+      litersIssued: litersFilled,
+      odometerBeforeKm: odometerStart,
+      odometerAfterKm: odometerEnd,
+      amount,
+      companyName,
+      remarks: "Created from bus daily update form",
+      userId: session.id,
+    });
+    await logAuditEvent({
+      session,
+      action: "create",
+      entityType: "fuel_truck_issue",
+      entityId: issueResult.issueId,
+      details: { busId, fuelTruckId, odometerStart, odometerEnd, litersFilled, amount, companyName },
+    });
+    revalidatePath(`/buses/${busId}`);
+    revalidatePath("/fuel-trucks");
+    revalidatePath("/dashboard");
+    redirect(`/buses/${busId}?fuelSaved=${Date.now()}`);
+  }
 
   const duplicate = await query<{ id: number }>(
     `SELECT id
@@ -230,6 +272,10 @@ export default async function BusDetailPage(props: Props) {
   const maintenanceToEdit = Number.isFinite(editMaintenanceId) && editMaintenanceId > 0
     ? detail.maintenance.find((record) => record.id === editMaintenanceId) ?? null
     : null;
+  const fuelTrucks = await fuelTruckService.listFuelTrucks("", "active");
+  const now = new Date();
+  const defaultDate = now.toISOString().slice(0, 10);
+  const defaultTime = now.toTimeString().slice(0, 5);
 
   return (
     <AppShell>
@@ -242,6 +288,16 @@ export default async function BusDetailPage(props: Props) {
         {searchParams.fuelError === "duplicate" ? (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             Duplicate daily mileage entry detected for today. Same values were already saved.
+          </div>
+        ) : null}
+        {searchParams.fuelError === "tankerMissing" ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            Please choose fuel tanker, issue date and issue time for tanker-linked mode.
+          </div>
+        ) : null}
+        {searchParams.fuelError === "odometer" ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            Odometer End must be greater than or equal to Odometer Start.
           </div>
         ) : null}
         {searchParams.docUploaded ? (
@@ -317,8 +373,26 @@ export default async function BusDetailPage(props: Props) {
             <CardTitle>Daily Odometer & Litres Update</CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={addDailyMileageEntry} className="grid gap-3 md:grid-cols-5">
+            <form action={addDailyMileageEntry} className="grid gap-3 md:grid-cols-6">
               <input type="hidden" name="busId" value={detail.bus.id} />
+              <div className="grid gap-1">
+                <Label htmlFor="entryMode">Entry Mode</Label>
+                <select id="entryMode" name="entryMode" className="h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+                  <option value="manual">Manual</option>
+                  <option value="tanker">Tanker-linked</option>
+                </select>
+              </div>
+              <div className="grid gap-1 md:col-span-2">
+                <Label htmlFor="fuelTruckId">Fuel Tanker (for tanker-linked mode)</Label>
+                <select id="fuelTruckId" name="fuelTruckId" className="h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+                  <option value="">Select fuel tanker</option>
+                  {fuelTrucks.map((truck) => (
+                    <option key={truck.id} value={truck.id}>
+                      {truck.truckCode} - {truck.truckName}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="grid gap-1">
                 <Label htmlFor="odometerStart">Odometer Start</Label>
                 <Input id="odometerStart" name="odometerStart" type="number" step="0.01" required />
@@ -336,6 +410,18 @@ export default async function BusDetailPage(props: Props) {
                 <Input id="companyName" name="companyName" placeholder="Fuel company/vendor" required />
               </div>
               <div className="grid gap-1">
+                <Label htmlFor="amount">Amount</Label>
+                <Input id="amount" name="amount" type="number" step="0.01" defaultValue="0" />
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="issueDate">Issue Date</Label>
+                <Input id="issueDate" name="issueDate" type="date" defaultValue={defaultDate} />
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="issueTime">Issue Time</Label>
+                <Input id="issueTime" name="issueTime" type="time" defaultValue={defaultTime} />
+              </div>
+              <div className="grid gap-1">
                 <Label className="invisible">Save</Label>
                 <button className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground">Save</button>
               </div>
@@ -351,6 +437,7 @@ export default async function BusDetailPage(props: Props) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
+                    <TableHead>Source</TableHead>
                     <TableHead>Start</TableHead>
                     <TableHead>End</TableHead>
                     <TableHead>Liters</TableHead>
@@ -363,12 +450,17 @@ export default async function BusDetailPage(props: Props) {
                   {detail.fuelHistory.map((entry) => (
                     <TableRow key={entry.id}>
                       <TableCell>{new Date(entry.filledAt).toLocaleDateString()}</TableCell>
-                      <TableCell>{entry.odometerBeforeKm.toFixed(2)}</TableCell>
-                      <TableCell>{entry.odometerAfterKm.toFixed(2)}</TableCell>
+                      <TableCell>
+                        <Badge variant={entry.source === "TANKER" ? "default" : "secondary"}>
+                          {entry.source === "TANKER" ? "Tanker" : "Manual"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{entry.odometerBeforeKm != null ? entry.odometerBeforeKm.toFixed(2) : "-"}</TableCell>
+                      <TableCell>{entry.odometerAfterKm != null ? entry.odometerAfterKm.toFixed(2) : "-"}</TableCell>
                       <TableCell>{entry.liters.toFixed(2)}</TableCell>
                       <TableCell>
                         {(
-                          (entry.odometerAfterKm - entry.odometerBeforeKm) /
+                          ((entry.odometerAfterKm ?? 0) - (entry.odometerBeforeKm ?? 0)) /
                           Math.max(entry.liters, 0.01)
                         ).toFixed(2)}
                       </TableCell>

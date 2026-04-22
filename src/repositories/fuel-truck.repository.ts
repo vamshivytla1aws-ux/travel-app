@@ -43,6 +43,10 @@ export type FuelIssueRow = {
   issue_date: string;
   issue_time: string;
   liters_issued: string;
+  odometer_before_km: string | null;
+  odometer_after_km: string | null;
+  amount: string;
+  company_name: string | null;
   issued_by_name: string | null;
   bus_driver_name: string | null;
   route_reference: string | null;
@@ -124,7 +128,8 @@ export class FuelTruckRepository {
   async listIssues(fuelTruckId: number, limit = 20) {
     const result = await query<FuelIssueRow>(
       `SELECT fi.id, fi.fuel_truck_id, fi.bus_id, b.bus_number, b.registration_number, fi.issue_date::text, fi.issue_time::text,
-              fi.liters_issued::text, fi.issued_by_name, fi.bus_driver_name, fi.route_reference, fi.remarks, fi.created_by, fi.created_at::text
+              fi.liters_issued::text, fi.odometer_before_km::text, fi.odometer_after_km::text, fi.amount::text, fi.company_name,
+              fi.issued_by_name, fi.bus_driver_name, fi.route_reference, fi.remarks, fi.created_by, fi.created_at::text
        FROM fuel_issues fi
        LEFT JOIN buses b ON b.id = fi.bus_id
        WHERE fi.fuel_truck_id = $1

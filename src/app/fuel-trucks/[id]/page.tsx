@@ -116,9 +116,10 @@ async function addTruckIssue(formData: FormData) {
   const id = Number(formData.get("fuelTruckId"));
   if (!id) return;
   try {
+    const busId = Number(formData.get("busId"));
     const result = await fuelTruckService.addIssue({
     fuelTruckId: id,
-    busId: Number(formData.get("busId")),
+    busId,
     issueDate: String(formData.get("issueDate") ?? ""),
     issueTime: String(formData.get("issueTime") ?? ""),
     litersIssued: Number(formData.get("litersIssued")),
@@ -134,10 +135,11 @@ async function addTruckIssue(formData: FormData) {
       action: "create",
       entityType: "fuel_truck_issue",
       entityId: result.issueId,
-      details: { fuelTruckId: id, busId: Number(formData.get("busId")), litersIssued: Number(formData.get("litersIssued")) },
+      details: { fuelTruckId: id, busId, litersIssued: Number(formData.get("litersIssued")) },
     });
     revalidatePath(`/fuel-trucks/${id}`);
     revalidatePath("/fuel-trucks");
+    if (busId) revalidatePath(`/buses/${busId}`);
     redirect(`/fuel-trucks/${id}?issued=${Date.now()}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to save issue";

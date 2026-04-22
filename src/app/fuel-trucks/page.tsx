@@ -116,9 +116,10 @@ async function addIssue(formData: FormData) {
   await requireModuleAccess("fuel-truck");
 
   try {
+    const busId = Number(formData.get("busId"));
     const result = await fuelTruckService.addIssue({
       fuelTruckId: Number(formData.get("fuelTruckId")),
-      busId: Number(formData.get("busId")),
+      busId,
       issueDate: String(formData.get("issueDate") ?? ""),
       issueTime: String(formData.get("issueTime") ?? ""),
       litersIssued: Number(formData.get("litersIssued")),
@@ -136,12 +137,13 @@ async function addIssue(formData: FormData) {
       entityId: result.issueId,
       details: {
         fuelTruckId: Number(formData.get("fuelTruckId")),
-        busId: Number(formData.get("busId")),
+        busId,
         litersIssued: Number(formData.get("litersIssued")),
         closingStock: result.closingStock,
       },
     });
     revalidatePath("/fuel-trucks");
+    if (busId) revalidatePath(`/buses/${busId}`);
     revalidatePath("/dashboard");
     redirect(`/fuel-trucks?issued=${Date.now()}`);
   } catch (error) {
