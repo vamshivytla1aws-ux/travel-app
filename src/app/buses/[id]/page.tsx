@@ -145,6 +145,60 @@ async function addDailyMileageEntry(formData: FormData) {
   redirect(`/buses/${busId}?fuelSaved=${Date.now()}`);
 }
 
+async function updateManualFuelHistoryEntry(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  await requireModuleAccess("buses");
+  await ensureTransportEnhancements();
+
+  const busId = Number(formData.get("busId"));
+  const fuelEntryId = Number(formData.get("fuelEntryId"));
+  const odometerStart = Number(formData.get("odometerStart"));
+  const odometerEnd = Number(formData.get("odometerEnd"));
+  const litersFilled = Number(formData.get("litersFilled"));
+  const companyName = String(formData.get("companyName") ?? "").trim();
+  const amount = Number(formData.get("amount") ?? 0);
+
+  if (!busId || !fuelEntryId || !Number.isFinite(litersFilled) || litersFilled <= 0) {
+    redirect(`/buses/${busId}?fuelError=invalid`);
+  }
+  if (odometerEnd < odometerStart) {
+    redirect(`/buses/${busId}?fuelError=odometer`);
+  }
+
+  const updated = await query<{ id: number }>(
+    `UPDATE fuel_entries
+     SET odometer_before_km = $1,
+         odometer_after_km = $2,
+         liters = $3,
+         amount = $4,
+         company_name = $5
+     WHERE id = $6
+       AND bus_id = $7
+     RETURNING id`,
+    [odometerStart, odometerEnd, litersFilled, amount, companyName || null, fuelEntryId, busId],
+  );
+  if (!updated.rows[0]) {
+    redirect(`/buses/${busId}?fuelError=notfound`);
+  }
+
+  await query(`UPDATE buses SET odometer_km = GREATEST(odometer_km, $1), updated_at = NOW() WHERE id = $2`, [
+    odometerEnd,
+    busId,
+  ]);
+
+  await logAuditEvent({
+    session,
+    action: "update",
+    entityType: "fuel_entry",
+    entityId: fuelEntryId,
+    details: { busId, odometerStart, odometerEnd, litersFilled, amount, companyName },
+  });
+  revalidatePath(`/buses/${busId}`);
+  revalidatePath("/dashboard");
+  redirect(`/buses/${busId}?fuelUpdated=${Date.now()}`);
+}
+
 async function createMaintenanceRecord(formData: FormData) {
   "use server";
   const session = await requireSession(["admin", "dispatcher", "updater"]);
@@ -251,6 +305,7 @@ type Props = {
   searchParams: Promise<{
     fuelSaved?: string;
     fuelError?: string;
+    fuelUpdated?: string;
     docUploaded?: string;
     docDeleted?: string;
     maintenanceSaved?: string;
@@ -258,6 +313,8 @@ type Props = {
     maintenanceDeleted?: string;
     maintenanceError?: string;
     editMaintenanceId?: string;
+    editFuelId?: string;
+    editFuelSource?: string;
   }>;
 };
 
@@ -272,6 +329,12 @@ export default async function BusDetailPage(props: Props) {
   const maintenanceToEdit = Number.isFinite(editMaintenanceId) && editMaintenanceId > 0
     ? detail.maintenance.find((record) => record.id === editMaintenanceId) ?? null
     : null;
+  const editFuelId = Number(searchParams.editFuelId ?? "");
+  const editFuelSource = String(searchParams.editFuelSource ?? "").toUpperCase();
+  const fuelToEdit =
+    Number.isFinite(editFuelId) && editFuelId > 0 && editFuelSource === "MANUAL"
+      ? detail.fuelHistory.find((entry) => entry.source === "MANUAL" && entry.id === editFuelId) ?? null
+      : null;
   const fuelTrucks = await fuelTruckService.listFuelTrucks("", "active");
   const now = new Date();
   const defaultDate = now.toISOString().slice(0, 10);
@@ -298,6 +361,21 @@ export default async function BusDetailPage(props: Props) {
         {searchParams.fuelError === "odometer" ? (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             Odometer End must be greater than or equal to Odometer Start.
+          </div>
+        ) : null}
+        {searchParams.fuelError === "invalid" ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            Invalid fuel values. Please check liters and odometer inputs.
+          </div>
+        ) : null}
+        {searchParams.fuelError === "notfound" ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            Fuel history entry not found.
+          </div>
+        ) : null}
+        {searchParams.fuelUpdated ? (
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+            Fuel history updated successfully.
           </div>
         ) : null}
         {searchParams.docUploaded ? (
@@ -433,7 +511,53 @@ export default async function BusDetailPage(props: Props) {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader><CardTitle>Fuel History</CardTitle></CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              {fuelToEdit ? (
+                <form action={updateManualFuelHistoryEntry} className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
+                  <input type="hidden" name="busId" value={detail.bus.id} />
+                  <input type="hidden" name="fuelEntryId" value={fuelToEdit.id} />
+                  <div className="grid gap-1">
+                    <Label htmlFor="editFuelOdoStart">Odometer Start</Label>
+                    <Input
+                      id="editFuelOdoStart"
+                      name="odometerStart"
+                      type="number"
+                      step="0.01"
+                      defaultValue={fuelToEdit.odometerBeforeKm ?? ""}
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="editFuelOdoEnd">Odometer End</Label>
+                    <Input
+                      id="editFuelOdoEnd"
+                      name="odometerEnd"
+                      type="number"
+                      step="0.01"
+                      defaultValue={fuelToEdit.odometerAfterKm ?? ""}
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="editFuelLiters">Liters</Label>
+                    <Input id="editFuelLiters" name="litersFilled" type="number" step="0.01" defaultValue={fuelToEdit.liters} required />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="editFuelCompany">Company</Label>
+                    <Input id="editFuelCompany" name="companyName" defaultValue={fuelToEdit.companyName ?? ""} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="editFuelAmount">Amount</Label>
+                    <Input id="editFuelAmount" name="amount" type="number" step="0.01" defaultValue={fuelToEdit.amount} />
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <button className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground">Update Fuel Entry</button>
+                    <a href={`/buses/${detail.bus.id}`} className="inline-flex h-9 items-center rounded-md border border-input px-4 text-sm">
+                      Cancel
+                    </a>
+                  </div>
+                </form>
+              ) : null}
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -445,6 +569,7 @@ export default async function BusDetailPage(props: Props) {
                     <TableHead>KM/L</TableHead>
                     <TableHead>Company</TableHead>
                     <TableHead>Amount</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -469,8 +594,34 @@ export default async function BusDetailPage(props: Props) {
                       </TableCell>
                       <TableCell>{entry.companyName ?? "-"}</TableCell>
                       <TableCell>{entry.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        {entry.source === "MANUAL" ? (
+                          <a
+                            href={`/buses/${detail.bus.id}?editFuelId=${entry.id}&editFuelSource=MANUAL`}
+                            className="text-blue-600 hover:underline"
+                          >
+                            Edit
+                          </a>
+                        ) : entry.fuelTruckId ? (
+                          <a
+                            href={`/fuel-trucks/${entry.fuelTruckId}?editIssueId=${entry.referenceId}`}
+                            className="text-blue-600 hover:underline"
+                          >
+                            Edit
+                          </a>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
+                  {detail.fuelHistory.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center text-sm text-muted-foreground">
+                        No fuel history available for this bus.
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
                 </TableBody>
               </Table>
             </CardContent>

@@ -21,17 +21,10 @@ export class DashboardService {
       ),
       query<{ liters: string; amount: string }>(
         `SELECT
-           COALESCE(SUM(liters),0)::text as liters,
+           COALESCE(SUM(liters_issued),0)::text as liters,
            COALESCE(SUM(amount),0)::text as amount
-         FROM (
-           SELECT liters, amount
-           FROM fuel_entries
-           WHERE DATE(filled_at) = CURRENT_DATE
-           UNION ALL
-           SELECT liters_issued AS liters, amount
-           FROM fuel_issues
-           WHERE issue_date = CURRENT_DATE
-         ) fuel`,
+         FROM fuel_issues
+         WHERE issue_date = CURRENT_DATE`,
       ),
     ]);
 

@@ -59,6 +59,7 @@ export class FuelRepository {
       source: "TANKER" | "MANUAL";
       id: number;
       reference_id: number;
+      fuel_truck_id: number | null;
       bus_id: number;
       filled_at: string;
       issue_date: string | null;
@@ -77,6 +78,7 @@ export class FuelRepository {
           'MANUAL'::text AS source,
           fe.id,
           fe.id AS reference_id,
+          NULL::bigint AS fuel_truck_id,
           fe.bus_id,
           fe.filled_at::text,
           NULL::text AS issue_date,
@@ -96,6 +98,7 @@ export class FuelRepository {
           'TANKER'::text AS source,
           fi.id,
           fi.id AS reference_id,
+          fi.fuel_truck_id,
           fi.bus_id,
           (fi.issue_date::text || 'T' || fi.issue_time::text)::text AS filled_at,
           fi.issue_date::text,
@@ -119,6 +122,7 @@ export class FuelRepository {
       source: row.source,
       id: row.id,
       referenceId: row.reference_id,
+      fuelTruckId: row.fuel_truck_id,
       busId: row.bus_id,
       filledAt: row.filled_at,
       issueDate: row.issue_date,

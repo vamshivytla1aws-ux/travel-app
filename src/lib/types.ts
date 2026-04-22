@@ -138,6 +138,7 @@ export interface BusFuelHistoryItem {
   source: "TANKER" | "MANUAL";
   id: number;
   referenceId: number;
+  fuelTruckId: number | null;
   busId: number;
   filledAt: string;
   issueDate: string | null;

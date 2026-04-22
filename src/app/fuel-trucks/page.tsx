@@ -776,14 +776,22 @@ export default async function FuelTrucksPage(props: Props) {
                           <TableCell>{row.registration_number ?? row.bus_number ?? "-"}</TableCell>
                           <TableCell className="text-right">{Number(row.liters_issued).toFixed(2)}</TableCell>
                           <TableCell className="text-right">
-                            <form action={deleteIssueReportEntry}>
-                              <input type="hidden" name="issueId" value={row.id} />
-                              <ConfirmSubmitButton
-                                label="Delete"
-                                message="Delete this issue report entry?"
-                                className="text-red-600 hover:underline"
-                              />
-                            </form>
+                            <div className="flex items-center justify-end gap-2">
+                              <Link
+                                href={`/fuel-trucks/${row.fuel_truck_id}?editIssueId=${row.id}`}
+                                className="text-blue-600 hover:underline"
+                              >
+                                Edit
+                              </Link>
+                              <form action={deleteIssueReportEntry}>
+                                <input type="hidden" name="issueId" value={row.id} />
+                                <ConfirmSubmitButton
+                                  label="Delete"
+                                  message="Delete this issue report entry?"
+                                  className="text-red-600 hover:underline"
+                                />
+                              </form>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
