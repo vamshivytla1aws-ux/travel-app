@@ -614,7 +614,7 @@ export default async function FuelTrucksPage(props: Props) {
                 <option value="">All buses</option>
                 {buses.rows.map((bus) => (
                   <option key={bus.id} value={bus.id}>
-                    {bus.bus_number}
+                    {bus.registration_number} - {bus.bus_number}
                   </option>
                 ))}
               </select>
@@ -669,7 +669,7 @@ export default async function FuelTrucksPage(props: Props) {
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Truck</TableHead>
-                        <TableHead>Bus</TableHead>
+                        <TableHead>Registration</TableHead>
                         <TableHead className="text-right">Liters</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -678,7 +678,7 @@ export default async function FuelTrucksPage(props: Props) {
                         <TableRow key={`${row.truck_code}-${idx}`}>
                           <TableCell>{row.issue_date}</TableCell>
                           <TableCell>{row.truck_code}</TableCell>
-                          <TableCell>{row.bus_id}</TableCell>
+                          <TableCell>{row.registration_number ?? row.bus_number ?? "-"}</TableCell>
                           <TableCell className="text-right">{Number(row.liters_issued).toFixed(2)}</TableCell>
                         </TableRow>
                       ))}

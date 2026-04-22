@@ -29,14 +29,33 @@ export function BusSearchSelect({ name, id, buses, required = false, oldOdometer
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
+    const normalizedTerm = term.replace(/[^a-z0-9]/g, "");
+    const termParts = term.split(/\s+/).filter(Boolean);
     if (!term) return buses.slice(0, 20);
     return buses
-      .filter(
-        (bus) =>
-          bus.busNumber.toLowerCase().includes(term) ||
-          bus.registrationNumber.toLowerCase().includes(term) ||
-          String(bus.id).includes(term),
-      )
+      .filter((bus) => {
+        const busNumber = bus.busNumber.toLowerCase();
+        const registration = bus.registrationNumber.toLowerCase();
+        const combined = `${bus.busNumber} ${bus.registrationNumber}`.toLowerCase();
+        const normalizedCombined = combined.replace(/[^a-z0-9]/g, "");
+        if (
+          busNumber.includes(term) ||
+          registration.includes(term) ||
+          combined.includes(term) ||
+          String(bus.id).includes(term)
+        ) {
+          return true;
+        }
+        if (normalizedTerm && normalizedCombined.includes(normalizedTerm)) {
+          return true;
+        }
+        if (termParts.length > 1) {
+          return termParts.every(
+            (part) => busNumber.includes(part) || registration.includes(part) || combined.includes(part),
+          );
+        }
+        return false;
+      })
       .slice(0, 30);
   }, [buses, query]);
 
@@ -122,7 +141,7 @@ export function BusSearchSelect({ name, id, buses, required = false, oldOdometer
             setHighlightedIndex(0);
           }
         }}
-        placeholder="Search bus number (e.g. 6686)"
+        placeholder="Search registration number (e.g. TG15T9386)"
         className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
       />
       <div
@@ -153,7 +172,7 @@ export function BusSearchSelect({ name, id, buses, required = false, oldOdometer
         )}
       </div>
       <p id={`${inputId}-hint`} className="text-xs text-muted-foreground">
-        Type bus number and choose from the list.
+        Type registration number and choose from the list.
       </p>
     </div>
   );

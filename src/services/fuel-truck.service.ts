@@ -765,12 +765,15 @@ export class FuelTruckService {
         query<{
           truck_code: string;
           bus_id: number;
+          registration_number: string | null;
+          bus_number: string | null;
           liters_issued: string;
           issue_date: string;
         }>(
-          `SELECT t.truck_code, i.bus_id, i.liters_issued::text, i.issue_date::text
+          `SELECT t.truck_code, i.bus_id, b.registration_number, b.bus_number, i.liters_issued::text, i.issue_date::text
            FROM fuel_issues i
            JOIN fuel_trucks t ON t.id = i.fuel_truck_id
+           LEFT JOIN buses b ON b.id = i.bus_id
            ${issueSql}
            ORDER BY i.issue_date DESC, i.id DESC
            LIMIT 300`,
