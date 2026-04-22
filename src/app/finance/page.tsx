@@ -13,6 +13,7 @@ import { StatusAlert } from "@/components/ui/status-alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
+import { query } from "@/lib/db";
 import { normalizeFinanceStatus } from "@/lib/finance";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 import { safeDecodeURIComponent } from "@/lib/url";
@@ -117,6 +118,17 @@ export default async function FinancePage(props: Props) {
       ? normalizeFinanceStatus(statusRaw)
       : undefined;
   const loans = await financeLoansService.listLoans(q, status);
+  const busOptionsResult = await query<{
+    id: number;
+    bus_number: string;
+    registration_number: string;
+    make: string;
+    model: string;
+  }>(
+    `SELECT id, bus_number, registration_number, make, model
+     FROM buses
+     ORDER BY bus_number ASC`,
+  );
   const showCreateModal = String(searchParams.create ?? "") === "1";
   const listBaseParams = new URLSearchParams();
   if (searchParams.q) listBaseParams.set("q", String(searchParams.q));
@@ -240,7 +252,16 @@ export default async function FinancePage(props: Props) {
               </div>
             </CardHeader>
             <CardContent>
-              <FinanceLoanForm action={createLoan} submitLabel="Create Loan" />
+              <FinanceLoanForm
+                action={createLoan}
+                submitLabel="Create Loan"
+                busOptions={busOptionsResult.rows.map((bus) => ({
+                  id: bus.id,
+                  busNumber: bus.bus_number,
+                  registrationNumber: bus.registration_number,
+                  vehicleLabel: `${bus.make} ${bus.model}`.trim(),
+                }))}
+              />
             </CardContent>
           </Card>
         </div>

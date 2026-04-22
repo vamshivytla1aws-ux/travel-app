@@ -7,6 +7,10 @@ import { FuelRepository } from "@/repositories/fuel.repository";
 const busesRepository = new BusesRepository();
 const fuelRepository = new FuelRepository();
 
+function normalizeRegistration(value: string) {
+  return value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
 export class BusesService {
   async listBuses(search = "", status?: "active" | "maintenance" | "inactive") {
     return busesRepository.list(search, status);
@@ -180,14 +184,19 @@ export class BusesService {
       [id],
     );
     const todayMileage =
-      latestFuel != null
-        ? Number(
-            (
-              (latestFuel.odometerAfterKm ?? 0) -
-              (latestFuel.odometerBeforeKm ?? 0)
-            ).toFixed(2),
-          )
-        : 0;
+      latestFuel != null &&
+      latestFuel.odometerAfterKm != null &&
+      latestFuel.odometerBeforeKm != null
+        ? Number((latestFuel.odometerAfterKm - latestFuel.odometerBeforeKm).toFixed(2))
+        : null;
+    const normalizedBusRegistration = normalizeRegistration(bus.registrationNumber);
+    const financeMatch = await query<{ total: string }>(
+      `SELECT COUNT(*)::text AS total
+       FROM finance_loans
+       WHERE regexp_replace(upper(registration_no), '[^A-Z0-9]', '', 'g') = $1`,
+      [normalizedBusRegistration],
+    );
+    const hasFinance = Number(financeMatch.rows[0]?.total ?? "0") > 0;
 
     return {
       bus,
@@ -198,6 +207,7 @@ export class BusesService {
       maintenance: maintenanceResult.rows,
       documents: busDocuments.rows,
       routeAssignments: routeAssignments.rows,
+      hasFinance,
     };
   }
 }

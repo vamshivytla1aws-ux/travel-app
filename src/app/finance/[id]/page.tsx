@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusAlert } from "@/components/ui/status-alert";
 import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
+import { query } from "@/lib/db";
 import { normalizeFinanceStatus } from "@/lib/finance";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 import { safeDecodeURIComponent } from "@/lib/url";
@@ -103,6 +104,17 @@ export default async function FinanceLoanDetailPage(props: Props) {
 
   const loan = await financeLoansService.getLoan(id);
   if (!loan) notFound();
+  const busOptionsResult = await query<{
+    id: number;
+    bus_number: string;
+    registration_number: string;
+    make: string;
+    model: string;
+  }>(
+    `SELECT id, bus_number, registration_number, make, model
+     FROM buses
+     ORDER BY bus_number ASC`,
+  );
 
   return (
     <AppShell>
@@ -144,6 +156,12 @@ export default async function FinanceLoanDetailPage(props: Props) {
                 loanEndDate: loan.loanEndDate,
                 status: loan.status,
               }}
+              busOptions={busOptionsResult.rows.map((bus) => ({
+                id: bus.id,
+                busNumber: bus.bus_number,
+                registrationNumber: bus.registration_number,
+                vehicleLabel: `${bus.make} ${bus.model}`.trim(),
+              }))}
             />
           </CardContent>
         </Card>

@@ -345,6 +345,7 @@ export default async function BusDetailPage(props: Props) {
               <p>Seater: {detail.bus.seater}</p>
               <p>Status: {detail.bus.status}</p>
               <p>Odometer: {detail.bus.odometerKm.toLocaleString()} km</p>
+              <p>Finance: {detail.hasFinance ? "Finance" : "No finance"}</p>
             </CardContent>
           </Card>
           <Card>
@@ -363,7 +364,7 @@ export default async function BusDetailPage(props: Props) {
               <p>Fuel: {detail.latestFuel ? `${detail.latestFuel.liters.toFixed(2)} L` : "N/A"}</p>
               <p>Company: {detail.latestFuel?.companyName ?? "N/A"}</p>
               <p>Amount: {detail.latestFuel ? `INR ${detail.latestFuel.amount.toFixed(2)}` : "N/A"}</p>
-              <p>Mileage: {detail.todayMileage.toFixed(2)} km</p>
+              <p>Mileage: {detail.todayMileage != null ? `${detail.todayMileage.toFixed(2)} km` : "N/A"}</p>
             </CardContent>
           </Card>
         </div>
@@ -459,10 +460,12 @@ export default async function BusDetailPage(props: Props) {
                       <TableCell>{entry.odometerAfterKm != null ? entry.odometerAfterKm.toFixed(2) : "-"}</TableCell>
                       <TableCell>{entry.liters.toFixed(2)}</TableCell>
                       <TableCell>
-                        {(
-                          ((entry.odometerAfterKm ?? 0) - (entry.odometerBeforeKm ?? 0)) /
-                          Math.max(entry.liters, 0.01)
-                        ).toFixed(2)}
+                        {entry.odometerBeforeKm != null && entry.odometerAfterKm != null
+                          ? (
+                              (entry.odometerAfterKm - entry.odometerBeforeKm) /
+                              Math.max(entry.liters, 0.01)
+                            ).toFixed(2)
+                          : "N/A"}
                       </TableCell>
                       <TableCell>{entry.companyName ?? "-"}</TableCell>
                       <TableCell>{entry.amount.toFixed(2)}</TableCell>

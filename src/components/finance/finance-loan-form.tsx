@@ -5,6 +5,10 @@ import { calculateFinanceDerivedFields, FINANCE_STATUSES, normalizeFinanceStatus
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import {
+  FinanceBusOption,
+  FinanceRegistrationSelect,
+} from "@/components/finance/finance-registration-select";
 
 type FormAction = string | ((formData: FormData) => void | Promise<void>);
 
@@ -34,6 +38,7 @@ type Props = {
   submitLabel: string;
   values?: Partial<FinanceLoanFormValues>;
   hiddenFields?: Record<string, string | number>;
+  busOptions?: FinanceBusOption[];
 };
 
 function asNumber(value: string) {
@@ -63,7 +68,7 @@ function inferYearsFromDates(startDate: string, endDate: string): string {
   return years ? String(years) : "";
 }
 
-export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: Props) {
+export function FinanceLoanForm({ action, submitLabel, values, hiddenFields, busOptions = [] }: Props) {
   const initialYears = inferYearsFromDates(values?.loanStartDate ?? "", values?.loanEndDate ?? "");
   const [formValues, setFormValues] = useState<FinanceLoanFormValues>({
     registrationNo: values?.registrationNo ?? "",
@@ -158,10 +163,18 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields }: P
 
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-2">
         <p className="text-xs font-medium text-muted-foreground uppercase md:col-span-2">Vehicle / Purchase Details</p>
-        <div className="grid gap-1">
-          <Label htmlFor="registrationNo">Registration</Label>
-          <Input id="registrationNo" name="registrationNo" required value={formValues.registrationNo} onChange={(e) => setFormValues((v) => ({ ...v, registrationNo: e.target.value }))} />
-        </div>
+        <FinanceRegistrationSelect
+          value={formValues.registrationNo}
+          options={busOptions}
+          onChange={(registrationNo) => setFormValues((v) => ({ ...v, registrationNo }))}
+          onSelectBus={(bus) =>
+            setFormValues((v) => ({
+              ...v,
+              registrationNo: bus.registrationNumber,
+              vehicleTypeOrBusName: bus.vehicleLabel,
+            }))
+          }
+        />
         <div className="grid gap-1">
           <Label htmlFor="vehicleTypeOrBusName">Vehicle</Label>
           <Input id="vehicleTypeOrBusName" name="vehicleTypeOrBusName" required value={formValues.vehicleTypeOrBusName} onChange={(e) => setFormValues((v) => ({ ...v, vehicleTypeOrBusName: e.target.value }))} />
