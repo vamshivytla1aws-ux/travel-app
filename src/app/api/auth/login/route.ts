@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
-import { APP_MODULES, createSession, sessionCookieSecureForHost } from "@/lib/auth";
+import { APP_MODULES, createSession, normalizeModuleAccess, sessionCookieSecureForHost } from "@/lib/auth";
 import { query } from "@/lib/db";
 
 function getPublicRequestBase(request: Request): URL {
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
         email: user.email,
         role: user.role,
         fullName: user.full_name,
-        moduleAccess: user.role === "admin" ? [...APP_MODULES] : (user.module_access as typeof APP_MODULES[number][] | null) ?? ["dashboard"],
+        moduleAccess: normalizeModuleAccess(user.module_access, user.role),
       })
     : await createSession(
         {

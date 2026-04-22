@@ -1,4 +1,4 @@
-import PDFDocument from "pdfkit";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { requireApiModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { MODULE_EXPORT_FIELDS, type ExportModuleKey } from "@/lib/module-export";
@@ -240,31 +240,62 @@ export async function GET(request: Request) {
     });
   }
 
-  const chunks: Buffer[] = [];
-  const doc = new PDFDocument({ size: "A4", margin: 36 });
-  doc.on("data", (chunk: Buffer) => chunks.push(chunk));
-  const done = new Promise<Buffer>((resolve) => doc.on("end", () => resolve(Buffer.concat(chunks))));
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const titleFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  doc.fontSize(16).text(`${moduleKey.toUpperCase()} Export Report`, { align: "center" });
-  doc.moveDown(0.5);
-  doc.fontSize(9).text(`Generated: ${new Date().toLocaleString()}`);
-  doc.text(`Records: ${rows.length}`);
-  doc.moveDown(0.8);
-  doc.fontSize(8).text(headers.join(" | "));
-  doc.moveDown(0.3);
-  doc.moveTo(36, doc.y).lineTo(560, doc.y).strokeColor("#cccccc").stroke();
-  doc.moveDown(0.5);
+  const pageWidth = 595; // A4 points
+  const pageHeight = 842;
+  const margin = 36;
+  const lineHeight = 12;
+  const contentWidth = pageWidth - margin * 2;
+  const maxLineChars = Math.max(40, Math.floor(contentWidth / 4.4));
+
+  let page = pdfDoc.addPage([pageWidth, pageHeight]);
+  let y = pageHeight - margin;
+
+  const drawLine = (text: string, options?: { size?: number; bold?: boolean; color?: [number, number, number] }) => {
+    const size = options?.size ?? 8;
+    const selectedFont = options?.bold ? titleFont : font;
+    const color = options?.color ?? [0, 0, 0];
+    if (y - lineHeight < margin) {
+      page = pdfDoc.addPage([pageWidth, pageHeight]);
+      y = pageHeight - margin;
+    }
+    page.drawText(text, {
+      x: margin,
+      y,
+      size,
+      font: selectedFont,
+      color: rgb(color[0], color[1], color[2]),
+    });
+    y -= lineHeight;
+  };
+
+  drawLine(`${moduleKey.toUpperCase()} Export Report`, { size: 16, bold: true });
+  y -= 4;
+  drawLine(`Generated: ${new Date().toLocaleString()}`, { size: 9, color: [0.25, 0.25, 0.25] });
+  drawLine(`Records: ${rows.length}`, { size: 9, color: [0.25, 0.25, 0.25] });
+  y -= 4;
+  drawLine(headers.join(" | "), { size: 8, bold: true });
+  y -= 2;
 
   for (const row of rows) {
     const line = headers.map((h) => `${h}: ${row[h] ?? "-"}`).join(" | ");
-    doc.fontSize(8).text(line, { width: 520 });
-    doc.moveDown(0.3);
-    if (doc.y > 760) doc.addPage();
+    if (line.length <= maxLineChars) {
+      drawLine(line, { size: 8 });
+      continue;
+    }
+    let start = 0;
+    while (start < line.length) {
+      drawLine(line.slice(start, start + maxLineChars), { size: 8 });
+      start += maxLineChars;
+    }
   }
 
-  doc.end();
-  const pdf = await done;
-  return new Response(new Uint8Array(pdf), {
+  const pdf = await pdfDoc.save();
+  const pdfBuffer = Buffer.from(pdf);
+  return new Response(pdfBuffer, {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${moduleKey}-export.pdf"`,

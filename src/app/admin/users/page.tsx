@@ -10,9 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { APP_MODULES, requireAdminSession, requireModuleAccess } from "@/lib/auth";
+import { APP_MODULES, normalizeModuleAccess, requireAdminSession, requireModuleAccess } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
-import { query } from "@/lib/db";
+import { query, withTransaction } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 
 function parseModuleAccessFromFormData(formData: FormData): (typeof APP_MODULES)[number][] {
@@ -20,13 +20,7 @@ function parseModuleAccessFromFormData(formData: FormData): (typeof APP_MODULES)
     .getAll("moduleAccess")
     .map((value) => String(value).trim())
     .filter((value) => APP_MODULES.includes(value as (typeof APP_MODULES)[number]));
-
-  const selectedFromCsv = String(formData.get("accessCsv") ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter((value) => APP_MODULES.includes(value as (typeof APP_MODULES)[number]));
-
-  const unique = Array.from(new Set([...selectedFromCheckboxes, ...selectedFromCsv]));
+  const unique = Array.from(new Set(selectedFromCheckboxes));
   if (unique.length === 0) return ["dashboard"];
   return unique as (typeof APP_MODULES)[number][];
 }
@@ -96,17 +90,69 @@ async function updateUserAccess(formData: FormData) {
   redirect(`/admin/users?updated=${Date.now()}`);
 }
 
-async function deactivateUser(formData: FormData) {
+function quoteIdentifier(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+async function deleteUser(formData: FormData) {
   "use server";
   const session = await requireAdminSession();
   await requireModuleAccess("user-admin");
+  await ensureTransportEnhancements();
   const userId = Number(formData.get("userId"));
   if (!userId) return;
   if (userId === session.id) {
-    redirect("/admin/users?error=self-deactivate");
+    redirect("/admin/users?error=self-delete");
   }
 
-  await query(`UPDATE users SET is_active = false, updated_at = NOW() WHERE id = $1`, [userId]);
+  let deleted = false;
+  try {
+    deleted = await withTransaction(async (client) => {
+      const references = await client.query<{
+        schema_name: string;
+        table_name: string;
+        column_name: string;
+        is_not_null: boolean;
+      }>(
+        `SELECT ns.nspname AS schema_name, tbl.relname AS table_name, att.attname AS column_name, att.attnotnull AS is_not_null
+         FROM pg_constraint con
+         JOIN pg_class tbl ON tbl.oid = con.conrelid
+         JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+         JOIN unnest(con.conkey) AS ck(attnum) ON TRUE
+         JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = ck.attnum
+         WHERE con.contype = 'f' AND con.confrelid = 'users'::regclass`,
+      );
+
+      for (const ref of references.rows) {
+        if (ref.table_name === "users") continue;
+        const table = `${quoteIdentifier(ref.schema_name)}.${quoteIdentifier(ref.table_name)}`;
+        const column = quoteIdentifier(ref.column_name);
+        if (ref.is_not_null) {
+          const dependent = await client.query<{ total: string }>(
+            `SELECT COUNT(*)::text AS total FROM ${table} WHERE ${column} = $1`,
+            [userId],
+          );
+          if (Number(dependent.rows[0]?.total ?? "0") > 0) {
+            throw new Error(`cannot_delete_due_to_dependency:${ref.table_name}`);
+          }
+          continue;
+        }
+        await client.query(`UPDATE ${table} SET ${column} = NULL WHERE ${column} = $1`, [userId]);
+      }
+
+      const deleteResult = await client.query(`DELETE FROM users WHERE id = $1`, [userId]);
+      return (deleteResult.rowCount ?? 0) > 0;
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("cannot_delete_due_to_dependency:")) {
+      redirect("/admin/users?error=dependency");
+    }
+    throw error;
+  }
+  if (!deleted) {
+    redirect("/admin/users?error=notfound");
+  }
+
   await logAuditEvent({
     session,
     action: "delete",
@@ -134,6 +180,7 @@ export default async function UsersAdminPage(props: Props) {
     module_access: string[] | null;
     is_active: boolean;
   }>(`SELECT id, full_name, email, role::text, module_access, is_active FROM users ORDER BY id DESC`);
+  const editableModules = APP_MODULES.filter((module) => module !== "user-admin");
 
   return (
     <AppShell>
@@ -159,10 +206,12 @@ export default async function UsersAdminPage(props: Props) {
       />
       {searchParams.error === "duplicate" ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">User email already exists.</div> : null}
       {searchParams.error === "self-demote" ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">You cannot remove your own admin role.</div> : null}
-      {searchParams.error === "self-deactivate" ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">You cannot deactivate your own account.</div> : null}
+      {searchParams.error === "self-delete" ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">You cannot delete your own account.</div> : null}
+      {searchParams.error === "notfound" ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">User not found.</div> : null}
+      {searchParams.error === "dependency" ? <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">User cannot be deleted because dependent records require this user reference.</div> : null}
       {searchParams.created ? <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">User created successfully.</div> : null}
-      {searchParams.updated ? <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">User access updated successfully.</div> : null}
-      {searchParams.deleted ? <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">User deactivated successfully.</div> : null}
+      {searchParams.updated ? <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">User access updated successfully. User must sign out and sign in again to load latest permissions.</div> : null}
+      {searchParams.deleted ? <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">User deleted permanently.</div> : null}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader><CardTitle>Create User</CardTitle></CardHeader>
@@ -202,14 +251,18 @@ export default async function UsersAdminPage(props: Props) {
               <TableBody>
                 {users.rows.map((user) => (
                   <TableRow key={user.id}>
+                    {(() => {
+                      const normalizedModules = normalizeModuleAccess(user.module_access, user.role as "admin" | "dispatcher" | "fuel_manager" | "viewer" | "updater");
+                      return (
+                        <>
                     <TableCell>{user.full_name}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{user.role}</TableCell>
-                    <TableCell className="max-w-[280px] truncate">{(user.module_access ?? []).join(", ") || "-"}</TableCell>
+                    <TableCell className="max-w-[280px] truncate">{normalizedModules.join(", ") || "-"}</TableCell>
                     <TableCell>{user.is_active ? "active" : "inactive"}</TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <form action={updateUserAccess} className="flex items-center gap-2">
+                      <div className="flex items-start justify-end gap-2">
+                        <form action={updateUserAccess} className="grid gap-2 rounded border p-2 text-left">
                           <input type="hidden" name="userId" value={user.id} />
                           <select name="role" defaultValue={user.role} className="h-8 rounded border border-input bg-transparent px-2 text-xs">
                             <option value="admin">admin</option>
@@ -218,19 +271,30 @@ export default async function UsersAdminPage(props: Props) {
                             <option value="viewer">viewer</option>
                             <option value="updater">updater</option>
                           </select>
-                          <input
-                            name="accessCsv"
-                            defaultValue={(user.module_access ?? []).join(",")}
-                            className="h-8 w-44 rounded border border-input bg-transparent px-2 text-xs"
-                          />
-                          <button className="h-8 rounded bg-primary px-2 text-xs text-primary-foreground">Update</button>
+                          <div className="grid max-w-[260px] grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                            {editableModules.map((module) => (
+                              <label key={`${user.id}-${module}`} className="flex items-center gap-1">
+                                <input
+                                  type="checkbox"
+                                  name="moduleAccess"
+                                  value={module}
+                                  defaultChecked={normalizedModules.includes(module)}
+                                />
+                                {module}
+                              </label>
+                            ))}
+                          </div>
+                          <button className="h-8 rounded bg-primary px-2 text-xs text-primary-foreground">Update Access</button>
                         </form>
-                        <form action={deactivateUser}>
+                        <form action={deleteUser}>
                           <input type="hidden" name="userId" value={user.id} />
-                          <ConfirmSubmitButton label="Delete" message="Deactivate this user?" className="text-red-600 hover:underline" />
+                          <ConfirmSubmitButton label="Delete" message="Delete this user permanently?" className="text-red-600 hover:underline" />
                         </form>
                       </div>
                     </TableCell>
+                        </>
+                      );
+                    })()}
                   </TableRow>
                 ))}
               </TableBody>

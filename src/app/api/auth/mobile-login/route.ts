@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
-import { APP_MODULES, createSession, sessionCookieSecureForHost } from "@/lib/auth";
+import { createSession, normalizeModuleAccess, sessionCookieSecureForHost } from "@/lib/auth";
 import { query } from "@/lib/db";
 
 export async function POST(request: Request) {
@@ -35,14 +35,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  const roleDefaultModules: (typeof APP_MODULES)[number][] =
-    user.role === "viewer" ? ["dashboard"] : [...APP_MODULES];
-  const resolvedModuleAccess =
-    user.role === "admin"
-      ? [...APP_MODULES]
-      : ((user.module_access as (typeof APP_MODULES)[number][] | null)?.length
-          ? (user.module_access as (typeof APP_MODULES)[number][])
-          : roleDefaultModules);
+  const resolvedModuleAccess = normalizeModuleAccess(user.module_access, user.role);
 
   const token = await createSession({
     id: user.id,

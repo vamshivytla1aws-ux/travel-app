@@ -37,6 +37,28 @@ export type SessionUser = {
   moduleAccess: AppModule[];
 };
 
+function normalizeModuleKey(raw: string): AppModule | null {
+  const value = raw.trim().toLowerCase().replace(/_/g, "-");
+  if (value === "fueltruck" || value === "fuel truck") return "fuel-truck";
+  if (value === "useradmin" || value === "user admin") return "user-admin";
+  return APP_MODULES.includes(value as AppModule) ? (value as AppModule) : null;
+}
+
+export function normalizeModuleAccess(
+  rawModules: unknown,
+  role?: SessionUser["role"],
+): AppModule[] {
+  if (role === "admin") return [...APP_MODULES];
+  const modules = Array.isArray(rawModules)
+    ? rawModules
+        .map((value) => normalizeModuleKey(String(value)))
+        .filter((value): value is AppModule => Boolean(value))
+    : [];
+  const unique = Array.from(new Set(modules));
+  if (unique.length > 0) return unique;
+  return ["dashboard"];
+}
+
 /**
  * `Secure` cookies are not sent on plain HTTP. Production builds (`next start`)
  * on localhost would otherwise never persist sessions. Real deployments use HTTPS.
@@ -85,7 +107,7 @@ export async function getSession(): Promise<SessionUser | null> {
       email: String(parsed.email),
       role: (parsed.role ?? "viewer") as SessionUser["role"],
       fullName: String(parsed.fullName ?? "User"),
-      moduleAccess: Array.isArray(parsed.moduleAccess) ? (parsed.moduleAccess as AppModule[]) : ["dashboard"],
+      moduleAccess: normalizeModuleAccess(parsed.moduleAccess, (parsed.role ?? "viewer") as SessionUser["role"]),
     };
   } catch {
     return null;
