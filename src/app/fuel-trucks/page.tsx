@@ -124,6 +124,9 @@ async function addIssue(formData: FormData) {
 
   try {
     const busId = Number(formData.get("busId"));
+    if (!Number.isFinite(busId) || busId <= 0) {
+      redirect(`/fuel-trucks?error=${encodeURIComponent("Please select a bus from the list before saving issue.")}`);
+    }
     const result = await fuelTruckService.addIssue({
       fuelTruckId: Number(formData.get("fuelTruckId")),
       busId,

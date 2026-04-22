@@ -19,6 +19,13 @@ import { RefillAmountFields } from "@/components/fuel-trucks/refill-amount-field
 
 const fuelTruckService = new FuelTruckService();
 
+function optionalNumber(formData: FormData, key: string): number | null {
+  const raw = String(formData.get(key) ?? "").trim();
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 async function updateFuelTruck(formData: FormData) {
   "use server";
   const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
@@ -117,12 +124,19 @@ async function addTruckIssue(formData: FormData) {
   if (!id) return;
   try {
     const busId = Number(formData.get("busId"));
+    if (!Number.isFinite(busId) || busId <= 0) {
+      redirect(`/fuel-trucks/${id}?error=${encodeURIComponent("Please select a bus from the list before saving issue.")}`);
+    }
     const result = await fuelTruckService.addIssue({
     fuelTruckId: id,
     busId,
     issueDate: String(formData.get("issueDate") ?? ""),
     issueTime: String(formData.get("issueTime") ?? ""),
     litersIssued: Number(formData.get("litersIssued")),
+    odometerBeforeKm: optionalNumber(formData, "odometerBeforeKm"),
+    odometerAfterKm: optionalNumber(formData, "odometerAfterKm"),
+    amount: optionalNumber(formData, "amount") ?? 0,
+    companyName: String(formData.get("companyName") ?? ""),
     issuedByName: String(formData.get("issuedByName") ?? ""),
     busDriverName: String(formData.get("busDriverName") ?? ""),
     routeReference: String(formData.get("routeReference") ?? ""),
@@ -147,9 +161,50 @@ async function addTruckIssue(formData: FormData) {
   }
 }
 
+async function updateTruckIssue(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager"]);
+  await requireModuleAccess("fuel-truck");
+  const fuelTruckId = Number(formData.get("fuelTruckId"));
+  const issueId = Number(formData.get("issueId"));
+  if (!fuelTruckId || !issueId) return;
+  try {
+    const busId = Number(formData.get("busId"));
+    await fuelTruckService.updateIssue({
+      issueId,
+      issueDate: String(formData.get("issueDate") ?? ""),
+      issueTime: String(formData.get("issueTime") ?? ""),
+      litersIssued: Number(formData.get("litersIssued")),
+      odometerBeforeKm: optionalNumber(formData, "odometerBeforeKm"),
+      odometerAfterKm: optionalNumber(formData, "odometerAfterKm"),
+      amount: optionalNumber(formData, "amount") ?? 0,
+      companyName: String(formData.get("companyName") ?? ""),
+      issuedByName: String(formData.get("issuedByName") ?? ""),
+      busDriverName: String(formData.get("busDriverName") ?? ""),
+      routeReference: String(formData.get("routeReference") ?? ""),
+      remarks: String(formData.get("remarks") ?? ""),
+      userId: session.id,
+    });
+    await logAuditEvent({
+      session,
+      action: "update",
+      entityType: "fuel_truck_issue",
+      entityId: issueId,
+      details: { fuelTruckId, busId, litersIssued: Number(formData.get("litersIssued")) },
+    });
+    revalidatePath(`/fuel-trucks/${fuelTruckId}`);
+    revalidatePath("/fuel-trucks");
+    if (busId) revalidatePath(`/buses/${busId}`);
+    redirect(`/fuel-trucks/${fuelTruckId}?issueUpdated=${Date.now()}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update issue";
+    redirect(`/fuel-trucks/${fuelTruckId}?error=${encodeURIComponent(message)}`);
+  }
+}
+
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ updated?: string; refilled?: string; issued?: string; error?: string }>;
+  searchParams: Promise<{ updated?: string; refilled?: string; issued?: string; issueUpdated?: string; editIssueId?: string; error?: string }>;
 };
 
 export default async function FuelTruckDetailPage(props: Props) {
@@ -163,11 +218,15 @@ export default async function FuelTruckDetailPage(props: Props) {
 
   const [detail, buses] = await Promise.all([
     fuelTruckService.getFuelTruckDetail(id),
-    query<{ id: number; bus_number: string; registration_number: string }>(
-      `SELECT id, bus_number, registration_number FROM buses WHERE status = 'active' ORDER BY bus_number`,
+    query<{ id: number; bus_number: string; registration_number: string; odometer_km: string | null }>(
+      `SELECT id, bus_number, registration_number, odometer_km::text FROM buses WHERE status = 'active' ORDER BY bus_number`,
     ),
   ]);
   if (!detail) notFound();
+  const editIssueId = Number(searchParams.editIssueId ?? "");
+  const issueToEdit = Number.isFinite(editIssueId) && editIssueId > 0
+    ? detail.issues.find((issue) => issue.id === editIssueId) ?? null
+    : null;
 
   const now = new Date();
   const defaultDate = now.toISOString().slice(0, 10);
@@ -184,6 +243,9 @@ export default async function FuelTruckDetailPage(props: Props) {
         ) : null}
         {searchParams.issued ? (
           <StatusAlert tone="info" message="Issue saved successfully." />
+        ) : null}
+        {searchParams.issueUpdated ? (
+          <StatusAlert tone="success" message="Issue updated successfully." />
         ) : null}
         {searchParams.error ? (
           <StatusAlert tone="error" message={safeDecodeURIComponent(searchParams.error)} />
@@ -320,7 +382,9 @@ export default async function FuelTruckDetailPage(props: Props) {
                     id: bus.id,
                     busNumber: bus.bus_number,
                     registrationNumber: bus.registration_number,
+                    latestOdometerKm: bus.odometer_km != null ? Number(bus.odometer_km) : null,
                   }))}
+                  oldOdometerTargetId="odometerBeforeKm"
                 />
                 <Label htmlFor="issueDate">Issue Date</Label>
                 <Input id="issueDate" name="issueDate" type="date" defaultValue={defaultDate} required />
@@ -328,6 +392,17 @@ export default async function FuelTruckDetailPage(props: Props) {
                 <Input id="issueTime" name="issueTime" type="time" defaultValue={defaultTime} required />
                 <Label htmlFor="litersIssued">Liters Issued</Label>
                 <Input id="litersIssued" name="litersIssued" type="number" step="0.01" required />
+                <Label htmlFor="odometerBeforeKm">Old Odometer (km)</Label>
+                <Input id="odometerBeforeKm" name="odometerBeforeKm" type="number" step="0.01" min="0" />
+                <Label htmlFor="odometerAfterKm">New Odometer (km)</Label>
+                <Input id="odometerAfterKm" name="odometerAfterKm" type="number" step="0.01" min="0" />
+                <Label htmlFor="amount">Amount</Label>
+                <Input id="amount" name="amount" type="number" step="0.01" defaultValue="0" />
+                <Label htmlFor="companyName">Company</Label>
+                <Input id="companyName" name="companyName" />
+                <p className="text-xs text-muted-foreground">
+                  Odometer is optional. If unavailable now, mileage will show as N/A until updated later.
+                </p>
                 <Label htmlFor="issuedByName">Issued By</Label>
                 <Input id="issuedByName" name="issuedByName" />
                 <Label htmlFor="busDriverName">Bus Driver / Operator</Label>
@@ -415,15 +490,79 @@ export default async function FuelTruckDetailPage(props: Props) {
             <CardTitle>Recent Issues</CardTitle>
           </CardHeader>
           <CardContent>
+            {issueToEdit ? (
+              <form action={updateTruckIssue} className="mb-4 grid gap-2 rounded-md border p-3">
+                <input type="hidden" name="fuelTruckId" value={detail.truck.id} />
+                <input type="hidden" name="issueId" value={issueToEdit.id} />
+                <input type="hidden" name="busId" value={issueToEdit.busId} />
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div className="grid gap-1">
+                    <Label htmlFor="editIssueDate">Issue Date</Label>
+                    <Input id="editIssueDate" name="issueDate" type="date" defaultValue={issueToEdit.issueDate} required />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="editIssueTime">Issue Time</Label>
+                    <Input id="editIssueTime" name="issueTime" type="time" defaultValue={issueToEdit.issueTime.slice(0, 5)} required />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="editLitersIssued">Liters Issued</Label>
+                    <Input id="editLitersIssued" name="litersIssued" type="number" step="0.01" defaultValue={issueToEdit.litersIssued} required />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="editAmount">Amount</Label>
+                    <Input id="editAmount" name="amount" type="number" step="0.01" defaultValue={issueToEdit.amount} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="editOdometerBefore">Old Odometer (km)</Label>
+                    <Input id="editOdometerBefore" name="odometerBeforeKm" type="number" step="0.01" defaultValue={issueToEdit.odometerBeforeKm ?? ""} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="editOdometerAfter">New Odometer (km)</Label>
+                    <Input id="editOdometerAfter" name="odometerAfterKm" type="number" step="0.01" defaultValue={issueToEdit.odometerAfterKm ?? ""} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="editCompanyName">Company</Label>
+                    <Input id="editCompanyName" name="companyName" defaultValue={issueToEdit.companyName ?? ""} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="editIssuedByName">Issued By</Label>
+                    <Input id="editIssuedByName" name="issuedByName" defaultValue={issueToEdit.issuedByName ?? ""} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="editBusDriverName">Bus Driver / Operator</Label>
+                    <Input id="editBusDriverName" name="busDriverName" defaultValue={issueToEdit.busDriverName ?? ""} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="editRouteReference">Route / Trip Reference</Label>
+                    <Input id="editRouteReference" name="routeReference" defaultValue={issueToEdit.routeReference ?? ""} />
+                  </div>
+                </div>
+                <div className="grid gap-1">
+                  <Label htmlFor="editRemarks">Remarks</Label>
+                  <Input id="editRemarks" name="remarks" defaultValue={issueToEdit.remarks ?? ""} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button type="submit">Update Issue</Button>
+                  <Link href={`/fuel-trucks/${detail.truck.id}`} className="inline-flex h-9 items-center rounded-md border px-3 text-sm">
+                    Cancel
+                  </Link>
+                </div>
+              </form>
+            ) : null}
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Bus</TableHead>
+                  <TableHead>Old Odo</TableHead>
+                  <TableHead>New Odo</TableHead>
                   <TableHead className="text-right">Liters</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>Company</TableHead>
                   <TableHead>Issued By</TableHead>
                   <TableHead>Driver</TableHead>
                   <TableHead>Route Ref</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -431,15 +570,24 @@ export default async function FuelTruckDetailPage(props: Props) {
                   <TableRow key={issue.id}>
                     <TableCell>{issue.issueDate} {issue.issueTime.slice(0, 5)}</TableCell>
                     <TableCell>{issue.busNumber ?? issue.busId}</TableCell>
+                    <TableCell>{issue.odometerBeforeKm != null ? issue.odometerBeforeKm.toFixed(2) : "-"}</TableCell>
+                    <TableCell>{issue.odometerAfterKm != null ? issue.odometerAfterKm.toFixed(2) : "-"}</TableCell>
                     <TableCell className="text-right">{issue.litersIssued.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{issue.amount.toFixed(2)}</TableCell>
+                    <TableCell>{issue.companyName ?? "-"}</TableCell>
                     <TableCell>{issue.issuedByName ?? "-"}</TableCell>
                     <TableCell>{issue.busDriverName ?? "-"}</TableCell>
                     <TableCell>{issue.routeReference ?? "-"}</TableCell>
+                    <TableCell className="text-right">
+                      <Link href={`/fuel-trucks/${detail.truck.id}?editIssueId=${issue.id}`} className="text-blue-600 hover:underline">
+                        Edit
+                      </Link>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {detail.issues.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center text-muted-foreground">
                       No issue records yet.
                     </TableCell>
                   </TableRow>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 type BusOption = {
   id: number;
@@ -21,6 +21,7 @@ export function BusSearchSelect({ name, id, buses, required = false, oldOdometer
   const generatedId = useId();
   const inputId = id ?? `bus-search-${generatedId}`;
   const listboxId = `${inputId}-listbox`;
+  const textInputRef = useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -44,16 +45,36 @@ export function BusSearchSelect({ name, id, buses, required = false, oldOdometer
   function selectBus(bus: BusOption) {
     setSelectedId(bus.id);
     setQuery(`${bus.busNumber} (${bus.registrationNumber})`);
+    if (textInputRef.current) textInputRef.current.setCustomValidity("");
     if (oldOdometerTargetId && bus.latestOdometerKm != null) {
       const target = document.getElementById(oldOdometerTargetId) as HTMLInputElement | null;
       if (target) target.value = String(bus.latestOdometerKm);
     }
   }
 
+  useEffect(() => {
+    const inputEl = textInputRef.current;
+    if (!inputEl) return;
+    const formEl = inputEl.closest("form");
+    if (!formEl) return;
+    const onSubmit = (event: Event) => {
+      if (required && !selectedId) {
+        event.preventDefault();
+        inputEl.setCustomValidity("Please select a bus from the dropdown list.");
+        inputEl.reportValidity();
+      } else {
+        inputEl.setCustomValidity("");
+      }
+    };
+    formEl.addEventListener("submit", onSubmit);
+    return () => formEl.removeEventListener("submit", onSubmit);
+  }, [required, selectedId]);
+
   return (
     <div className="space-y-2">
-      <input type="hidden" name={name} value={selectedId ?? ""} required={required} />
+      <input type="hidden" name={name} value={selectedId ?? ""} />
       <input
+        ref={textInputRef}
         id={inputId}
         role="combobox"
         aria-autocomplete="list"
@@ -71,6 +92,7 @@ export function BusSearchSelect({ name, id, buses, required = false, oldOdometer
         onChange={(event) => {
           setQuery(event.target.value);
           setSelectedId(null);
+          if (textInputRef.current) textInputRef.current.setCustomValidity("");
           setHighlightedIndex(0);
           setIsOpen(true);
         }}
@@ -96,6 +118,7 @@ export function BusSearchSelect({ name, id, buses, required = false, oldOdometer
             event.preventDefault();
             setQuery("");
             setSelectedId(null);
+            if (textInputRef.current) textInputRef.current.setCustomValidity("");
             setHighlightedIndex(0);
           }
         }}
