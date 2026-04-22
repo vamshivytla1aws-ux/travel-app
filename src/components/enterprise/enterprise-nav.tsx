@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { CarFront, ChevronDown, ClipboardList, Fuel, Gauge, KeyRound, Landmark, LogOut, MapPinned, Menu, Route, Timer, Truck, Users } from "lucide-react";
+import { CarFront, ChevronDown, ClipboardList, Fuel, Gauge, Info, KeyRound, Landmark, LogOut, MapPinned, Menu, Route, Timer, Truck, Users } from "lucide-react";
 import { cn } from "@/lib/ui-core";
 import { AppModule } from "@/lib/auth";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const navGroups = [
   {
@@ -53,6 +54,7 @@ function formatRoleLabel(role?: EnterpriseNavProps["userRole"]) {
 export function EnterpriseNav({ allowedModules, userFullName, userRole }: EnterpriseNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [isNativeApp, setIsNativeApp] = useState(false);
   const filteredGroups = navGroups
     .map((group) => ({
@@ -62,6 +64,7 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
     .filter((group) => group.items.length > 0);
 
   const adminGroup = filteredGroups.find((group) => group.label === "Admin");
+  const adminItems = adminGroup?.items ?? [];
   const nonAdminGroups = filteredGroups.filter((group) => group.label !== "Admin");
 
   const flatItems = nonAdminGroups.flatMap((group, groupIndex) =>
@@ -74,7 +77,7 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
     })),
   );
 
-  const adminActive = Boolean(adminGroup?.items.some((item) => pathname.startsWith(item.href)));
+  const adminActive = Boolean(adminItems.some((item) => pathname.startsWith(item.href)));
   const [adminExpanded, setAdminExpanded] = useState(adminActive);
   useEffect(() => {
     if (adminActive) setAdminExpanded(true);
@@ -138,7 +141,7 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
                 })}
               </div>
             ))}
-            {adminGroup ? (
+            {userRole ? (
               <div className="space-y-1.5 border-t border-slate-700 pt-3">
                 <div className="px-2 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">Admin</div>
                 <button
@@ -160,7 +163,7 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
                 </button>
                 {adminExpanded ? (
                   <div className="space-y-1 pl-2">
-                    {adminGroup.items.map((item) => {
+                    {adminItems.map((item) => {
                       const ItemIcon = item.icon;
                       const active = pathname.startsWith(item.href);
                       return (
@@ -180,6 +183,17 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
                         </Link>
                       );
                     })}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpen(false);
+                        setAboutOpen(true);
+                      }}
+                      className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-[#151b2b] hover:text-yellow-200"
+                    >
+                      <Info className="h-4 w-4" />
+                      About
+                    </button>
                   </div>
                 ) : null}
               </div>
@@ -233,7 +247,7 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
             </div>
           );
         })}
-        {adminGroup ? (
+        {userRole ? (
           <div className="ml-auto flex items-center">
             <div className="mx-1 h-6 w-px bg-slate-700" aria-hidden />
             <details className="group relative">
@@ -251,7 +265,7 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
                 <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
               </summary>
               <div className="absolute right-0 z-40 mt-1 w-48 rounded border border-slate-700 bg-[#0f1627] p-1 shadow-xl">
-                {adminGroup.items.map((item) => {
+                {adminItems.map((item) => {
                   const ItemIcon = item.icon;
                   const active = pathname.startsWith(item.href);
                   return (
@@ -270,11 +284,60 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
                     </Link>
                   );
                 })}
+                {userRole ? (
+                  <button
+                    type="button"
+                    onClick={() => setAboutOpen(true)}
+                    className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-[#151b2b] hover:text-yellow-200"
+                  >
+                    <Info className="h-4 w-4" />
+                    About
+                  </button>
+                ) : null}
               </div>
             </details>
           </div>
         ) : null}
       </div>
+      <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
+        <DialogContent className="max-w-xl rounded-2xl border border-white/40 bg-white/65 shadow-2xl backdrop-blur-md">
+          <DialogHeader>
+            <DialogTitle>About AASTHIX</DialogTitle>
+            <DialogDescription>
+              Product information and company contact details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 text-sm text-slate-900">
+            <p><span className="font-semibold">Developed by:</span> aasthix talent pvt ltd</p>
+            <p><span className="font-semibold">Company Name:</span> AASTHIX</p>
+            <p>
+              <span className="font-semibold">URL:</span>{" "}
+              <a href="https://www.aasthix.com" target="_blank" rel="noreferrer" className="text-blue-700 underline underline-offset-2">
+                www.aasthix.com
+              </a>
+            </p>
+            <p>
+              <span className="font-semibold">Reachout to:</span>{" "}
+              <a href="mailto:contact@aasthix.com" className="text-blue-700 underline underline-offset-2">
+                contact@aasthix.com
+              </a>
+            </p>
+            <p><span className="font-semibold">Author:</span> Vamshi Vytla</p>
+            <p className="leading-relaxed">
+              <span className="font-semibold">Address:</span> Unit.No. 114, Manjeera Trinity Corporate, JNTU - Hitech Road, beside LuLu Mall, Ashok Nagar, Kukatpally Housing Board Colony, Kukatpally, Hyderabad, Telangana 500072.
+            </p>
+            <p>
+              <span className="font-semibold">Tel:</span>{" "}
+              <a href="tel:+919573543933" className="text-blue-700 underline underline-offset-2">
+                +91 9573543933
+              </a>
+            </p>
+          </div>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>Close</DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </nav>
   );
 }
