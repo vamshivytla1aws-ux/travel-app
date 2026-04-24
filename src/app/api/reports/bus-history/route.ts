@@ -1,6 +1,7 @@
 import PDFDocument from "pdfkit";
 import { requireApiModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
+import { appDateFromTimestamptzSql, formatDateInAppTimeZone, formatDateTimeInAppTimeZone } from "@/lib/timezone";
 
 type ExportRow = {
   bus_number: string;
@@ -13,7 +14,7 @@ type ExportRow = {
 };
 
 function formatDate(value: string) {
-  return new Date(value).toLocaleDateString();
+  return formatDateInAppTimeZone(value);
 }
 
 export async function GET(request: Request) {
@@ -43,11 +44,11 @@ export async function GET(request: Request) {
   }
   if (from) {
     params.push(from);
-    where.push(`DATE(f.filled_at) >= $${params.length}`);
+    where.push(`${appDateFromTimestamptzSql("f.filled_at")} >= $${params.length}`);
   }
   if (to) {
     params.push(to);
-    where.push(`DATE(f.filled_at) <= $${params.length}`);
+    where.push(`${appDateFromTimestamptzSql("f.filled_at")} <= $${params.length}`);
   }
 
   const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
@@ -84,7 +85,7 @@ export async function GET(request: Request) {
 
   doc.fontSize(16).text("Bus Fuel and Mileage Report", { align: "center" });
   doc.moveDown(0.5);
-  doc.fontSize(10).text(`Generated: ${new Date().toLocaleString()}`);
+  doc.fontSize(10).text(`Generated: ${formatDateTimeInAppTimeZone(new Date())}`);
   doc.text(`Mode: ${mode === "latest" ? "Latest entry per bus" : "History by date range"}`);
   doc.text(`Records: ${result.rows.length}`);
   doc.moveDown(0.8);

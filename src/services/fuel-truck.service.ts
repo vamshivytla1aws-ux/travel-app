@@ -5,6 +5,7 @@ import {
   FuelTruckLedgerEntry,
   FuelTruckRefill,
 } from "@/lib/types";
+import { appDateFromTimestamptzSql, appTodaySql } from "@/lib/timezone";
 import {
   FuelIssueRow,
   FuelTruckLedgerRow,
@@ -733,6 +734,7 @@ export class FuelTruckService {
 
   async getSummary() {
     await ensureTransportEnhancements();
+    const appToday = appTodaySql();
     const [stockRows, todayRows, recentRefills, recentIssues] = await Promise.all([
       query<{
         truck_id: number;
@@ -750,8 +752,8 @@ export class FuelTruckService {
       ),
       query<{ refilled_today: string; issued_today: string }>(
         `SELECT
-            COALESCE((SELECT SUM(quantity_liters) FROM fuel_truck_refills WHERE refill_date = CURRENT_DATE), 0)::text as refilled_today,
-            COALESCE((SELECT SUM(liters_issued) FROM fuel_issues WHERE issue_date = CURRENT_DATE), 0)::text as issued_today`,
+            COALESCE((SELECT SUM(quantity_liters) FROM fuel_truck_refills WHERE refill_date = ${appToday}), 0)::text as refilled_today,
+            COALESCE((SELECT SUM(liters_issued) FROM fuel_issues WHERE issue_date = ${appToday}), 0)::text as issued_today`,
       ),
       query<{ id: number; truck_code: string; quantity_liters: string; refill_date: string; refill_time: string }>(
         `SELECT r.id, t.truck_code, r.quantity_liters::text, r.refill_date::text, r.refill_time::text
@@ -798,6 +800,7 @@ export class FuelTruckService {
 
   async getReports(filters: ReportFilters) {
     await ensureTransportEnhancements();
+    const appToday = appTodaySql();
     const refillParams: unknown[] = [];
     const issueParams: unknown[] = [];
     const ledgerParams: unknown[] = [];
@@ -909,7 +912,7 @@ export class FuelTruckService {
                  fe.odometer_before_km,
                  fe.odometer_after_km,
                  fe.liters,
-                 DATE(fe.filled_at) AS metric_day
+                 ${appDateFromTimestamptzSql("fe.filled_at")} AS metric_day
                FROM fuel_entries fe
                UNION ALL
                SELECT
@@ -921,7 +924,7 @@ export class FuelTruckService {
                FROM fuel_issues fi
              ) fuel
              WHERE
-               fuel.metric_day = CURRENT_DATE - INTERVAL '1 day'
+               fuel.metric_day = ${appToday} - INTERVAL '1 day'
                AND fuel.odometer_before_km IS NOT NULL
                AND fuel.odometer_after_km IS NOT NULL
              GROUP BY fuel.bus_id

@@ -3,6 +3,11 @@ import { requireApiModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { MODULE_EXPORT_FIELDS, type ExportModuleKey } from "@/lib/module-export";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
+import {
+  appDateFromTimestamptzSql,
+  appTodaySql,
+  formatDateTimeInAppTimeZone,
+} from "@/lib/timezone";
 
 type ExportRow = Record<string, string | number | boolean | null>;
 
@@ -23,7 +28,20 @@ function normalizeModule(raw: string): ExportModuleKey {
   return "overall";
 }
 
-function buildWhere(baseAlias: string, params: unknown[], input: { q?: string; status?: string; from?: string; to?: string; dateColumn?: string; searchCols?: string[]; statusCol?: string }) {
+function buildWhere(
+  baseAlias: string,
+  params: unknown[],
+  input: {
+    q?: string;
+    status?: string;
+    from?: string;
+    to?: string;
+    dateColumn?: string;
+    dateColumnExpr?: string;
+    searchCols?: string[];
+    statusCol?: string;
+  },
+) {
   const where: string[] = [];
   if (input.q?.trim() && input.searchCols?.length) {
     params.push(`%${input.q.trim()}%`);
@@ -33,29 +51,39 @@ function buildWhere(baseAlias: string, params: unknown[], input: { q?: string; s
     params.push(input.status.trim());
     where.push(`${baseAlias}.${input.statusCol}::text ILIKE $${params.length}`);
   }
-  if (input.from?.trim() && input.dateColumn) {
+  const dateExpr = input.dateColumnExpr ?? (input.dateColumn ? `DATE(${baseAlias}.${input.dateColumn})` : null);
+  if (input.from?.trim() && dateExpr) {
     params.push(input.from.trim());
-    where.push(`DATE(${baseAlias}.${input.dateColumn}) >= $${params.length}`);
+    where.push(`${dateExpr} >= $${params.length}`);
   }
-  if (input.to?.trim() && input.dateColumn) {
+  if (input.to?.trim() && dateExpr) {
     params.push(input.to.trim());
-    where.push(`DATE(${baseAlias}.${input.dateColumn}) <= $${params.length}`);
+    where.push(`${dateExpr} <= $${params.length}`);
   }
   return where.length ? `WHERE ${where.join(" AND ")}` : "";
 }
 
 async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string, from?: string, to?: string): Promise<ExportRow[]> {
   const params: unknown[] = [];
+  const appToday = appTodaySql();
   switch (moduleKey) {
     case "buses": {
-      const where = buildWhere("b", params, { q, status, from, to, dateColumn: "created_at", searchCols: ["bus_number", "registration_number", "make", "model"], statusCol: "status" });
+      const where = buildWhere("b", params, {
+        q,
+        status,
+        from,
+        to,
+        dateColumnExpr: appDateFromTimestamptzSql("b.created_at"),
+        searchCols: ["bus_number", "registration_number", "make", "model"],
+        statusCol: "status",
+      });
       const result = await query<ExportRow>(
         `WITH fuel_history AS (
            SELECT
              fe.id,
              fe.bus_id,
              fe.filled_at,
-             DATE(fe.filled_at) AS metric_day,
+             ${appDateFromTimestamptzSql("fe.filled_at")} AS metric_day,
              fe.odometer_before_km,
              fe.odometer_after_km,
              fe.liters,
@@ -118,7 +146,7 @@ async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string
            FROM fuel_history fh3
            WHERE
              fh3.bus_id = b.id
-             AND fh3.metric_day = CURRENT_DATE - INTERVAL '1 day'
+             AND fh3.metric_day = ${appToday} - INTERVAL '1 day'
              AND fh3.odometer_before_km IS NOT NULL
              AND fh3.odometer_after_km IS NOT NULL
          ) pd ON true
@@ -130,7 +158,15 @@ async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string
       return result.rows;
     }
     case "drivers": {
-      const where = buildWhere("d", params, { q, status, from, to, dateColumn: "created_at", searchCols: ["full_name", "phone", "license_number", "company_name"], statusCol: "is_active" });
+      const where = buildWhere("d", params, {
+        q,
+        status,
+        from,
+        to,
+        dateColumnExpr: appDateFromTimestamptzSql("d.created_at"),
+        searchCols: ["full_name", "phone", "license_number", "company_name"],
+        statusCol: "is_active",
+      });
       const result = await query<ExportRow>(
         `SELECT
            d.id::text,
@@ -202,7 +238,15 @@ async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string
       return result.rows;
     }
     case "employees": {
-      const where = buildWhere("e", params, { q, status, from, to, dateColumn: "created_at", searchCols: ["employee_code", "full_name", "phone", "department", "company_name"], statusCol: "is_active" });
+      const where = buildWhere("e", params, {
+        q,
+        status,
+        from,
+        to,
+        dateColumnExpr: appDateFromTimestamptzSql("e.created_at"),
+        searchCols: ["employee_code", "full_name", "phone", "department", "company_name"],
+        statusCol: "is_active",
+      });
       const result = await query<ExportRow>(
         `SELECT e.employee_code, e.full_name, e.phone, e.department, e.company_name, e.is_active::text
          FROM employees e
@@ -240,7 +284,15 @@ async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string
       return result.rows;
     }
     case "tracking": {
-      const where = buildWhere("g", params, { q, status, from, to, dateColumn: "logged_at", searchCols: ["latitude", "longitude"], statusCol: undefined });
+      const where = buildWhere("g", params, {
+        q,
+        status,
+        from,
+        to,
+        dateColumnExpr: appDateFromTimestamptzSql("g.logged_at"),
+        searchCols: ["latitude", "longitude"],
+        statusCol: undefined,
+      });
       const result = await query<ExportRow>(
         `SELECT g.logged_at::text, b.bus_number, g.latitude::text, g.longitude::text, g.speed_kmph::text
          FROM gps_logs g
@@ -277,7 +329,15 @@ async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string
       return result.rows;
     }
     case "logs": {
-      const where = buildWhere("a", params, { q, status, from, to, dateColumn: "created_at", searchCols: ["user_email", "action", "entity_type"], statusCol: undefined });
+      const where = buildWhere("a", params, {
+        q,
+        status,
+        from,
+        to,
+        dateColumnExpr: appDateFromTimestamptzSql("a.created_at"),
+        searchCols: ["user_email", "action", "entity_type"],
+        statusCol: undefined,
+      });
       const result = await query<ExportRow>(
         `SELECT a.created_at::text, a.user_email, a.action, a.entity_type, a.entity_id::text
          FROM audit_logs a
@@ -289,7 +349,15 @@ async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string
       return result.rows;
     }
     case "users": {
-      const where = buildWhere("u", params, { q, status, from, to, dateColumn: "updated_at", searchCols: ["full_name", "email", "role"], statusCol: "is_active" });
+      const where = buildWhere("u", params, {
+        q,
+        status,
+        from,
+        to,
+        dateColumnExpr: appDateFromTimestamptzSql("u.updated_at"),
+        searchCols: ["full_name", "email", "role"],
+        statusCol: "is_active",
+      });
       const result = await query<ExportRow>(
         `SELECT u.full_name, u.email, u.role::text, u.is_active::text, u.updated_at::text
          FROM users u
@@ -338,7 +406,6 @@ function pickFields(rows: ExportRow[], fields: string[]) {
 }
 
 export async function GET(request: Request) {
-  await ensureTransportEnhancements();
   const url = new URL(request.url);
   const moduleKey = normalizeModule(url.searchParams.get("module") ?? "overall");
   const authModule =
@@ -352,67 +419,81 @@ export async function GET(request: Request) {
   const session = await requireApiModuleAccess(authModule as never);
   if (!session) return new Response("Forbidden", { status: 403 });
 
-  const format = (url.searchParams.get("format") ?? "pdf").toLowerCase();
-  const q = url.searchParams.get("q") ?? "";
-  const status = url.searchParams.get("status") ?? "";
-  const from = url.searchParams.get("from") ?? "";
-  const to = url.searchParams.get("to") ?? "";
-  const selectedFields = url.searchParams.getAll("field");
+  try {
+    await ensureTransportEnhancements();
+    const format = (url.searchParams.get("format") ?? "pdf").toLowerCase();
+    const q = url.searchParams.get("q") ?? "";
+    const status = url.searchParams.get("status") ?? "";
+    const from = url.searchParams.get("from") ?? "";
+    const to = url.searchParams.get("to") ?? "";
+    const selectedFields = url.searchParams.getAll("field");
 
-  const rawRows = await fetchRows(moduleKey, q, status, from, to);
-  const rows = pickFields(rawRows, selectedFields);
-  const headers = rows.length ? Object.keys(rows[0]) : (selectedFields.length ? selectedFields : MODULE_EXPORT_FIELDS[moduleKey].map((f) => f.key));
+    const rawRows = await fetchRows(moduleKey, q, status, from, to);
+    const rows = pickFields(rawRows, selectedFields);
+    const headers = rows.length ? Object.keys(rows[0]) : (selectedFields.length ? selectedFields : MODULE_EXPORT_FIELDS[moduleKey].map((f) => f.key));
 
-  if (format === "excel") {
-    const csvLines = [headers.join(",")];
-    for (const row of rows) {
-      csvLines.push(headers.map((key) => escapeCsv(row[key])).join(","));
+    if (format === "excel") {
+      const csvLines = [headers.join(",")];
+      for (const row of rows) {
+        csvLines.push(headers.map((key) => escapeCsv(row[key])).join(","));
+      }
+      const csv = csvLines.join("\n");
+      return new Response(csv, {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${moduleKey}-export.csv"`,
+        },
+      });
     }
-    const csv = csvLines.join("\n");
-    return new Response(csv, {
+
+    const chunks: Buffer[] = [];
+    const doc = new PDFDocument({ size: "A4", margin: 36 });
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    const done = new Promise<Buffer>((resolve) => {
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+    });
+
+    doc.fontSize(16).font("Helvetica-Bold").text(`${moduleKey.toUpperCase()} Export Report`);
+    doc.moveDown(0.3);
+    doc
+      .fontSize(9)
+      .font("Helvetica")
+      .fillColor("#4b5563")
+      .text(`Generated: ${formatDateTimeInAppTimeZone(new Date())}`);
+    doc.text(`Records: ${rows.length}`);
+    doc.moveDown(0.4);
+    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(8).text(headers.join(" | "));
+    doc.moveDown(0.2);
+    doc.moveTo(36, doc.y).lineTo(560, doc.y).strokeColor("#d1d5db").stroke();
+    doc.moveDown(0.3);
+
+    rows.forEach((row) => {
+      const line = headers.map((h) => `${h}: ${row[h] ?? "-"}`).join(" | ");
+      doc.fillColor("#111827").font("Helvetica").fontSize(8).text(line, {
+        width: 523,
+        lineGap: 1,
+      });
+      doc.moveDown(0.15);
+      if (doc.y > 800) {
+        doc.addPage();
+      }
+    });
+
+    doc.end();
+    const pdfBuffer = await done;
+    const binary = new Uint8Array(pdfBuffer);
+    return new Response(binary, {
       headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${moduleKey}-export.csv"`,
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${moduleKey}-export.pdf"`,
       },
     });
-  }
-
-  const chunks: Buffer[] = [];
-  const doc = new PDFDocument({ size: "A4", margin: 36 });
-  doc.on("data", (chunk: Buffer) => chunks.push(chunk));
-  const done = new Promise<Buffer>((resolve) => {
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-  });
-
-  doc.fontSize(16).font("Helvetica-Bold").text(`${moduleKey.toUpperCase()} Export Report`);
-  doc.moveDown(0.3);
-  doc.fontSize(9).font("Helvetica").fillColor("#4b5563").text(`Generated: ${new Date().toLocaleString()}`);
-  doc.text(`Records: ${rows.length}`);
-  doc.moveDown(0.4);
-  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(8).text(headers.join(" | "));
-  doc.moveDown(0.2);
-  doc.moveTo(36, doc.y).lineTo(560, doc.y).strokeColor("#d1d5db").stroke();
-  doc.moveDown(0.3);
-
-  rows.forEach((row) => {
-    const line = headers.map((h) => `${h}: ${row[h] ?? "-"}`).join(" | ");
-    doc.fillColor("#111827").font("Helvetica").fontSize(8).text(line, {
-      width: 523,
-      lineGap: 1,
+  } catch (error) {
+    console.error("Export route failed", {
+      moduleKey,
+      format: url.searchParams.get("format") ?? "pdf",
+      error,
     });
-    doc.moveDown(0.15);
-    if (doc.y > 800) {
-      doc.addPage();
-    }
-  });
-
-  doc.end();
-  const pdfBuffer = await done;
-  const binary = new Uint8Array(pdfBuffer);
-  return new Response(binary, {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${moduleKey}-export.pdf"`,
-    },
-  });
+    return new Response("Export failed. Please retry in a moment.", { status: 500 });
+  }
 }

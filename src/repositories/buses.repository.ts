@@ -1,5 +1,6 @@
 import { query, withTransaction } from "@/lib/db";
 import { Bus } from "@/lib/types";
+import { appDateFromTimestamptzSql, appTodaySql } from "@/lib/timezone";
 
 type BusRow = {
   id: number;
@@ -43,6 +44,8 @@ export class BusesRepository {
     const offset = (safePage - 1) * safeLimit;
     const params: unknown[] = [];
     const where: string[] = [];
+    const appToday = appTodaySql();
+    const fuelDayExpr = appDateFromTimestamptzSql("fe.filled_at");
 
     if (search) {
       params.push(`%${search}%`);
@@ -86,7 +89,7 @@ export class BusesRepository {
             fe.odometer_before_km,
             fe.odometer_after_km,
             fe.liters,
-            DATE(fe.filled_at) AS metric_day,
+            ${fuelDayExpr} AS metric_day,
             fe.filled_at
           FROM fuel_entries fe
           UNION ALL
@@ -109,7 +112,7 @@ export class BusesRepository {
             )::text AS previous_day_mileage_kmpl
           FROM fuel
           WHERE
-            metric_day = CURRENT_DATE - INTERVAL '1 day'
+            metric_day = ${appToday} - INTERVAL '1 day'
             AND odometer_before_km IS NOT NULL
             AND odometer_after_km IS NOT NULL
             AND liters > 0
@@ -147,6 +150,8 @@ export class BusesRepository {
   async list(search = "", status?: Bus["status"]): Promise<Bus[]> {
     const params: unknown[] = [];
     const where: string[] = [];
+    const appToday = appTodaySql();
+    const fuelDayExpr = appDateFromTimestamptzSql("fe.filled_at");
 
     if (search) {
       params.push(`%${search}%`);
@@ -181,7 +186,7 @@ export class BusesRepository {
             fe.odometer_before_km,
             fe.odometer_after_km,
             fe.liters,
-            DATE(fe.filled_at) AS metric_day,
+            ${fuelDayExpr} AS metric_day,
             fe.filled_at
           FROM fuel_entries fe
           UNION ALL
@@ -204,7 +209,7 @@ export class BusesRepository {
             )::text AS previous_day_mileage_kmpl
           FROM fuel
           WHERE
-            metric_day = CURRENT_DATE - INTERVAL '1 day'
+            metric_day = ${appToday} - INTERVAL '1 day'
             AND odometer_before_km IS NOT NULL
             AND odometer_after_km IS NOT NULL
             AND liters > 0
@@ -238,6 +243,8 @@ export class BusesRepository {
   }
 
   async getById(id: number): Promise<Bus | null> {
+    const appToday = appTodaySql();
+    const fuelDayExpr = appDateFromTimestamptzSql("fe.filled_at");
     const result = await query<BusRow>(
       `SELECT b.id, b.bus_number, b.registration_number, b.make, b.model, b.seater, b.odometer_km,
               pd.previous_day_mileage_kmpl, b.status, b.last_service_at
@@ -250,7 +257,7 @@ export class BusesRepository {
              fe.odometer_before_km,
              fe.odometer_after_km,
              fe.liters,
-             DATE(fe.filled_at) AS metric_day,
+             ${fuelDayExpr} AS metric_day,
              fe.filled_at
            FROM fuel_entries fe
            UNION ALL
@@ -273,7 +280,7 @@ export class BusesRepository {
              )::text AS previous_day_mileage_kmpl
            FROM fuel
            WHERE
-             metric_day = CURRENT_DATE - INTERVAL '1 day'
+             metric_day = ${appToday} - INTERVAL '1 day'
              AND odometer_before_km IS NOT NULL
              AND odometer_after_km IS NOT NULL
              AND liters > 0

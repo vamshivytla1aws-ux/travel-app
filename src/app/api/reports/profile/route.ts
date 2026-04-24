@@ -2,6 +2,10 @@ import PDFDocument from "pdfkit";
 import { requireApiModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
+import {
+  formatDateInAppTimeZone,
+  formatDateTimeInAppTimeZone,
+} from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -10,7 +14,7 @@ function fmtDate(value?: string | null) {
   if (!value) return "-";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString();
+  return formatDateInAppTimeZone(parsed);
 }
 
 function addSectionTitle(doc: any, title: string) {
@@ -99,7 +103,7 @@ async function buildBusProfilePdf(busId: number) {
 
   doc.font("Helvetica-Bold").fontSize(16).text("Bus Profile Report", { align: "center" });
   doc.moveDown(0.4);
-  addField(doc, "Generated", new Date().toLocaleString());
+  addField(doc, "Generated", formatDateTimeInAppTimeZone(new Date()));
   addField(doc, "Bus ID", bus.id);
 
   addSectionTitle(doc, "Bus Information");
@@ -244,7 +248,7 @@ async function buildDriverProfilePdf(driverId: number) {
 
   doc.font("Helvetica-Bold").fontSize(16).text("Driver Profile Report", { align: "center" });
   doc.moveDown(0.4);
-  addField(doc, "Generated", new Date().toLocaleString());
+  addField(doc, "Generated", formatDateTimeInAppTimeZone(new Date()));
   addField(doc, "Driver ID", driver.id);
 
   addSectionTitle(doc, "Driver Information");
@@ -320,7 +324,6 @@ async function buildDriverProfilePdf(driverId: number) {
 }
 
 export async function GET(request: Request) {
-  await ensureTransportEnhancements();
   const url = new URL(request.url);
   const type = String(url.searchParams.get("type") ?? "").toLowerCase();
   const id = Number(url.searchParams.get("id") ?? "0");
@@ -331,27 +334,39 @@ export async function GET(request: Request) {
   if (type === "bus") {
     const session = await requireApiModuleAccess("buses");
     if (!session) return new Response("Forbidden", { status: 403 });
-    const pdf = await buildBusProfilePdf(id);
-    if (!pdf) return new Response("Not found", { status: 404 });
-    return new Response(new Uint8Array(pdf), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="bus-profile-${id}.pdf"`,
-      },
-    });
+    try {
+      await ensureTransportEnhancements();
+      const pdf = await buildBusProfilePdf(id);
+      if (!pdf) return new Response("Not found", { status: 404 });
+      return new Response(new Uint8Array(pdf), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="bus-profile-${id}.pdf"`,
+        },
+      });
+    } catch (error) {
+      console.error("Bus profile export failed", { id, error });
+      return new Response("Profile export failed. Please retry in a moment.", { status: 500 });
+    }
   }
 
   if (type === "driver") {
     const session = await requireApiModuleAccess("drivers");
     if (!session) return new Response("Forbidden", { status: 403 });
-    const pdf = await buildDriverProfilePdf(id);
-    if (!pdf) return new Response("Not found", { status: 404 });
-    return new Response(new Uint8Array(pdf), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="driver-profile-${id}.pdf"`,
-      },
-    });
+    try {
+      await ensureTransportEnhancements();
+      const pdf = await buildDriverProfilePdf(id);
+      if (!pdf) return new Response("Not found", { status: 404 });
+      return new Response(new Uint8Array(pdf), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="driver-profile-${id}.pdf"`,
+        },
+      });
+    } catch (error) {
+      console.error("Driver profile export failed", { id, error });
+      return new Response("Profile export failed. Please retry in a moment.", { status: 500 });
+    }
   }
 
   return new Response("Invalid type", { status: 400 });

@@ -1,9 +1,12 @@
 import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
+import { appDateFromTimestamptzSql, appTodaySql } from "@/lib/timezone";
 
 export class DashboardService {
   async getSummary() {
     await ensureTransportEnhancements();
+    const appToday = appTodaySql();
+    const filledAtDay = appDateFromTimestamptzSql("filled_at");
     const [fleet, drivers, employees, activeAssignments, fuelToday] = await Promise.all([
       query<{ total: string; active: string; maintenance: string }>(
         `SELECT
@@ -17,14 +20,14 @@ export class DashboardService {
       query<{ total: string }>(
         `SELECT COUNT(*)::text as total
          FROM bus_assignments
-         WHERE assignment_date = CURRENT_DATE AND status IN ('scheduled', 'in_transit')`,
+         WHERE assignment_date = ${appToday} AND status IN ('scheduled', 'in_transit')`,
       ),
       query<{ liters: string; amount: string }>(
         `SELECT
            COALESCE(SUM(liters_issued),0)::text as liters,
            COALESCE(SUM(amount),0)::text as amount
          FROM fuel_issues
-         WHERE issue_date = CURRENT_DATE`,
+         WHERE issue_date = ${appToday}`,
       ),
     ]);
 
@@ -33,13 +36,13 @@ export class DashboardService {
          TO_CHAR(day, 'YYYY-MM-DD') as day,
          SUM(liters)::text as liters
        FROM (
-         SELECT DATE(filled_at) as day, liters
+         SELECT ${filledAtDay} as day, liters
          FROM fuel_entries
-         WHERE DATE(filled_at) >= CURRENT_DATE - INTERVAL '13 days'
+         WHERE ${filledAtDay} >= ${appToday} - INTERVAL '13 days'
          UNION ALL
          SELECT issue_date as day, liters_issued as liters
          FROM fuel_issues
-         WHERE issue_date >= CURRENT_DATE - INTERVAL '13 days'
+         WHERE issue_date >= ${appToday} - INTERVAL '13 days'
        ) fuel
        GROUP BY day
        ORDER BY day ASC`,
@@ -82,11 +85,11 @@ export class DashboardService {
     }>(
       `SELECT
         COUNT(*) FILTER (WHERE status = 'planned')::text as planned,
-        COUNT(*) FILTER (WHERE status = 'in_progress')::text as in_progress,
+       COUNT(*) FILTER (WHERE status = 'in_progress')::text as in_progress,
         COUNT(*) FILTER (WHERE status = 'completed')::text as completed,
         COUNT(*) FILTER (WHERE status = 'cancelled')::text as cancelled
        FROM trip_runs
-       WHERE trip_date = CURRENT_DATE`,
+       WHERE trip_date = ${appToday}`,
     );
 
     return {

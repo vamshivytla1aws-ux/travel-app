@@ -9,6 +9,7 @@ import { DashboardService } from "@/services/dashboard.service";
 import { FuelTruckService } from "@/services/fuel-truck.service";
 import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
+import { formatDateTimeInAppTimeZone } from "@/lib/timezone";
 
 const dashboardService = new DashboardService();
 const fuelTruckService = new FuelTruckService();
@@ -136,7 +137,7 @@ export default async function DashboardPage() {
             {data.recentActivity.map((event, index) => (
               <div key={`${event.type}-${index}`} className="rounded border p-2 text-sm">
                 <p className="font-medium">{event.title}</p>
-                <p className="text-xs text-slate-500">{new Date(event.at).toLocaleString()}</p>
+                <p className="text-xs text-slate-500">{formatDateTimeInAppTimeZone(event.at)}</p>
               </div>
             ))}
           </CardContent>
