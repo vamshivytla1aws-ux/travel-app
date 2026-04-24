@@ -183,6 +183,8 @@ type Props = {
     driver?: string;
     page?: string;
     pageSize?: string;
+    refillPage?: string;
+    issuePage?: string;
     action?: string;
     export?: string;
     error?: string;
@@ -310,6 +312,38 @@ export default async function FuelTrucksPage(props: Props) {
   const refillActionHref = `/fuel-trucks?${refillParams.toString()}`;
   const issueActionHref = `/fuel-trucks?${issueParams.toString()}`;
   const modalAction = String(searchParams.action ?? "");
+  const reportPageSize = 15;
+  const requestedRefillPage = Number(searchParams.refillPage ?? "1");
+  const requestedIssuePage = Number(searchParams.issuePage ?? "1");
+  const refillTotal = reports.refillReport.length;
+  const issueTotal = reports.issueReport.length;
+  const refillTotalPages = Math.max(1, Math.ceil(refillTotal / reportPageSize));
+  const issueTotalPages = Math.max(1, Math.ceil(issueTotal / reportPageSize));
+  const refillPage = Number.isFinite(requestedRefillPage) && requestedRefillPage > 0
+    ? Math.min(refillTotalPages, Math.floor(requestedRefillPage))
+    : 1;
+  const issuePage = Number.isFinite(requestedIssuePage) && requestedIssuePage > 0
+    ? Math.min(issueTotalPages, Math.floor(requestedIssuePage))
+    : 1;
+  const refillStart = (refillPage - 1) * reportPageSize;
+  const issueStart = (issuePage - 1) * reportPageSize;
+  const visibleRefillRows = reports.refillReport.slice(refillStart, refillStart + reportPageSize);
+  const visibleIssueRows = reports.issueReport.slice(issueStart, issueStart + reportPageSize);
+  const reportPageHref = (kind: "refill" | "issue", page: number) => {
+    const params = new URLSearchParams();
+    Object.entries(searchParams).forEach(([key, value]) => {
+      if (!value || key === "refillPage" || key === "issuePage") return;
+      params.set(key, value);
+    });
+    if (kind === "refill") {
+      params.set("refillPage", String(page));
+      params.set("issuePage", String(issuePage));
+    } else {
+      params.set("refillPage", String(refillPage));
+      params.set("issuePage", String(page));
+    }
+    return `/fuel-trucks?${params.toString()}`;
+  };
 
   return (
     <AppShell>
@@ -715,6 +749,7 @@ export default async function FuelTrucksPage(props: Props) {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>S.No</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Truck</TableHead>
                         <TableHead>Station</TableHead>
@@ -723,8 +758,9 @@ export default async function FuelTrucksPage(props: Props) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {reports.refillReport.slice(0, 20).map((row, idx) => (
+                      {visibleRefillRows.map((row, idx) => (
                         <TableRow key={`${row.truck_code}-${idx}`}>
+                          <TableCell>{refillStart + idx + 1}</TableCell>
                           <TableCell>{row.refill_date}</TableCell>
                           <TableCell>{row.truck_code}</TableCell>
                           <TableCell>{row.fuel_station_name ?? "-"}</TableCell>
@@ -743,13 +779,33 @@ export default async function FuelTrucksPage(props: Props) {
                       ))}
                       {reports.refillReport.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
                             No refill records for current filters.
                           </TableCell>
                         </TableRow>
                       ) : null}
                     </TableBody>
                   </Table>
+                  <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
+                    <span>
+                      Showing {refillTotal === 0 ? 0 : refillStart + 1}-{Math.min(refillStart + reportPageSize, refillTotal)} of {refillTotal}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={reportPageHref("refill", Math.max(1, refillPage - 1))}
+                        className={`rounded border px-2 py-1 ${refillPage <= 1 ? "pointer-events-none opacity-50" : ""}`}
+                      >
+                        Prev
+                      </Link>
+                      <span>{refillPage}/{refillTotalPages}</span>
+                      <Link
+                        href={reportPageHref("refill", Math.min(refillTotalPages, refillPage + 1))}
+                        className={`rounded border px-2 py-1 ${refillPage >= refillTotalPages ? "pointer-events-none opacity-50" : ""}`}
+                      >
+                        Next
+                      </Link>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -761,19 +817,44 @@ export default async function FuelTrucksPage(props: Props) {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>S.No</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Truck</TableHead>
                         <TableHead>Registration</TableHead>
+                        <TableHead className="text-right">Mileage</TableHead>
                         <TableHead className="text-right">Liters</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {reports.issueReport.slice(0, 20).map((row, idx) => (
+                      {visibleIssueRows.map((row, idx) => (
                         <TableRow key={`${row.truck_code}-${idx}`}>
+                          <TableCell>{issueStart + idx + 1}</TableCell>
                           <TableCell>{row.issue_date}</TableCell>
                           <TableCell>{row.truck_code}</TableCell>
-                          <TableCell>{row.registration_number ?? row.bus_number ?? "-"}</TableCell>
+                          <TableCell>
+                            {row.bus_id ? (
+                              <Link href={`/buses/${row.bus_id}`} className="text-blue-600 hover:underline">
+                                {row.registration_number ?? row.bus_number ?? "-"}
+                              </Link>
+                            ) : (
+                              row.registration_number ?? row.bus_number ?? "-"
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {(() => {
+                              const liters = Number(row.liters_issued);
+                              const start = row.odometer_before_km != null ? Number(row.odometer_before_km) : null;
+                              const end = row.odometer_after_km != null ? Number(row.odometer_after_km) : null;
+                              if (start != null && end != null && liters > 0) {
+                                return ((end - start) / liters).toFixed(2);
+                              }
+                              if (row.previous_day_mileage_kmpl != null) {
+                                return Number(row.previous_day_mileage_kmpl).toFixed(2);
+                              }
+                              return "N/A";
+                            })()}
+                          </TableCell>
                           <TableCell className="text-right">{Number(row.liters_issued).toFixed(2)}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
@@ -797,13 +878,33 @@ export default async function FuelTrucksPage(props: Props) {
                       ))}
                       {reports.issueReport.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          <TableCell colSpan={7} className="text-center text-muted-foreground">
                             No issue records for current filters.
                           </TableCell>
                         </TableRow>
                       ) : null}
                     </TableBody>
                   </Table>
+                  <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
+                    <span>
+                      Showing {issueTotal === 0 ? 0 : issueStart + 1}-{Math.min(issueStart + reportPageSize, issueTotal)} of {issueTotal}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={reportPageHref("issue", Math.max(1, issuePage - 1))}
+                        className={`rounded border px-2 py-1 ${issuePage <= 1 ? "pointer-events-none opacity-50" : ""}`}
+                      >
+                        Prev
+                      </Link>
+                      <span>{issuePage}/{issueTotalPages}</span>
+                      <Link
+                        href={reportPageHref("issue", Math.min(issueTotalPages, issuePage + 1))}
+                        className={`rounded border px-2 py-1 ${issuePage >= issueTotalPages ? "pointer-events-none opacity-50" : ""}`}
+                      >
+                        Next
+                      </Link>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>

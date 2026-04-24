@@ -93,7 +93,13 @@ export class BusesService {
     return { success: true as const };
   }
 
-  async getBusDetail(id: number) {
+  async getBusDetail(
+    id: number,
+    options?: {
+      fuelPage?: number;
+      fuelPageSize?: number;
+    },
+  ) {
     await ensureTransportEnhancements();
     await ensureDocumentTables();
     const bus = await busesRepository.getById(id);
@@ -144,7 +150,18 @@ export class BusesService {
       [id],
     );
 
-    const fuelHistory = await fuelRepository.listUnifiedHistoryByBus(id, 20);
+    const fuelPageSizeRaw = options?.fuelPageSize ?? 10;
+    const fuelPageRaw = options?.fuelPage ?? 1;
+    const fuelPageSize = Number.isFinite(fuelPageSizeRaw)
+      ? Math.min(50, Math.max(5, Math.floor(fuelPageSizeRaw)))
+      : 10;
+    const fuelPage = Number.isFinite(fuelPageRaw) ? Math.max(1, Math.floor(fuelPageRaw)) : 1;
+    const allFuelHistory = await fuelRepository.listUnifiedHistoryByBus(id, 1000);
+    const fuelTotal = allFuelHistory.length;
+    const fuelTotalPages = Math.max(1, Math.ceil(fuelTotal / fuelPageSize));
+    const safeFuelPage = Math.min(fuelPage, fuelTotalPages);
+    const fuelOffset = (safeFuelPage - 1) * fuelPageSize;
+    const fuelHistory = allFuelHistory.slice(fuelOffset, fuelOffset + fuelPageSize);
     const latestFuel = fuelHistory[0] ?? null;
     const busDocuments = await query<{
       id: number;
@@ -204,6 +221,12 @@ export class BusesService {
       latestFuel,
       todayMileage,
       fuelHistory,
+      fuelPagination: {
+        page: safeFuelPage,
+        pageSize: fuelPageSize,
+        total: fuelTotal,
+        totalPages: fuelTotalPages,
+      },
       maintenance: maintenanceResult.rows,
       documents: busDocuments.rows,
       routeAssignments: routeAssignments.rows,

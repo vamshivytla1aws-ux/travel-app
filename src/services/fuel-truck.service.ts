@@ -865,7 +865,7 @@ export class FuelTruckService {
            JOIN fuel_trucks t ON t.id = r.fuel_truck_id
            ${refillSql}
            ORDER BY r.refill_date DESC, r.id DESC
-           LIMIT 300`,
+           LIMIT 1000`,
           refillParams,
         ),
         query<{
@@ -876,15 +876,59 @@ export class FuelTruckService {
           registration_number: string | null;
           bus_number: string | null;
           liters_issued: string;
+          odometer_before_km: string | null;
+          odometer_after_km: string | null;
+          previous_day_mileage_kmpl: string | null;
           issue_date: string;
         }>(
-          `SELECT i.id, i.fuel_truck_id, t.truck_code, i.bus_id, b.registration_number, b.bus_number, i.liters_issued::text, i.issue_date::text
+          `SELECT
+             i.id,
+             i.fuel_truck_id,
+             t.truck_code,
+             i.bus_id,
+             b.registration_number,
+             b.bus_number,
+             i.liters_issued::text,
+             i.odometer_before_km::text,
+             i.odometer_after_km::text,
+             pd.previous_day_mileage_kmpl,
+             i.issue_date::text
            FROM fuel_issues i
            JOIN fuel_trucks t ON t.id = i.fuel_truck_id
            LEFT JOIN buses b ON b.id = i.bus_id
+           LEFT JOIN (
+             SELECT
+               fuel.bus_id,
+               (
+                 SUM(fuel.odometer_after_km - fuel.odometer_before_km) /
+                 NULLIF(SUM(fuel.liters), 0)
+               )::text AS previous_day_mileage_kmpl
+             FROM (
+               SELECT
+                 fe.bus_id,
+                 fe.odometer_before_km,
+                 fe.odometer_after_km,
+                 fe.liters,
+                 DATE(fe.filled_at) AS metric_day
+               FROM fuel_entries fe
+               UNION ALL
+               SELECT
+                 fi.bus_id,
+                 fi.odometer_before_km,
+                 fi.odometer_after_km,
+                 fi.liters_issued AS liters,
+                 fi.issue_date AS metric_day
+               FROM fuel_issues fi
+             ) fuel
+             WHERE
+               fuel.metric_day = CURRENT_DATE - INTERVAL '1 day'
+               AND fuel.odometer_before_km IS NOT NULL
+               AND fuel.odometer_after_km IS NOT NULL
+             GROUP BY fuel.bus_id
+           ) pd ON pd.bus_id = i.bus_id
            ${issueSql}
            ORDER BY i.issue_date DESC, i.id DESC
-           LIMIT 300`,
+           LIMIT 1000`,
           issueParams,
         ),
         query<{ truck_code: string; current_stock: string }>(

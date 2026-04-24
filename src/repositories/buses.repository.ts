@@ -85,8 +85,27 @@ export class BusesRepository {
             SUM(odometer_after_km - odometer_before_km) /
             NULLIF(SUM(liters), 0)
           )::text AS previous_day_mileage_kmpl
-        FROM fuel_entries
-        WHERE DATE(filled_at) = CURRENT_DATE - INTERVAL '1 day'
+        FROM (
+          SELECT
+            fe.bus_id,
+            fe.odometer_before_km,
+            fe.odometer_after_km,
+            fe.liters,
+            DATE(fe.filled_at) AS metric_day
+          FROM fuel_entries fe
+          UNION ALL
+          SELECT
+            fi.bus_id,
+            fi.odometer_before_km,
+            fi.odometer_after_km,
+            fi.liters_issued AS liters,
+            fi.issue_date AS metric_day
+          FROM fuel_issues fi
+        ) fuel
+        WHERE
+          metric_day = CURRENT_DATE - INTERVAL '1 day'
+          AND odometer_before_km IS NOT NULL
+          AND odometer_after_km IS NOT NULL
         GROUP BY bus_id
       ) pd ON pd.bus_id = b.id
       ${whereSql}
@@ -134,8 +153,27 @@ export class BusesRepository {
             SUM(odometer_after_km - odometer_before_km) /
             NULLIF(SUM(liters), 0)
           )::text AS previous_day_mileage_kmpl
-        FROM fuel_entries
-        WHERE DATE(filled_at) = CURRENT_DATE - INTERVAL '1 day'
+        FROM (
+          SELECT
+            fe.bus_id,
+            fe.odometer_before_km,
+            fe.odometer_after_km,
+            fe.liters,
+            DATE(fe.filled_at) AS metric_day
+          FROM fuel_entries fe
+          UNION ALL
+          SELECT
+            fi.bus_id,
+            fi.odometer_before_km,
+            fi.odometer_after_km,
+            fi.liters_issued AS liters,
+            fi.issue_date AS metric_day
+          FROM fuel_issues fi
+        ) fuel
+        WHERE
+          metric_day = CURRENT_DATE - INTERVAL '1 day'
+          AND odometer_before_km IS NOT NULL
+          AND odometer_after_km IS NOT NULL
         GROUP BY bus_id
       ) pd ON pd.bus_id = b.id
       ${whereSql}
@@ -157,8 +195,27 @@ export class BusesRepository {
              SUM(odometer_after_km - odometer_before_km) /
              NULLIF(SUM(liters), 0)
            )::text AS previous_day_mileage_kmpl
-         FROM fuel_entries
-         WHERE DATE(filled_at) = CURRENT_DATE - INTERVAL '1 day'
+         FROM (
+           SELECT
+             fe.bus_id,
+             fe.odometer_before_km,
+             fe.odometer_after_km,
+             fe.liters,
+             DATE(fe.filled_at) AS metric_day
+           FROM fuel_entries fe
+           UNION ALL
+           SELECT
+             fi.bus_id,
+             fi.odometer_before_km,
+             fi.odometer_after_km,
+             fi.liters_issued AS liters,
+             fi.issue_date AS metric_day
+           FROM fuel_issues fi
+         ) fuel
+         WHERE
+           metric_day = CURRENT_DATE - INTERVAL '1 day'
+           AND odometer_before_km IS NOT NULL
+           AND odometer_after_km IS NOT NULL
          GROUP BY bus_id
        ) pd ON pd.bus_id = b.id
        WHERE b.id = $1`,

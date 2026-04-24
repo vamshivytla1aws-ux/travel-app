@@ -355,6 +355,7 @@ type Props = {
     editMaintenanceId?: string;
     editFuelId?: string;
     editFuelSource?: string;
+    fuelPage?: string;
   }>;
 };
 
@@ -363,7 +364,9 @@ export default async function BusDetailPage(props: Props) {
   await requireModuleAccess("buses");
   const params = await props.params;
   const searchParams = await props.searchParams;
-  const detail = await busesService.getBusDetail(Number(params.id));
+  const requestedFuelPage = Number(searchParams.fuelPage ?? "1");
+  const fuelPage = Number.isFinite(requestedFuelPage) && requestedFuelPage > 0 ? Math.floor(requestedFuelPage) : 1;
+  const detail = await busesService.getBusDetail(Number(params.id), { fuelPage, fuelPageSize: 10 });
   if (!detail) notFound();
   const editMaintenanceId = Number(searchParams.editMaintenanceId ?? "");
   const maintenanceToEdit = Number.isFinite(editMaintenanceId) && editMaintenanceId > 0
@@ -380,6 +383,15 @@ export default async function BusDetailPage(props: Props) {
   const now = new Date();
   const defaultDate = now.toISOString().slice(0, 10);
   const defaultTime = now.toTimeString().slice(0, 5);
+  const fuelPageHref = (page: number) => {
+    const paramsObj = new URLSearchParams();
+    Object.entries(searchParams).forEach(([key, value]) => {
+      if (!value || key === "fuelPage") return;
+      paramsObj.set(key, value);
+    });
+    paramsObj.set("fuelPage", String(page));
+    return `/buses/${detail.bus.id}?${paramsObj.toString()}`;
+  };
 
   return (
     <AppShell>
@@ -459,7 +471,17 @@ export default async function BusDetailPage(props: Props) {
             Maintenance record not found.
           </div>
         ) : null}
-        <h2 className="text-2xl font-semibold">Bus {detail.bus.busNumber}</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-2xl font-semibold">Bus {detail.bus.busNumber}</h2>
+          <a
+            href={`/api/reports/profile?type=bus&id=${detail.bus.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-9 items-center rounded-md border border-input px-3 text-sm"
+          >
+            Export Bus Profile (PDF)
+          </a>
+        </div>
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader><CardTitle>Bus Info</CardTitle></CardHeader>
@@ -693,6 +715,34 @@ export default async function BusDetailPage(props: Props) {
                   ) : null}
                 </TableBody>
               </Table>
+              <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  Showing {detail.fuelPagination.total === 0 ? 0 : (detail.fuelPagination.page - 1) * detail.fuelPagination.pageSize + 1}
+                  -
+                  {Math.min(
+                    detail.fuelPagination.page * detail.fuelPagination.pageSize,
+                    detail.fuelPagination.total,
+                  )}{" "}
+                  of {detail.fuelPagination.total}
+                </span>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={fuelPageHref(Math.max(1, detail.fuelPagination.page - 1))}
+                    className={`rounded border px-2 py-1 ${detail.fuelPagination.page <= 1 ? "pointer-events-none opacity-50" : ""}`}
+                  >
+                    Prev
+                  </a>
+                  <span>
+                    {detail.fuelPagination.page}/{detail.fuelPagination.totalPages}
+                  </span>
+                  <a
+                    href={fuelPageHref(Math.min(detail.fuelPagination.totalPages, detail.fuelPagination.page + 1))}
+                    className={`rounded border px-2 py-1 ${detail.fuelPagination.page >= detail.fuelPagination.totalPages ? "pointer-events-none opacity-50" : ""}`}
+                  >
+                    Next
+                  </a>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

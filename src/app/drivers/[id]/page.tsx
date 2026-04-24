@@ -472,7 +472,17 @@ export default async function DriverProfilePage(props: Props) {
             <ProfileAvatar name={profile.driver.full_name} src={profile.driver.has_profile_photo ? `/api/profile-photo/driver/${profile.driver.id}` : null} />
             <h2 className="text-2xl font-semibold">{profile.driver.full_name}</h2>
           </div>
-          <Link href="/drivers" className="text-sm text-blue-600 hover:underline">Back to Drivers</Link>
+          <div className="flex items-center gap-3">
+            <a
+              href={`/api/reports/profile?type=driver&id=${profile.driver.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-9 items-center rounded-md border border-input px-3 text-sm"
+            >
+              Export Driver Profile (PDF)
+            </a>
+            <Link href="/drivers" className="text-sm text-blue-600 hover:underline">Back to Drivers</Link>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">

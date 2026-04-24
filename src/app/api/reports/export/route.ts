@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import PDFDocument from "pdfkit";
 import { requireApiModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { MODULE_EXPORT_FIELDS, type ExportModuleKey } from "@/lib/module-export";
@@ -46,9 +46,80 @@ async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string
     case "buses": {
       const where = buildWhere("b", params, { q, status, from, to, dateColumn: "created_at", searchCols: ["bus_number", "registration_number", "make", "model"], statusCol: "status" });
       const result = await query<ExportRow>(
-        `SELECT b.bus_number, b.registration_number, b.make, b.model, b.seater, b.status::text, b.odometer_km::text
+        `WITH fuel_history AS (
+           SELECT
+             fe.id,
+             fe.bus_id,
+             fe.filled_at,
+             DATE(fe.filled_at) AS metric_day,
+             fe.odometer_before_km,
+             fe.odometer_after_km,
+             fe.liters,
+             fe.amount,
+             fe.company_name
+           FROM fuel_entries fe
+           UNION ALL
+           SELECT
+             fi.id,
+             fi.bus_id,
+             (fi.issue_date::text || 'T' || fi.issue_time::text)::timestamp AS filled_at,
+             fi.issue_date AS metric_day,
+             fi.odometer_before_km,
+             fi.odometer_after_km,
+             fi.liters_issued AS liters,
+             fi.amount,
+             fi.company_name
+           FROM fuel_issues fi
+         )
+         SELECT
+           b.id::text,
+           b.bus_number,
+           b.registration_number,
+           b.make,
+           b.model,
+           b.seater::text,
+           b.status::text,
+           b.odometer_km::text,
+           pd.previous_day_mileage_kmpl,
+           COALESCE(SUM(fh.liters), 0)::text AS total_fuel_liters,
+           COALESCE(SUM(fh.amount), 0)::text AS total_fuel_amount,
+           COALESCE(SUM(CASE WHEN fh.odometer_before_km IS NOT NULL AND fh.odometer_after_km IS NOT NULL THEN fh.odometer_after_km - fh.odometer_before_km ELSE 0 END), 0)::text AS total_km_run,
+           CASE
+             WHEN COALESCE(SUM(fh.liters), 0) > 0 THEN
+               (
+                 COALESCE(SUM(CASE WHEN fh.odometer_before_km IS NOT NULL AND fh.odometer_after_km IS NOT NULL THEN fh.odometer_after_km - fh.odometer_before_km ELSE 0 END), 0)
+                 / NULLIF(SUM(fh.liters), 0)
+               )::text
+             ELSE NULL
+           END AS overall_mileage_kmpl,
+           TO_CHAR(MAX(fh.filled_at), 'YYYY-MM-DD"T"HH24:MI:SS') AS last_fuel_date,
+           MAX(CASE WHEN fh.filled_at = lf.latest_filled_at THEN fh.odometer_before_km END)::text AS last_odometer_start,
+           MAX(CASE WHEN fh.filled_at = lf.latest_filled_at THEN fh.odometer_after_km END)::text AS last_odometer_end,
+           MAX(CASE WHEN fh.filled_at = lf.latest_filled_at THEN fh.liters END)::text AS last_fuel_liters,
+           MAX(CASE WHEN fh.filled_at = lf.latest_filled_at THEN fh.amount END)::text AS last_fuel_amount,
+           MAX(CASE WHEN fh.filled_at = lf.latest_filled_at THEN fh.company_name END) AS last_company_name
          FROM buses b
+         LEFT JOIN fuel_history fh ON fh.bus_id = b.id
+         LEFT JOIN LATERAL (
+           SELECT MAX(fh2.filled_at) AS latest_filled_at
+           FROM fuel_history fh2
+           WHERE fh2.bus_id = b.id
+         ) lf ON true
+         LEFT JOIN LATERAL (
+           SELECT
+             (
+               SUM(fh3.odometer_after_km - fh3.odometer_before_km) /
+               NULLIF(SUM(fh3.liters), 0)
+             )::text AS previous_day_mileage_kmpl
+           FROM fuel_history fh3
+           WHERE
+             fh3.bus_id = b.id
+             AND fh3.metric_day = CURRENT_DATE - INTERVAL '1 day'
+             AND fh3.odometer_before_km IS NOT NULL
+             AND fh3.odometer_after_km IS NOT NULL
+         ) pd ON true
          ${where}
+         GROUP BY b.id, b.bus_number, b.registration_number, b.make, b.model, b.seater, b.status, b.odometer_km, pd.previous_day_mileage_kmpl
          ORDER BY b.id DESC`,
         params,
       );
@@ -57,8 +128,69 @@ async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string
     case "drivers": {
       const where = buildWhere("d", params, { q, status, from, to, dateColumn: "created_at", searchCols: ["full_name", "phone", "license_number", "company_name"], statusCol: "is_active" });
       const result = await query<ExportRow>(
-        `SELECT d.full_name, d.phone, d.company_name, d.license_number, d.is_active::text
+        `SELECT
+           d.id::text,
+           d.full_name,
+           d.phone,
+           d.company_name,
+           dp.blood_group,
+           dp.father_name,
+           dp.father_contact,
+           dp.mother_name,
+           dp.mother_contact,
+           dp.spouse_name,
+           dp.spouse_contact,
+           dp.child_1_name,
+           dp.child_2_name,
+           dp.pan_or_voter_id,
+           dp.aadhaar_no,
+           d.bank_name,
+           d.bank_account_number,
+           d.bank_ifsc,
+           dp.vehicle_registration_no,
+           dp.present_reading_km::text,
+           d.license_number,
+           d.license_expiry::text,
+           dp.badge_no,
+           dp.badge_validity::text,
+           dp.education,
+           d.experience_years::text,
+           dp.date_of_birth::text,
+           dp.marital_status,
+           dp.religion,
+           dp.present_village,
+           dp.present_landmark,
+           dp.present_post_office,
+           dp.present_mandal,
+           dp.present_police_station,
+           dp.present_district,
+           dp.present_state,
+           dp.present_pin_code,
+           dp.permanent_village,
+           dp.permanent_landmark,
+           dp.permanent_post_office,
+           dp.permanent_mandal,
+           dp.permanent_police_station,
+           dp.permanent_district,
+           dp.permanent_state,
+           dp.permanent_pin_code,
+           dp.reference1_name,
+           dp.reference1_relationship,
+           dp.reference1_contact,
+           dp.reference2_name,
+           dp.reference2_relationship,
+           dp.reference2_contact,
+           dp.present_salary::text,
+           dp.salary_expectation::text,
+           dp.salary_offered::text,
+           dp.joining_date::text,
+           dp.candidate_signature_text,
+           dp.appointee_signature_text,
+           dp.approval_authority_signature_text,
+           d.is_active::text,
+           d.updated_at::text
          FROM drivers d
+         LEFT JOIN driver_profiles dp ON dp.driver_id = d.id
          ${where}
          ORDER BY d.id DESC`,
         params,
@@ -240,62 +372,39 @@ export async function GET(request: Request) {
     });
   }
 
-  const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const titleFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const chunks: Buffer[] = [];
+  const doc = new PDFDocument({ size: "A4", margin: 36 });
+  doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+  const done = new Promise<Buffer>((resolve) => {
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+  });
 
-  const pageWidth = 595; // A4 points
-  const pageHeight = 842;
-  const margin = 36;
-  const lineHeight = 12;
-  const contentWidth = pageWidth - margin * 2;
-  const maxLineChars = Math.max(40, Math.floor(contentWidth / 4.4));
+  doc.fontSize(16).font("Helvetica-Bold").text(`${moduleKey.toUpperCase()} Export Report`);
+  doc.moveDown(0.3);
+  doc.fontSize(9).font("Helvetica").fillColor("#4b5563").text(`Generated: ${new Date().toLocaleString()}`);
+  doc.text(`Records: ${rows.length}`);
+  doc.moveDown(0.4);
+  doc.fillColor("#111827").font("Helvetica-Bold").fontSize(8).text(headers.join(" | "));
+  doc.moveDown(0.2);
+  doc.moveTo(36, doc.y).lineTo(560, doc.y).strokeColor("#d1d5db").stroke();
+  doc.moveDown(0.3);
 
-  let page = pdfDoc.addPage([pageWidth, pageHeight]);
-  let y = pageHeight - margin;
-
-  const drawLine = (text: string, options?: { size?: number; bold?: boolean; color?: [number, number, number] }) => {
-    const size = options?.size ?? 8;
-    const selectedFont = options?.bold ? titleFont : font;
-    const color = options?.color ?? [0, 0, 0];
-    if (y - lineHeight < margin) {
-      page = pdfDoc.addPage([pageWidth, pageHeight]);
-      y = pageHeight - margin;
-    }
-    page.drawText(text, {
-      x: margin,
-      y,
-      size,
-      font: selectedFont,
-      color: rgb(color[0], color[1], color[2]),
-    });
-    y -= lineHeight;
-  };
-
-  drawLine(`${moduleKey.toUpperCase()} Export Report`, { size: 16, bold: true });
-  y -= 4;
-  drawLine(`Generated: ${new Date().toLocaleString()}`, { size: 9, color: [0.25, 0.25, 0.25] });
-  drawLine(`Records: ${rows.length}`, { size: 9, color: [0.25, 0.25, 0.25] });
-  y -= 4;
-  drawLine(headers.join(" | "), { size: 8, bold: true });
-  y -= 2;
-
-  for (const row of rows) {
+  rows.forEach((row) => {
     const line = headers.map((h) => `${h}: ${row[h] ?? "-"}`).join(" | ");
-    if (line.length <= maxLineChars) {
-      drawLine(line, { size: 8 });
-      continue;
+    doc.fillColor("#111827").font("Helvetica").fontSize(8).text(line, {
+      width: 523,
+      lineGap: 1,
+    });
+    doc.moveDown(0.15);
+    if (doc.y > 800) {
+      doc.addPage();
     }
-    let start = 0;
-    while (start < line.length) {
-      drawLine(line.slice(start, start + maxLineChars), { size: 8 });
-      start += maxLineChars;
-    }
-  }
+  });
 
-  const pdf = await pdfDoc.save();
-  const pdfBuffer = Buffer.from(pdf);
-  return new Response(pdfBuffer, {
+  doc.end();
+  const pdfBuffer = await done;
+  const binary = new Uint8Array(pdfBuffer);
+  return new Response(binary, {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${moduleKey}-export.pdf"`,
