@@ -252,10 +252,13 @@ async function buildDriverProfilePdf(driverId: number) {
       bank_name: string | null;
       bank_account_number: string | null;
       bank_ifsc: string | null;
+      pf_account_number: string | null;
+      uan_number: string | null;
+      esic_number: string | null;
       profile_photo_data: Buffer | null;
       profile_photo_mime: string | null;
     }>(
-      `SELECT id, full_name, phone, company_name, license_number, license_expiry::text, experience_years::text, bank_name, bank_account_number, bank_ifsc, profile_photo_data, profile_photo_mime
+      `SELECT id, full_name, phone, company_name, license_number, license_expiry::text, experience_years::text, bank_name, bank_account_number, bank_ifsc, pf_account_number, uan_number, esic_number, profile_photo_data, profile_photo_mime
        FROM drivers WHERE id = $1`,
       [driverId],
     ),
@@ -354,7 +357,7 @@ async function buildDriverProfilePdf(driverId: number) {
   const fitText = (text: string, maxChars = 30) => {
     const safe = toText(text);
     if (safe.length <= maxChars) return safe;
-    return `${safe.slice(0, maxChars - 1)}…`;
+    return `${safe.slice(0, maxChars - 3)}...`;
   };
 
   const addPageIfNeeded = (neededHeight: number) => {
@@ -456,7 +459,6 @@ async function buildDriverProfilePdf(driverId: number) {
     [0.2, 0.22, 0.27],
   );
   drawCentered("Contact no: 9666227227, 9494665519", pageHeight - margin - 64, 12, boldFont, [0.2, 0.22, 0.27]);
-  drawCentered(`Driver ID: ${driver.id}`, pageHeight - margin - 80, 10, bodyFont, [0.3, 0.33, 0.4]);
 
   page.drawRectangle({
     x: photoX,
@@ -573,6 +575,11 @@ async function buildDriverProfilePdf(driverId: number) {
     { label: "Bank Name", value: toText(driver.bank_name) },
     { label: "Bank Account No", value: toText(driver.bank_account_number) },
     { label: "IFSC No", value: toText(driver.bank_ifsc) },
+  ]);
+  drawRow([
+    { label: "PF / EPF Account No", value: toText(driver.pf_account_number) },
+    { label: "UAN No", value: toText(driver.uan_number) },
+    { label: "ESIC No", value: toText(driver.esic_number) },
   ]);
 
   drawSection("Education & Personal");

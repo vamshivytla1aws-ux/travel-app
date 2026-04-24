@@ -49,6 +49,7 @@ const EMPTY_DEFAULTS: DriverIntakeDefaults = {
   bankIfsc: "",
   pfAccountNumber: "",
   uanNumber: "",
+  esicNumber: "",
   bloodGroup: "",
   fatherName: "",
   fatherContact: "",
@@ -297,10 +298,10 @@ async function createDriver(formData: FormData) {
     const driverId = await withTransaction(async (client) => {
       const created = await client.query<{ id: number }>(
         `INSERT INTO drivers(
-          full_name, phone, company_name, bank_name, bank_account_number, bank_ifsc, pf_account_number, uan_number,
+          full_name, phone, company_name, bank_name, bank_account_number, bank_ifsc, pf_account_number, uan_number, esic_number,
           license_number, license_expiry, experience_years
         )
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          RETURNING id`,
         [
           payload.core.fullName,
@@ -311,6 +312,7 @@ async function createDriver(formData: FormData) {
           payload.core.bankIfsc,
           payload.core.pfAccountNumber,
           payload.core.uanNumber,
+          payload.core.esicNumber,
           payload.core.licenseNumber,
           payload.core.licenseExpiry,
           payload.core.experienceYears,

@@ -24,6 +24,7 @@ type DriverCoreValues = {
   bankIfsc: string;
   pfAccountNumber: string;
   uanNumber: string;
+  esicNumber: string;
 };
 
 type DriverProfileValues = {
@@ -178,6 +179,7 @@ export function DriverIntakeForm({ defaults, buses, submitLabel }: Props) {
         <div className="grid gap-1"><Label htmlFor="bankIfsc">IFSC No</Label><Input id="bankIfsc" name="bankIfsc" defaultValue={defaults.bankIfsc} /></div>
         <div className="grid gap-1"><Label htmlFor="pfAccountNumber">PF Account No</Label><Input id="pfAccountNumber" name="pfAccountNumber" defaultValue={defaults.pfAccountNumber} /></div>
         <div className="grid gap-1"><Label htmlFor="uanNumber">UAN No</Label><Input id="uanNumber" name="uanNumber" defaultValue={defaults.uanNumber} /></div>
+        <div className="grid gap-1"><Label htmlFor="esicNumber">ESIC No</Label><Input id="esicNumber" name="esicNumber" defaultValue={defaults.esicNumber} /></div>
       </div>
 
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-3">

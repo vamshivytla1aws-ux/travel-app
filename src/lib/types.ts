@@ -28,6 +28,7 @@ export interface Driver {
   bankIfsc: string | null;
   pfAccountNumber: string | null;
   uanNumber: string | null;
+  esicNumber: string | null;
   licenseNumber: string;
   licenseExpiry: string;
   experienceYears: number;

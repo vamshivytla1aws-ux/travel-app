@@ -225,9 +225,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
          SET full_name = $1, phone = $2, company_name = $3,
              bank_name = $4, bank_account_number = $5, bank_ifsc = $6,
              pf_account_number = $7, uan_number = $8,
-             license_number = $9, license_expiry = $10, experience_years = $11,
+             esic_number = $9,
+             license_number = $10, license_expiry = $11, experience_years = $12,
              updated_at = NOW()
-         WHERE id = $12`,
+         WHERE id = $13`,
         [
           payload.core.fullName,
           payload.core.phone,
@@ -237,6 +238,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
           payload.core.bankIfsc,
           payload.core.pfAccountNumber,
           payload.core.uanNumber,
+          payload.core.esicNumber,
           payload.core.licenseNumber,
           payload.core.licenseExpiry,
           payload.core.experienceYears,

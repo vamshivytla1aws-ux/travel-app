@@ -10,6 +10,7 @@ export type DriverCorePayload = {
   bankIfsc: string | null;
   pfAccountNumber: string | null;
   uanNumber: string | null;
+  esicNumber: string | null;
 };
 
 export type DriverProfilePayload = {
@@ -115,6 +116,7 @@ export function readDriverPayload(source: Source): {
       bankIfsc: cleanText(source.get("bankIfsc")),
       pfAccountNumber: cleanText(source.get("pfAccountNumber")),
       uanNumber: cleanText(source.get("uanNumber")),
+      esicNumber: cleanText(source.get("esicNumber")),
     },
     profile: {
       bloodGroup: cleanText(source.get("bloodGroup")),

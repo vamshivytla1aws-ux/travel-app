@@ -11,6 +11,7 @@ type DriverRow = {
   bank_ifsc: string | null;
   pf_account_number: string | null;
   uan_number: string | null;
+  esic_number: string | null;
   license_number: string;
   license_expiry: string;
   experience_years: number;
@@ -29,6 +30,7 @@ function mapDriver(row: DriverRow): Driver {
     bankIfsc: row.bank_ifsc,
     pfAccountNumber: row.pf_account_number,
     uanNumber: row.uan_number,
+    esicNumber: row.esic_number,
     licenseNumber: row.license_number,
     licenseExpiry: row.license_expiry,
     experienceYears: row.experience_years,
@@ -40,7 +42,7 @@ function mapDriver(row: DriverRow): Driver {
 export class DriversRepository {
   async list(): Promise<Driver[]> {
     const result = await query<DriverRow>(
-      `SELECT id, full_name, phone, company_name, bank_name, bank_account_number, bank_ifsc, pf_account_number, uan_number,
+      `SELECT id, full_name, phone, company_name, bank_name, bank_account_number, bank_ifsc, pf_account_number, uan_number, esic_number,
               license_number, license_expiry, experience_years,
               (profile_photo_data IS NOT NULL) as has_profile_photo,
               is_active

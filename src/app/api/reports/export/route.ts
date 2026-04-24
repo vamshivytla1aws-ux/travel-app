@@ -225,6 +225,9 @@ async function fetchRows(
            d.bank_name,
            d.bank_account_number,
            d.bank_ifsc,
+           d.pf_account_number,
+           d.uan_number,
+           d.esic_number,
            dp.vehicle_registration_no,
            dp.present_reading_km::text,
            d.license_number,
@@ -263,6 +266,7 @@ async function fetchRows(
            dp.salary_offered::text,
            dp.joining_date::text,
            dp.candidate_signature_text,
+           dp.candidate_signature_date::text,
            dp.appointee_signature_text,
            dp.approval_authority_signature_text,
            d.is_active::text,
@@ -288,6 +292,9 @@ async function fetchRows(
              d.bank_name,
              d.bank_account_number,
              d.bank_ifsc,
+             d.pf_account_number,
+             d.uan_number,
+             d.esic_number,
              d.is_active::text,
              d.updated_at::text
            FROM drivers d

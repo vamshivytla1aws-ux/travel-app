@@ -47,6 +47,7 @@ function toDefaults(profile: Awaited<ReturnType<DriversService["getDriverProfile
     bankIfsc: profile.driver.bank_ifsc ?? "",
     pfAccountNumber: profile.driver.pf_account_number ?? "",
     uanNumber: profile.driver.uan_number ?? "",
+    esicNumber: profile.driver.esic_number ?? "",
     bloodGroup: profile.profile?.bloodGroup ?? "",
     fatherName: profile.profile?.fatherName ?? "",
     fatherContact: profile.profile?.fatherContact ?? "",
@@ -304,11 +305,12 @@ async function updateDriverProfile(formData: FormData) {
              bank_ifsc = $6,
              pf_account_number = $7,
              uan_number = $8,
-             license_number = $9,
-             license_expiry = $10,
-             experience_years = $11,
+             esic_number = $9,
+             license_number = $10,
+             license_expiry = $11,
+             experience_years = $12,
              updated_at = NOW()
-         WHERE id = $12`,
+         WHERE id = $13`,
         [
           payload.core.fullName,
           payload.core.phone,
@@ -318,6 +320,7 @@ async function updateDriverProfile(formData: FormData) {
           payload.core.bankIfsc,
           payload.core.pfAccountNumber,
           payload.core.uanNumber,
+          payload.core.esicNumber,
           payload.core.licenseNumber,
           payload.core.licenseExpiry,
           payload.core.experienceYears,
@@ -509,9 +512,10 @@ export default async function DriverProfilePage(props: Props) {
               {sectionRow("License", profile.driver.license_number)}
               {sectionRow("DL Validity", profile.driver.license_expiry ? new Date(profile.driver.license_expiry).toLocaleDateString() : "-")}
               {sectionRow("Joining Date", profile.profile?.joiningDate ? new Date(profile.profile.joiningDate).toLocaleDateString() : "-")}
-              {sectionRow("Vehicle", profile.profile?.vehicleRegistrationNo)}
-              {sectionRow("Present Reading", profile.profile?.presentReadingKm != null ? String(profile.profile.presentReadingKm) : "-")}
-            </CardContent>
+                {sectionRow("Vehicle", profile.profile?.vehicleRegistrationNo)}
+                {sectionRow("Present Reading", profile.profile?.presentReadingKm != null ? String(profile.profile.presentReadingKm) : "-")}
+                {sectionRow("ESIC", profile.driver.esic_number)}
+              </CardContent>
           </Card>
           <Card>
             <CardHeader><CardTitle>Profile Photo</CardTitle></CardHeader>

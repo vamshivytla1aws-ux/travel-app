@@ -19,6 +19,7 @@ export async function ensureTransportEnhancements() {
   await query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS bank_ifsc VARCHAR(30);`);
   await query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS pf_account_number VARCHAR(40);`);
   await query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS uan_number VARCHAR(40);`);
+  await query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS esic_number VARCHAR(40);`);
   await query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS profile_photo_name VARCHAR(255);`);
   await query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS profile_photo_mime VARCHAR(120);`);
   await query(`ALTER TABLE drivers ADD COLUMN IF NOT EXISTS profile_photo_data BYTEA;`);
