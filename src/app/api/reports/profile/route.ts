@@ -252,8 +252,10 @@ async function buildDriverProfilePdf(driverId: number) {
       bank_name: string | null;
       bank_account_number: string | null;
       bank_ifsc: string | null;
+      profile_photo_data: Buffer | null;
+      profile_photo_mime: string | null;
     }>(
-      `SELECT id, full_name, phone, company_name, license_number, license_expiry::text, experience_years::text, bank_name, bank_account_number, bank_ifsc
+      `SELECT id, full_name, phone, company_name, license_number, license_expiry::text, experience_years::text, bank_name, bank_account_number, bank_ifsc, profile_photo_data, profile_photo_mime
        FROM drivers WHERE id = $1`,
       [driverId],
     ),
@@ -330,111 +332,310 @@ async function buildDriverProfilePdf(driverId: number) {
   const driver = driverRes.rows[0];
   if (!driver) return null;
   const profile = profileRes.rows[0];
+  const pdfDoc = await PDFDocument.create();
+  const bodyFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  const lines: string[] = [];
-  lines.push(`Driver Profile Form`);
-  lines.push(`Driver ID: ${driver.id}`);
-  lines.push("");
-  lines.push("Basic");
-  lines.push(`Driver Name: ${driver.full_name}`);
-  lines.push(`Contact No: ${driver.phone}`);
-  lines.push(`Company: ${toText(driver.company_name)}`);
-  lines.push("");
-  lines.push("Vehicle & License");
-  lines.push(`Vehicle Registration: ${toText(profile?.vehicle_registration_no)}`);
-  lines.push(`Present Reading: ${toText(profile?.present_reading_km)}`);
-  lines.push(`Driving License No: ${driver.license_number}`);
-  lines.push(`Validity (DL): ${fmtDate(driver.license_expiry)}`);
-  lines.push(`Badge No: ${toText(profile?.badge_no)}`);
-  lines.push(`Validity (Badge): ${fmtDate(profile?.badge_validity)}`);
-  lines.push("");
-  lines.push("Family Details");
-  lines.push(`Father's Name: ${toText(profile?.father_name)}`);
-  lines.push(`Father Contact: ${toText(profile?.father_contact)}`);
-  lines.push(`Mother's Name: ${toText(profile?.mother_name)}`);
-  lines.push(`Mother Contact: ${toText(profile?.mother_contact)}`);
-  lines.push(`Spouse Name: ${toText(profile?.spouse_name)}`);
-  lines.push(`Spouse Contact: ${toText(profile?.spouse_contact)}`);
-  lines.push(`Children 1: ${toText(profile?.child_1_name)}`);
-  lines.push(`Children 2: ${toText(profile?.child_2_name)}`);
-  lines.push("");
-  lines.push("Identity & Banking");
-  lines.push(`Blood Group: ${toText(profile?.blood_group)}`);
-  lines.push(`PAN / Voter ID: ${toText(profile?.pan_or_voter_id)}`);
-  lines.push(`Aadhaar No: ${toText(profile?.aadhaar_no)}`);
-  lines.push(`Bank Name: ${toText(driver.bank_name)}`);
-  lines.push(`Bank Account No: ${toText(driver.bank_account_number)}`);
-  lines.push(`IFSC No: ${toText(driver.bank_ifsc)}`);
-  lines.push("");
-  lines.push("Education & Personal");
-  lines.push(`Education: ${toText(profile?.education)}`);
-  lines.push(`Experience: ${toText(driver.experience_years)}`);
-  lines.push(`Date of Birth: ${fmtDate(profile?.date_of_birth)}`);
-  lines.push(`Marital Status: ${toText(profile?.marital_status)}`);
-  lines.push(`Religion: ${toText(profile?.religion)}`);
-  lines.push("");
-  lines.push("Present Address");
-  lines.push(
-    [
-      profile?.present_village,
-      profile?.present_landmark,
-      profile?.present_post_office,
-      profile?.present_mandal,
-      profile?.present_police_station,
-      profile?.present_district,
-      profile?.present_state,
-      profile?.present_pin_code,
-    ]
-      .map(toText)
-      .filter((value) => value !== "-")
-      .join(", ") || "-",
-  );
-  lines.push("");
-  lines.push("Permanent Address");
-  lines.push(
-    [
-      profile?.permanent_village,
-      profile?.permanent_landmark,
-      profile?.permanent_post_office,
-      profile?.permanent_mandal,
-      profile?.permanent_police_station,
-      profile?.permanent_district,
-      profile?.permanent_state,
-      profile?.permanent_pin_code,
-    ]
-      .map(toText)
-      .filter((value) => value !== "-")
-      .join(", ") || "-",
-  );
-  lines.push("");
-  lines.push("Reference Details");
-  lines.push(
-    `Reference 1: ${toText(profile?.reference1_name)} | ${toText(profile?.reference1_relationship)} | ${toText(profile?.reference1_contact)}`,
-  );
-  lines.push(
-    `Reference 2: ${toText(profile?.reference2_name)} | ${toText(profile?.reference2_relationship)} | ${toText(profile?.reference2_contact)}`,
-  );
-  lines.push("");
-  lines.push("Salary Details");
-  lines.push(`Present Salary: ${toText(profile?.present_salary)}`);
-  lines.push(`Salary Expectation: ${toText(profile?.salary_expectation)}`);
-  lines.push(`Salary Offered: ${toText(profile?.salary_offered)}`);
-  lines.push(`Joining Date: ${fmtDate(profile?.joining_date)}`);
-  lines.push("");
-  lines.push("Final Signatures");
-  lines.push(`Candidate Signature / Date: ${toText(profile?.candidate_signature_text)} | ${fmtDate(profile?.candidate_signature_date)}`);
-  lines.push(`Signature of Appointee: ${toText(profile?.appointee_signature_text)}`);
-  lines.push(`Signature of Approval Authority: ${toText(profile?.approval_authority_signature_text)}`);
+  const pageWidth = 595;
+  const pageHeight = 842;
+  const margin = 28;
+  const sectionHeaderHeight = 18;
+  const rowHeight = 34;
+  const labelSize = 8;
+  const valueSize = 9;
+  const sectionGap = 6;
+  const colGap = 10;
+  const contentWidth = pageWidth - margin * 2;
+  const colWidth = (contentWidth - colGap * 2) / 3;
 
-  lines.push("");
-  lines.push("Extended Intake (Raw)");
-  if (!profile) {
-    lines.push("No extended profile saved");
+  let page = pdfDoc.addPage([pageWidth, pageHeight]);
+  let y = pageHeight - margin;
+
+  const fitText = (text: string, maxChars = 30) => {
+    const safe = toText(text);
+    if (safe.length <= maxChars) return safe;
+    return `${safe.slice(0, maxChars - 1)}…`;
+  };
+
+  const addPageIfNeeded = (neededHeight: number) => {
+    if (y - neededHeight < margin) {
+      page = pdfDoc.addPage([pageWidth, pageHeight]);
+      y = pageHeight - margin;
+    }
+  };
+
+  const drawSection = (title: string) => {
+    addPageIfNeeded(sectionHeaderHeight + 4);
+    page.drawRectangle({
+      x: margin,
+      y: y - sectionHeaderHeight + 2,
+      width: contentWidth,
+      height: sectionHeaderHeight,
+      color: rgb(0.92, 0.95, 1),
+      borderColor: rgb(0.72, 0.79, 0.95),
+      borderWidth: 1,
+    });
+    page.drawText(title, {
+      x: margin + 6,
+      y: y - sectionHeaderHeight + 7,
+      size: 10,
+      font: boldFont,
+      color: rgb(0.1, 0.2, 0.45),
+    });
+    y -= sectionHeaderHeight + sectionGap;
+  };
+
+  const drawRow = (fields: Array<{ label: string; value: string }>) => {
+    addPageIfNeeded(rowHeight + 2);
+    for (let i = 0; i < 3; i += 1) {
+      const field = fields[i];
+      const x = margin + i * (colWidth + colGap);
+      if (!field) {
+        page.drawLine({
+          start: { x, y: y - 26 },
+          end: { x: x + colWidth, y: y - 26 },
+          thickness: 0.8,
+          color: rgb(0.8, 0.82, 0.86),
+        });
+        continue;
+      }
+      page.drawText(field.label, {
+        x,
+        y: y - 10,
+        size: labelSize,
+        font: boldFont,
+        color: rgb(0.32, 0.36, 0.44),
+      });
+      page.drawText(fitText(field.value), {
+        x,
+        y: y - 22,
+        size: valueSize,
+        font: bodyFont,
+        color: rgb(0.08, 0.09, 0.11),
+      });
+      page.drawLine({
+        start: { x, y: y - 26 },
+        end: { x: x + colWidth, y: y - 26 },
+        thickness: 0.8,
+        color: rgb(0.7, 0.74, 0.82),
+      });
+    }
+    y -= rowHeight;
+  };
+
+  const photoWidth = 110;
+  const photoHeight = 130;
+  const photoX = pageWidth - margin - photoWidth;
+  const photoY = pageHeight - margin - photoHeight;
+
+  page.drawText("Driver Profile Report", {
+    x: margin,
+    y: pageHeight - margin - 2,
+    size: 18,
+    font: boldFont,
+    color: rgb(0.08, 0.09, 0.11),
+  });
+  page.drawText(`Generated: ${formatDateTimeInAppTimeZone(new Date())}`, {
+    x: margin,
+    y: pageHeight - margin - 18,
+    size: 9,
+    font: bodyFont,
+    color: rgb(0.3, 0.33, 0.4),
+  });
+  page.drawText(`Driver ID: ${driver.id}`, {
+    x: margin,
+    y: pageHeight - margin - 32,
+    size: 9,
+    font: bodyFont,
+    color: rgb(0.3, 0.33, 0.4),
+  });
+
+  page.drawRectangle({
+    x: photoX,
+    y: photoY,
+    width: photoWidth,
+    height: photoHeight,
+    borderColor: rgb(0.55, 0.61, 0.73),
+    borderWidth: 1,
+    color: rgb(0.97, 0.98, 1),
+  });
+  page.drawText("Profile Photo", {
+    x: photoX + 22,
+    y: photoY + photoHeight - 12,
+    size: 8,
+    font: boldFont,
+    color: rgb(0.35, 0.4, 0.5),
+  });
+
+  if (driver.profile_photo_data && driver.profile_photo_data.length > 0) {
+    try {
+      let embeddedImage;
+      const mime = (driver.profile_photo_mime ?? "").toLowerCase();
+      if (mime.includes("png")) {
+        embeddedImage = await pdfDoc.embedPng(driver.profile_photo_data);
+      } else {
+        try {
+          embeddedImage = await pdfDoc.embedJpg(driver.profile_photo_data);
+        } catch {
+          embeddedImage = await pdfDoc.embedPng(driver.profile_photo_data);
+        }
+      }
+      const scale = Math.min(
+        (photoWidth - 8) / embeddedImage.width,
+        (photoHeight - 20) / embeddedImage.height,
+      );
+      const imageWidth = embeddedImage.width * scale;
+      const imageHeight = embeddedImage.height * scale;
+      page.drawImage(embeddedImage, {
+        x: photoX + (photoWidth - imageWidth) / 2,
+        y: photoY + 4 + (photoHeight - 20 - imageHeight) / 2,
+        width: imageWidth,
+        height: imageHeight,
+      });
+    } catch {
+      page.drawText("Photo format", {
+        x: photoX + 24,
+        y: photoY + photoHeight / 2,
+        size: 8,
+        font: bodyFont,
+        color: rgb(0.55, 0.2, 0.2),
+      });
+      page.drawText("not previewable", {
+        x: photoX + 18,
+        y: photoY + photoHeight / 2 - 10,
+        size: 8,
+        font: bodyFont,
+        color: rgb(0.55, 0.2, 0.2),
+      });
+    }
   } else {
-    lines.push(`Profile Fields Loaded: Yes`);
+    page.drawText("No Photo", {
+      x: photoX + 34,
+      y: photoY + photoHeight / 2,
+      size: 9,
+      font: bodyFont,
+      color: rgb(0.55, 0.58, 0.66),
+    });
   }
 
-  return renderTextPdf("Driver Profile Report", lines);
+  y = photoY - 12;
+
+  drawSection("Basic");
+  drawRow([
+    { label: "Driver Name", value: driver.full_name },
+    { label: "Contact No", value: driver.phone },
+    { label: "Company", value: toText(driver.company_name) },
+  ]);
+
+  drawSection("Vehicle & License");
+  drawRow([
+    { label: "Vehicle Registration", value: toText(profile?.vehicle_registration_no) },
+    { label: "Present Reading", value: toText(profile?.present_reading_km) },
+    { label: "Driving License No", value: driver.license_number },
+  ]);
+  drawRow([
+    { label: "Validity (DL)", value: fmtDate(driver.license_expiry) },
+    { label: "Badge No", value: toText(profile?.badge_no) },
+    { label: "Validity (Badge)", value: fmtDate(profile?.badge_validity) },
+  ]);
+
+  drawSection("Family Details");
+  drawRow([
+    { label: "Father's Name", value: toText(profile?.father_name) },
+    { label: "Father Contact", value: toText(profile?.father_contact) },
+    { label: "Mother's Name", value: toText(profile?.mother_name) },
+  ]);
+  drawRow([
+    { label: "Mother Contact", value: toText(profile?.mother_contact) },
+    { label: "Spouse Name", value: toText(profile?.spouse_name) },
+    { label: "Spouse Contact", value: toText(profile?.spouse_contact) },
+  ]);
+  drawRow([
+    { label: "Children 1", value: toText(profile?.child_1_name) },
+    { label: "Children 2", value: toText(profile?.child_2_name) },
+  ]);
+
+  drawSection("Identity & Banking");
+  drawRow([
+    { label: "Blood Group", value: toText(profile?.blood_group) },
+    { label: "PAN / Voter ID", value: toText(profile?.pan_or_voter_id) },
+    { label: "Aadhaar No", value: toText(profile?.aadhaar_no) },
+  ]);
+  drawRow([
+    { label: "Bank Name", value: toText(driver.bank_name) },
+    { label: "Bank Account No", value: toText(driver.bank_account_number) },
+    { label: "IFSC No", value: toText(driver.bank_ifsc) },
+  ]);
+
+  drawSection("Education & Personal");
+  drawRow([
+    { label: "Education", value: toText(profile?.education) },
+    { label: "Experience", value: toText(driver.experience_years) },
+    { label: "Date of Birth", value: fmtDate(profile?.date_of_birth) },
+  ]);
+  drawRow([
+    { label: "Marital Status", value: toText(profile?.marital_status) },
+    { label: "Religion", value: toText(profile?.religion) },
+    { label: "Joining Date", value: fmtDate(profile?.joining_date) },
+  ]);
+
+  drawSection("Present Address");
+  drawRow([
+    { label: "Village", value: toText(profile?.present_village) },
+    { label: "Land Mark", value: toText(profile?.present_landmark) },
+    { label: "Post Office", value: toText(profile?.present_post_office) },
+  ]);
+  drawRow([
+    { label: "Mandal", value: toText(profile?.present_mandal) },
+    { label: "Police Station", value: toText(profile?.present_police_station) },
+    { label: "District", value: toText(profile?.present_district) },
+  ]);
+  drawRow([
+    { label: "State", value: toText(profile?.present_state) },
+    { label: "Pin Code", value: toText(profile?.present_pin_code) },
+  ]);
+
+  drawSection("Permanent Address");
+  drawRow([
+    { label: "Village", value: toText(profile?.permanent_village) },
+    { label: "Land Mark", value: toText(profile?.permanent_landmark) },
+    { label: "Post Office", value: toText(profile?.permanent_post_office) },
+  ]);
+  drawRow([
+    { label: "Mandal", value: toText(profile?.permanent_mandal) },
+    { label: "Police Station", value: toText(profile?.permanent_police_station) },
+    { label: "District", value: toText(profile?.permanent_district) },
+  ]);
+  drawRow([
+    { label: "State", value: toText(profile?.permanent_state) },
+    { label: "Pin Code", value: toText(profile?.permanent_pin_code) },
+  ]);
+
+  drawSection("Reference Details");
+  drawRow([
+    { label: "Reference 1 Name", value: toText(profile?.reference1_name) },
+    { label: "Relation (Ref 1)", value: toText(profile?.reference1_relationship) },
+    { label: "Contact (Ref 1)", value: toText(profile?.reference1_contact) },
+  ]);
+  drawRow([
+    { label: "Reference 2 Name", value: toText(profile?.reference2_name) },
+    { label: "Relation (Ref 2)", value: toText(profile?.reference2_relationship) },
+    { label: "Contact (Ref 2)", value: toText(profile?.reference2_contact) },
+  ]);
+
+  drawSection("Salary & Final Signatures");
+  drawRow([
+    { label: "Present Salary", value: toText(profile?.present_salary) },
+    { label: "Salary Expectation", value: toText(profile?.salary_expectation) },
+    { label: "Salary Offered", value: toText(profile?.salary_offered) },
+  ]);
+  drawRow([
+    { label: "Candidate Signature / Date", value: `${toText(profile?.candidate_signature_text)} / ${fmtDate(profile?.candidate_signature_date)}` },
+    { label: "Signature of Appointee", value: toText(profile?.appointee_signature_text) },
+    { label: "Approval Authority", value: toText(profile?.approval_authority_signature_text) },
+  ]);
+
+  return Buffer.from(await pdfDoc.save());
 }
 
 export async function GET(request: Request) {
