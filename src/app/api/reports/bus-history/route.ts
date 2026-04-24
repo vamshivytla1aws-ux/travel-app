@@ -1,4 +1,4 @@
-import PDFDocument from "pdfkit";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { requireApiModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { appDateFromTimestamptzSql, formatDateInAppTimeZone, formatDateTimeInAppTimeZone } from "@/lib/timezone";
@@ -74,104 +74,86 @@ export async function GET(request: Request) {
     `;
 
   const result = await query<ExportRow>(sql, params);
+  const pdfDoc = await PDFDocument.create();
+  const bodyFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const pageWidth = 842;
+  const pageHeight = 595;
+  const margin = 30;
+  const lineHeight = 12;
+  const maxLineChars = 170;
 
-  const chunks: Buffer[] = [];
-  const doc = new PDFDocument({ size: "A4", margin: 40 });
-  doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+  let page = pdfDoc.addPage([pageWidth, pageHeight]);
+  let y = pageHeight - margin;
 
-  const done = new Promise<Buffer>((resolve) => {
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
+  const drawLine = (text: string, options?: { size?: number; bold?: boolean; color?: [number, number, number] }) => {
+    const size = options?.size ?? 8;
+    if (y - lineHeight < margin) {
+      page = pdfDoc.addPage([pageWidth, pageHeight]);
+      y = pageHeight - margin;
+    }
+    page.drawText(text, {
+      x: margin,
+      y,
+      size,
+      font: options?.bold ? boldFont : bodyFont,
+      color: rgb(...(options?.color ?? [0, 0, 0])),
+    });
+    y -= lineHeight;
+  };
+
+  drawLine("Bus Fuel and Mileage Report", { size: 14, bold: true });
+  drawLine(`Generated: ${formatDateTimeInAppTimeZone(new Date())}`, { color: [0.25, 0.25, 0.25] });
+  drawLine(`Mode: ${mode === "latest" ? "Latest entry per bus" : "History by date range"}`, {
+    color: [0.25, 0.25, 0.25],
   });
+  drawLine(`Records: ${result.rows.length}`, { color: [0.25, 0.25, 0.25] });
+  drawLine("");
 
-  doc.fontSize(16).text("Bus Fuel and Mileage Report", { align: "center" });
-  doc.moveDown(0.5);
-  doc.fontSize(10).text(`Generated: ${formatDateTimeInAppTimeZone(new Date())}`);
-  doc.text(`Mode: ${mode === "latest" ? "Latest entry per bus" : "History by date range"}`);
-  doc.text(`Records: ${result.rows.length}`);
-  doc.moveDown(0.8);
-
-  doc.fontSize(9).text("S.No", 40, doc.y, { width: 30 });
-  doc.text("Bus", 70, doc.y - 10, { width: 80 });
-  doc.text("Date", 150, doc.y - 10, { width: 70 });
-
-  let x = 220;
-  if (selectedFields.includes("odometer_start")) {
-    doc.text("Odo Start", x, doc.y - 10, { width: 55 });
-    x += 55;
-  }
-  if (selectedFields.includes("odometer_end")) {
-    doc.text("Odo End", x, doc.y - 10, { width: 55 });
-    x += 55;
-  }
-  if (selectedFields.includes("kms_run")) {
-    doc.text("KM Run", x, doc.y - 10, { width: 45 });
-    x += 45;
-  }
-  if (selectedFields.includes("fuel_filled")) {
-    doc.text("Litres", x, doc.y - 10, { width: 45 });
-    x += 45;
-  }
-  if (selectedFields.includes("mileage")) {
-    doc.text("KM/L", x, doc.y - 10, { width: 40 });
-    x += 40;
-  }
-  if (selectedFields.includes("company_name")) {
-    doc.text("Company", x, doc.y - 10, { width: 70 });
-  }
-
-  doc.moveDown(0.5);
-  doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#cccccc").stroke();
-  doc.moveDown(0.3);
+  const headerSegments = ["S.No", "Bus", "Registration", "Date"];
+  if (selectedFields.includes("odometer_start")) headerSegments.push("Odo Start");
+  if (selectedFields.includes("odometer_end")) headerSegments.push("Odo End");
+  if (selectedFields.includes("kms_run")) headerSegments.push("KM Run");
+  if (selectedFields.includes("fuel_filled")) headerSegments.push("Litres");
+  if (selectedFields.includes("mileage")) headerSegments.push("KM/L");
+  if (selectedFields.includes("company_name")) headerSegments.push("Company");
+  drawLine(headerSegments.join(" | "), { bold: true });
 
   result.rows.forEach((row, index) => {
-    const y = doc.y;
     const odoStart = Number(row.odometer_before_km);
     const odoEnd = Number(row.odometer_after_km);
     const liters = Number(row.liters);
-    const kmRun = odoEnd - odoStart;
-    const mileage = liters > 0 ? kmRun / liters : 0;
+    const safeOdoStart = Number.isFinite(odoStart) ? odoStart : 0;
+    const safeOdoEnd = Number.isFinite(odoEnd) ? odoEnd : 0;
+    const safeLiters = Number.isFinite(liters) ? liters : 0;
+    const kmRun = safeOdoEnd - safeOdoStart;
+    const mileage = safeLiters > 0 ? kmRun / safeLiters : 0;
 
-    doc.fontSize(8).fillColor("#111111");
-    doc.text(String(index + 1), 40, y, { width: 30 });
-    doc.text(row.bus_number, 70, y, { width: 80 });
-    doc.text(formatDate(row.filled_at), 150, y, { width: 70 });
+    const segments = [
+      String(index + 1),
+      row.bus_number,
+      row.registration_number,
+      formatDate(row.filled_at),
+    ];
+    if (selectedFields.includes("odometer_start")) segments.push(safeOdoStart.toFixed(1));
+    if (selectedFields.includes("odometer_end")) segments.push(safeOdoEnd.toFixed(1));
+    if (selectedFields.includes("kms_run")) segments.push(kmRun.toFixed(1));
+    if (selectedFields.includes("fuel_filled")) segments.push(safeLiters.toFixed(2));
+    if (selectedFields.includes("mileage")) segments.push(mileage.toFixed(2));
+    if (selectedFields.includes("company_name")) segments.push(row.company_name ?? "-");
 
-    let colX = 220;
-    if (selectedFields.includes("odometer_start")) {
-      doc.text(odoStart.toFixed(1), colX, y, { width: 55 });
-      colX += 55;
+    const line = segments.join(" | ");
+    if (line.length <= maxLineChars) {
+      drawLine(line);
+      return;
     }
-    if (selectedFields.includes("odometer_end")) {
-      doc.text(odoEnd.toFixed(1), colX, y, { width: 55 });
-      colX += 55;
-    }
-    if (selectedFields.includes("kms_run")) {
-      doc.text(kmRun.toFixed(1), colX, y, { width: 45 });
-      colX += 45;
-    }
-    if (selectedFields.includes("fuel_filled")) {
-      doc.text(liters.toFixed(1), colX, y, { width: 45 });
-      colX += 45;
-    }
-    if (selectedFields.includes("mileage")) {
-      doc.text(mileage.toFixed(2), colX, y, { width: 40 });
-      colX += 40;
-    }
-    if (selectedFields.includes("company_name")) {
-      doc.text(row.company_name ?? "-", colX, y, { width: 70 });
-    }
-
-    doc.moveDown(0.8);
-    if (doc.y > 760) {
-      doc.addPage();
+    for (let i = 0; i < line.length; i += maxLineChars) {
+      drawLine(line.slice(i, i + maxLineChars));
     }
   });
 
-  doc.end();
-  const pdfBuffer = await done;
-  const binary = new Uint8Array(pdfBuffer);
-
-  return new Response(binary, {
+  const binary = await pdfDoc.save();
+  return new Response(Buffer.from(binary), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="bus-history-report.pdf"`,

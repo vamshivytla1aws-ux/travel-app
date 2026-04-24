@@ -1,4 +1,4 @@
-import PDFDocument from "pdfkit";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { requireApiModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { MODULE_EXPORT_FIELDS, type ExportModuleKey } from "@/lib/module-export";
@@ -478,43 +478,55 @@ export async function GET(request: Request) {
       });
     }
 
-    const chunks: Buffer[] = [];
-    const doc = new PDFDocument({ size: "A4", margin: 36 });
-    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
-    const done = new Promise<Buffer>((resolve) => {
-      doc.on("end", () => resolve(Buffer.concat(chunks)));
-    });
+    const pdfDoc = await PDFDocument.create();
+    const bodyFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const pageWidth = 595;
+    const pageHeight = 842;
+    const margin = 36;
+    const lineHeight = 12;
+    const maxLineChars = 135;
 
-    doc.fontSize(16).font("Helvetica-Bold").text(`${moduleKey.toUpperCase()} Export Report`);
-    doc.moveDown(0.3);
-    doc
-      .fontSize(9)
-      .font("Helvetica")
-      .fillColor("#4b5563")
-      .text(`Generated: ${formatDateTimeInAppTimeZone(new Date())}`);
-    doc.text(`Records: ${rows.length}`);
-    doc.moveDown(0.4);
-    doc.fillColor("#111827").font("Helvetica-Bold").fontSize(8).text(headers.join(" | "));
-    doc.moveDown(0.2);
-    doc.moveTo(36, doc.y).lineTo(560, doc.y).strokeColor("#d1d5db").stroke();
-    doc.moveDown(0.3);
+    let page = pdfDoc.addPage([pageWidth, pageHeight]);
+    let y = pageHeight - margin;
+
+    const drawLine = (
+      text: string,
+      options?: { size?: number; bold?: boolean; color?: [number, number, number] },
+    ) => {
+      const size = options?.size ?? 8;
+      if (y - lineHeight < margin) {
+        page = pdfDoc.addPage([pageWidth, pageHeight]);
+        y = pageHeight - margin;
+      }
+      page.drawText(text, {
+        x: margin,
+        y,
+        size,
+        font: options?.bold ? boldFont : bodyFont,
+        color: rgb(...(options?.color ?? [0, 0, 0])),
+      });
+      y -= lineHeight;
+    };
+
+    drawLine(`${moduleKey.toUpperCase()} Export Report`, { size: 16, bold: true });
+    drawLine(`Generated: ${formatDateTimeInAppTimeZone(new Date())}`, { size: 9, color: [0.25, 0.25, 0.25] });
+    drawLine(`Records: ${rows.length}`, { size: 9, color: [0.25, 0.25, 0.25] });
+    drawLine(headers.join(" | "), { size: 8, bold: true });
 
     rows.forEach((row) => {
       const line = headers.map((h) => `${h}: ${row[h] ?? "-"}`).join(" | ");
-      doc.fillColor("#111827").font("Helvetica").fontSize(8).text(line, {
-        width: 523,
-        lineGap: 1,
-      });
-      doc.moveDown(0.15);
-      if (doc.y > 800) {
-        doc.addPage();
+      if (line.length <= maxLineChars) {
+        drawLine(line);
+        return;
+      }
+      for (let i = 0; i < line.length; i += maxLineChars) {
+        drawLine(line.slice(i, i + maxLineChars));
       }
     });
 
-    doc.end();
-    const pdfBuffer = await done;
-    const binary = new Uint8Array(pdfBuffer);
-    return new Response(binary, {
+    const binary = await pdfDoc.save();
+    return new Response(Buffer.from(binary), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${moduleKey}-export.pdf"`,

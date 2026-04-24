@@ -1,4 +1,4 @@
-import PDFDocument from "pdfkit";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { requireApiModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
@@ -9,32 +9,6 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-async function tryEnsureTransportEnhancements() {
-  try {
-    await ensureTransportEnhancements();
-  } catch (error) {
-    console.warn("Skipping schema ensure in profile export route", error);
-  }
-}
-
-function fmtDate(value?: string | null) {
-  if (!value) return "-";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return formatDateInAppTimeZone(parsed);
-}
-
-function addSectionTitle(doc: any, title: string) {
-  doc.moveDown(0.4);
-  doc.font("Helvetica-Bold").fontSize(11).fillColor("#111827").text(title);
-  doc.moveDown(0.1);
-}
-
-function addField(doc: any, label: string, value: unknown) {
-  doc.font("Helvetica-Bold").fontSize(9).fillColor("#111827").text(`${label}: `, { continued: true });
-  doc.font("Helvetica").text(value == null || value === "" ? "-" : String(value));
-}
 
 type DriverProfileRow = {
   blood_group: string | null;
@@ -87,6 +61,79 @@ type DriverProfileRow = {
   appointee_signature_text: string | null;
   approval_authority_signature_text: string | null;
 };
+
+async function tryEnsureTransportEnhancements() {
+  try {
+    await ensureTransportEnhancements();
+  } catch (error) {
+    console.warn("Skipping schema ensure in profile export route", error);
+  }
+}
+
+function fmtDate(value?: string | null) {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return formatDateInAppTimeZone(parsed);
+}
+
+function toText(value: unknown) {
+  if (value == null) return "-";
+  const text = String(value).trim();
+  return text.length > 0 ? text : "-";
+}
+
+async function renderTextPdf(title: string, lines: string[]) {
+  const pdfDoc = await PDFDocument.create();
+  const bodyFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const pageWidth = 595;
+  const pageHeight = 842;
+  const margin = 36;
+  const lineHeight = 12;
+  const maxLineChars = 128;
+
+  let page = pdfDoc.addPage([pageWidth, pageHeight]);
+  let y = pageHeight - margin;
+
+  const drawLine = (
+    text: string,
+    options?: { size?: number; bold?: boolean; color?: [number, number, number] },
+  ) => {
+    const size = options?.size ?? 9;
+    if (y - lineHeight < margin) {
+      page = pdfDoc.addPage([pageWidth, pageHeight]);
+      y = pageHeight - margin;
+    }
+    page.drawText(text, {
+      x: margin,
+      y,
+      size,
+      font: options?.bold ? boldFont : bodyFont,
+      color: rgb(...(options?.color ?? [0, 0, 0])),
+    });
+    y -= lineHeight;
+  };
+
+  drawLine(title, { size: 16, bold: true });
+  drawLine(`Generated: ${formatDateTimeInAppTimeZone(new Date())}`, {
+    size: 9,
+    color: [0.25, 0.25, 0.25],
+  });
+  drawLine("");
+
+  lines.forEach((line) => {
+    if (line.length <= maxLineChars) {
+      drawLine(line);
+      return;
+    }
+    for (let i = 0; i < line.length; i += maxLineChars) {
+      drawLine(line.slice(i, i + maxLineChars));
+    }
+  });
+
+  return Buffer.from(await pdfDoc.save());
+}
 
 async function buildBusProfilePdf(busId: number) {
   const [busRes, fuelRes, maintenanceRes] = await Promise.all([
@@ -154,60 +201,42 @@ async function buildBusProfilePdf(busId: number) {
   const bus = busRes.rows[0];
   if (!bus) return null;
 
-  const chunks: Buffer[] = [];
-  const doc = new PDFDocument({ size: "A4", margin: 36 });
-  doc.on("data", (chunk: Buffer) => chunks.push(chunk));
-  const done = new Promise<Buffer>((resolve) => {
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-  });
-
-  doc.font("Helvetica-Bold").fontSize(16).text("Bus Profile Report", { align: "center" });
-  doc.moveDown(0.4);
-  addField(doc, "Generated", formatDateTimeInAppTimeZone(new Date()));
-  addField(doc, "Bus ID", bus.id);
-
-  addSectionTitle(doc, "Bus Information");
-  addField(doc, "Bus Number", bus.bus_number);
-  addField(doc, "Registration", bus.registration_number);
-  addField(doc, "Vehicle", `${bus.make} ${bus.model}`);
-  addField(doc, "Seater", bus.seater);
-  addField(doc, "Status", bus.status);
-  addField(doc, "Odometer (KM)", bus.odometer_km);
-
-  addSectionTitle(doc, "Fuel History (Latest 30)");
+  const lines: string[] = [];
+  lines.push(`Bus ID: ${bus.id}`);
+  lines.push(`Bus Number: ${bus.bus_number}`);
+  lines.push(`Registration: ${bus.registration_number}`);
+  lines.push(`Vehicle: ${bus.make} ${bus.model}`);
+  lines.push(`Seater: ${bus.seater}`);
+  lines.push(`Status: ${bus.status}`);
+  lines.push(`Odometer (KM): ${bus.odometer_km}`);
+  lines.push("");
+  lines.push("Fuel History (Latest 30)");
   if (fuelRes.rows.length === 0) {
-    addField(doc, "Records", "No fuel history");
+    lines.push("No fuel history");
   } else {
     fuelRes.rows.forEach((row, idx) => {
       const liters = Number(row.liters);
       const start = row.odometer_before_km != null ? Number(row.odometer_before_km) : null;
       const end = row.odometer_after_km != null ? Number(row.odometer_after_km) : null;
       const mileage = start != null && end != null && liters > 0 ? ((end - start) / liters).toFixed(2) : "N/A";
-      addField(
-        doc,
-        `#${idx + 1}`,
-        `${fmtDate(row.filled_at)} | ${row.source} | Start: ${start ?? "-"} | End: ${end ?? "-"} | Liters: ${liters.toFixed(2)} | KM/L: ${mileage} | Company: ${row.company_name ?? "-"} | Amount: ${Number(row.amount).toFixed(2)}`,
+      lines.push(
+        `${idx + 1}. ${fmtDate(row.filled_at)} | ${row.source} | Start: ${start ?? "-"} | End: ${end ?? "-"} | Liters: ${liters.toFixed(2)} | KM/L: ${mileage} | Company: ${toText(row.company_name)} | Amount: ${Number(row.amount).toFixed(2)}`,
       );
-      if (doc.y > 780) doc.addPage();
     });
   }
-
-  addSectionTitle(doc, "Maintenance (Latest 20)");
+  lines.push("");
+  lines.push("Maintenance (Latest 20)");
   if (maintenanceRes.rows.length === 0) {
-    addField(doc, "Records", "No maintenance records");
+    lines.push("No maintenance records");
   } else {
     maintenanceRes.rows.forEach((row, idx) => {
-      addField(
-        doc,
-        `#${idx + 1}`,
-        `${fmtDate(row.maintenance_date)} | ${row.issue_type} | Cost: ${Number(row.cost).toFixed(2)} | ${row.description}`,
+      lines.push(
+        `${idx + 1}. ${fmtDate(row.maintenance_date)} | ${toText(row.issue_type)} | Cost: ${Number(row.cost).toFixed(2)} | ${toText(row.description)}`,
       );
-      if (doc.y > 780) doc.addPage();
     });
   }
 
-  doc.end();
-  return done;
+  return renderTextPdf("Bus Profile Report", lines);
 }
 
 async function buildDriverProfilePdf(driverId: number) {
@@ -302,49 +331,39 @@ async function buildDriverProfilePdf(driverId: number) {
   if (!driver) return null;
   const profile = profileRes.rows[0];
 
-  const chunks: Buffer[] = [];
-  const doc = new PDFDocument({ size: "A4", margin: 36 });
-  doc.on("data", (chunk: Buffer) => chunks.push(chunk));
-  const done = new Promise<Buffer>((resolve) => {
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-  });
+  const lines: string[] = [];
+  lines.push(`Driver ID: ${driver.id}`);
+  lines.push(`Driver Name: ${driver.full_name}`);
+  lines.push(`Contact No: ${driver.phone}`);
+  lines.push(`Company: ${toText(driver.company_name)}`);
+  lines.push(`Driving License No: ${driver.license_number}`);
+  lines.push(`Validity (DL): ${fmtDate(driver.license_expiry)}`);
+  lines.push(`Experience: ${toText(driver.experience_years)}`);
+  lines.push(
+    `Bank: ${toText(driver.bank_name)} | A/C: ${toText(driver.bank_account_number)} | IFSC: ${toText(driver.bank_ifsc)}`,
+  );
 
-  doc.font("Helvetica-Bold").fontSize(16).text("Driver Profile Report", { align: "center" });
-  doc.moveDown(0.4);
-  addField(doc, "Generated", formatDateTimeInAppTimeZone(new Date()));
-  addField(doc, "Driver ID", driver.id);
-
-  addSectionTitle(doc, "Driver Information");
-  addField(doc, "Driver Name", driver.full_name);
-  addField(doc, "Contact No", driver.phone);
-  addField(doc, "Company", driver.company_name ?? "-");
-  addField(doc, "Driving License No", driver.license_number);
-  addField(doc, "Validity (DL)", fmtDate(driver.license_expiry));
-  addField(doc, "Experience", driver.experience_years ?? "-");
-  addField(doc, "Bank", `${driver.bank_name ?? "-"} | A/C: ${driver.bank_account_number ?? "-"} | IFSC: ${driver.bank_ifsc ?? "-"}`);
-
-  addSectionTitle(doc, "Extended Intake");
+  lines.push("");
+  lines.push("Extended Intake");
   if (!profile) {
-    addField(doc, "Profile", "No extended profile saved");
+    lines.push("No extended profile saved");
   } else {
-    addField(doc, "Blood Group", profile.blood_group);
-    addField(doc, "Father", `${profile.father_name ?? "-"} (${profile.father_contact ?? "-"})`);
-    addField(doc, "Mother", `${profile.mother_name ?? "-"} (${profile.mother_contact ?? "-"})`);
-    addField(doc, "Spouse", `${profile.spouse_name ?? "-"} (${profile.spouse_contact ?? "-"})`);
-    addField(doc, "Children", `${profile.child_1_name ?? "-"}, ${profile.child_2_name ?? "-"}`);
-    addField(doc, "PAN / Voter", profile.pan_or_voter_id);
-    addField(doc, "Aadhaar", profile.aadhaar_no);
-    addField(doc, "Vehicle", profile.vehicle_registration_no);
-    addField(doc, "Present Reading", profile.present_reading_km ?? "-");
-    addField(doc, "Badge", `${profile.badge_no ?? "-"} | Validity: ${fmtDate(profile.badge_validity)}`);
-    addField(doc, "Education", profile.education);
-    addField(doc, "DOB", fmtDate(profile.date_of_birth));
-    addField(doc, "Marital Status", profile.marital_status);
-    addField(doc, "Religion", profile.religion);
-    addField(
-      doc,
-      "Present Address",
-      [
+    lines.push(`Blood Group: ${toText(profile.blood_group)}`);
+    lines.push(`Father: ${toText(profile.father_name)} (${toText(profile.father_contact)})`);
+    lines.push(`Mother: ${toText(profile.mother_name)} (${toText(profile.mother_contact)})`);
+    lines.push(`Spouse: ${toText(profile.spouse_name)} (${toText(profile.spouse_contact)})`);
+    lines.push(`Children: ${toText(profile.child_1_name)}, ${toText(profile.child_2_name)}`);
+    lines.push(`PAN / Voter: ${toText(profile.pan_or_voter_id)}`);
+    lines.push(`Aadhaar: ${toText(profile.aadhaar_no)}`);
+    lines.push(`Vehicle: ${toText(profile.vehicle_registration_no)}`);
+    lines.push(`Present Reading: ${toText(profile.present_reading_km)}`);
+    lines.push(`Badge: ${toText(profile.badge_no)} | Validity: ${fmtDate(profile.badge_validity)}`);
+    lines.push(`Education: ${toText(profile.education)}`);
+    lines.push(`DOB: ${fmtDate(profile.date_of_birth)}`);
+    lines.push(`Marital Status: ${toText(profile.marital_status)}`);
+    lines.push(`Religion: ${toText(profile.religion)}`);
+    lines.push(
+      `Present Address: ${[
         profile.present_village,
         profile.present_landmark,
         profile.present_post_office,
@@ -354,13 +373,12 @@ async function buildDriverProfilePdf(driverId: number) {
         profile.present_state,
         profile.present_pin_code,
       ]
-        .filter(Boolean)
-        .join(", "),
+        .map(toText)
+        .filter((value) => value !== "-")
+        .join(", ") || "-"}`,
     );
-    addField(
-      doc,
-      "Permanent Address",
-      [
+    lines.push(
+      `Permanent Address: ${[
         profile.permanent_village,
         profile.permanent_landmark,
         profile.permanent_post_office,
@@ -370,20 +388,28 @@ async function buildDriverProfilePdf(driverId: number) {
         profile.permanent_state,
         profile.permanent_pin_code,
       ]
-        .filter(Boolean)
-        .join(", "),
+        .map(toText)
+        .filter((value) => value !== "-")
+        .join(", ") || "-"}`,
     );
-    addField(doc, "Reference 1", `${profile.reference1_name ?? "-"} | ${profile.reference1_relationship ?? "-"} | ${profile.reference1_contact ?? "-"}`);
-    addField(doc, "Reference 2", `${profile.reference2_name ?? "-"} | ${profile.reference2_relationship ?? "-"} | ${profile.reference2_contact ?? "-"}`);
-    addField(doc, "Salary", `Present: ${profile.present_salary ?? "-"} | Expected: ${profile.salary_expectation ?? "-"} | Offered: ${profile.salary_offered ?? "-"}`);
-    addField(doc, "Joining Date", fmtDate(profile.joining_date));
-    addField(doc, "Candidate Signature / Date", `${profile.candidate_signature_text ?? "-"} | ${fmtDate(profile.candidate_signature_date)}`);
-    addField(doc, "Appointee Signature", profile.appointee_signature_text);
-    addField(doc, "Approval Authority", profile.approval_authority_signature_text);
+    lines.push(
+      `Reference 1: ${toText(profile.reference1_name)} | ${toText(profile.reference1_relationship)} | ${toText(profile.reference1_contact)}`,
+    );
+    lines.push(
+      `Reference 2: ${toText(profile.reference2_name)} | ${toText(profile.reference2_relationship)} | ${toText(profile.reference2_contact)}`,
+    );
+    lines.push(
+      `Salary: Present ${toText(profile.present_salary)} | Expected ${toText(profile.salary_expectation)} | Offered ${toText(profile.salary_offered)}`,
+    );
+    lines.push(`Joining Date: ${fmtDate(profile.joining_date)}`);
+    lines.push(
+      `Candidate Signature / Date: ${toText(profile.candidate_signature_text)} | ${fmtDate(profile.candidate_signature_date)}`,
+    );
+    lines.push(`Appointee Signature: ${toText(profile.appointee_signature_text)}`);
+    lines.push(`Approval Authority: ${toText(profile.approval_authority_signature_text)}`);
   }
 
-  doc.end();
-  return done;
+  return renderTextPdf("Driver Profile Report", lines);
 }
 
 export async function GET(request: Request) {
@@ -401,7 +427,7 @@ export async function GET(request: Request) {
       await tryEnsureTransportEnhancements();
       const pdf = await buildBusProfilePdf(id);
       if (!pdf) return new Response("Not found", { status: 404 });
-      return new Response(new Uint8Array(pdf), {
+      return new Response(pdf, {
         headers: {
           "Content-Type": "application/pdf",
           "Content-Disposition": `attachment; filename="bus-profile-${id}.pdf"`,
@@ -420,7 +446,7 @@ export async function GET(request: Request) {
       await tryEnsureTransportEnhancements();
       const pdf = await buildDriverProfilePdf(id);
       if (!pdf) return new Response("Not found", { status: 404 });
-      return new Response(new Uint8Array(pdf), {
+      return new Response(pdf, {
         headers: {
           "Content-Type": "application/pdf",
           "Content-Disposition": `attachment; filename="driver-profile-${id}.pdf"`,
