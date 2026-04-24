@@ -3,6 +3,9 @@ import { requireApiModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 function fmtDate(value?: string | null) {
   if (!value) return "-";
   const parsed = new Date(value);

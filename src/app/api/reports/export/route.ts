@@ -6,6 +6,9 @@ import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 
 type ExportRow = Record<string, string | number | boolean | null>;
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 function escapeCsv(value: unknown) {
   const raw = value == null ? "" : String(value);
   if (raw.includes(",") || raw.includes('"') || raw.includes("\n")) {
