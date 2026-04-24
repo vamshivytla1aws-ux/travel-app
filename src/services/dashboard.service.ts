@@ -316,7 +316,7 @@ export class DashboardService {
     await ensureTransportEnhancements();
     const appToday = appTodaySql();
     const filledAtDay = appDateFromTimestamptzSql("filled_at");
-    const [fleet, drivers, employees, activeAssignments, fuelToday, exceptions] = await Promise.all([
+    const [fleet, drivers, employees, activeAssignments, fuelToday] = await Promise.all([
       query<{ total: string; active: string; maintenance: string }>(
         `SELECT
           COUNT(*)::text as total,
@@ -338,7 +338,6 @@ export class DashboardService {
          FROM fuel_issues
          WHERE issue_date = ${appToday}`,
       ),
-      this.getExceptions(),
     ]);
 
     const fuelTrend = await query<{ day: string; liters: string }>(
@@ -416,7 +415,6 @@ export class DashboardService {
       },
       fuelTrend: fuelTrend.rows,
       recentActivity: recentActivity.rows,
-      exceptions,
     };
   }
 }

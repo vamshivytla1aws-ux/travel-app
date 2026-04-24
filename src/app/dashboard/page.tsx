@@ -1,5 +1,4 @@
 import { AppShell } from "@/components/app-shell";
-import { DashboardAlertsCenter } from "@/components/dashboard/dashboard-alerts-center";
 import { DashboardLiveStats } from "@/components/dashboard/dashboard-live-stats";
 import { DashboardQuickActions } from "@/components/dashboard/dashboard-quick-actions";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
@@ -46,7 +45,6 @@ export default async function DashboardPage() {
           <DashboardLiveStats />
         </div>
         <DashboardQuickActions allowedModules={allowedModules} />
-        <DashboardAlertsCenter alerts={data.exceptions} allowedModules={allowedModules} />
         <div className="grid gap-4 md:grid-cols-6">
           <Card>
             <CardHeader>

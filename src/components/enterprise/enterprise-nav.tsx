@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { CarFront, ChevronDown, ClipboardList, Fuel, Gauge, Info, KeyRound, Landmark, LogOut, MapPinned, Menu, Route, Timer, Truck, Users } from "lucide-react";
 import { cn } from "@/lib/ui-core";
 import { AppModule } from "@/lib/auth";
+import { AlertsBell } from "@/components/enterprise/alerts-bell";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -244,6 +245,7 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
                 <Icon className="h-4 w-4" />
                 {item.label}
               </Link>
+              {item.module === "finance" ? <AlertsBell /> : null}
             </div>
           );
         })}
