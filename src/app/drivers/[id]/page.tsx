@@ -14,7 +14,7 @@ import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 import { DriverProfilePayload, readDriverPayload, validateDriverCore } from "@/lib/driver-payload";
 import { logAuditEvent } from "@/lib/audit";
-import { ensureDocumentTables, getUploadedFileBuffer } from "@/lib/document-storage";
+import { ensureDocumentTables, getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
 import { normalizeProfilePhotoMime } from "@/lib/image-mime";
 import { query, withTransaction } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
@@ -349,7 +349,7 @@ async function uploadDriverPhoto(formData: FormData) {
 
   const driverId = Number(formData.get("driverId"));
   const file = formData.get("photo");
-  if (!driverId || !(file instanceof File) || file.size === 0) return;
+  if (!driverId || !isUploadLikeFile(file) || file.size === 0) return;
   if (file.size > MAX_PROFILE_PHOTO_BYTES) {
     redirect(`/drivers/${driverId}?error=photo_too_large`);
   }
@@ -386,7 +386,7 @@ async function uploadDriverDocument(formData: FormData) {
   const documentName = String(formData.get("documentName"));
   const file = formData.get("file");
 
-  if (!driverId || !(file instanceof File) || file.size === 0) return;
+  if (!driverId || !isUploadLikeFile(file) || file.size === 0) return;
 
   const uploaded = await getUploadedFileBuffer(file);
   await query(

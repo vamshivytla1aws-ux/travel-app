@@ -1,6 +1,23 @@
 import { query } from "@/lib/db";
 
-export async function getUploadedFileBuffer(file: File): Promise<{
+export type UploadLikeFile = {
+  name: string;
+  type?: string;
+  size: number;
+  arrayBuffer: () => Promise<ArrayBuffer>;
+};
+
+export function isUploadLikeFile(value: unknown): value is UploadLikeFile {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<UploadLikeFile>;
+  return (
+    typeof candidate.name === "string" &&
+    typeof candidate.size === "number" &&
+    typeof candidate.arrayBuffer === "function"
+  );
+}
+
+export async function getUploadedFileBuffer(file: UploadLikeFile): Promise<{
   fileName: string;
   mimeType: string;
   sizeBytes: number;

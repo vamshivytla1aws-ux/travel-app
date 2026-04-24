@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
-import { ensureDocumentTables, getUploadedFileBuffer } from "@/lib/document-storage";
+import { ensureDocumentTables, getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
 import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 import { BusesService } from "@/services/buses.service";
@@ -32,7 +32,7 @@ async function uploadBusDocument(formData: FormData) {
   const documentType = String(formData.get("documentType"));
   const documentName = String(formData.get("documentName"));
   const file = formData.get("file");
-  if (!busId || !(file instanceof File) || file.size === 0) return;
+  if (!busId || !isUploadLikeFile(file) || file.size === 0) return;
 
   const uploaded = await getUploadedFileBuffer(file);
   await query(

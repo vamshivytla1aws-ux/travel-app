@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
-import { getUploadedFileBuffer } from "@/lib/document-storage";
+import { getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
 import { safeDecodeURIComponent } from "@/lib/url";
 import { FuelTruckService } from "@/services/fuel-truck.service";
 import { BusSearchSelect } from "@/components/fuel-trucks/bus-search-select";
@@ -71,7 +71,7 @@ async function addTruckRefill(formData: FormData) {
   if (!id) return;
   const receiptFile = formData.get("receipt");
   const receipt =
-    receiptFile instanceof File && receiptFile.size > 0 ? await getUploadedFileBuffer(receiptFile) : null;
+    isUploadLikeFile(receiptFile) && receiptFile.size > 0 ? await getUploadedFileBuffer(receiptFile) : null;
 
   try {
     const result = await fuelTruckService.addRefill({

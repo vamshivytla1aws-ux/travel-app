@@ -10,7 +10,7 @@ import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
-import { getUploadedFileBuffer } from "@/lib/document-storage";
+import { getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
 import { normalizeProfilePhotoMime } from "@/lib/image-mime";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 import { EmployeesService } from "@/services/employees.service";
@@ -90,7 +90,7 @@ async function uploadEmployeePhoto(formData: FormData) {
 
   const employeeId = Number(formData.get("employeeId"));
   const file = formData.get("photo");
-  if (!employeeId || !(file instanceof File) || file.size === 0) return;
+  if (!employeeId || !isUploadLikeFile(file) || file.size === 0) return;
   if (file.size > MAX_PROFILE_PHOTO_BYTES) {
     redirect(`/employees/${employeeId}?error=photo_too_large`);
   }
