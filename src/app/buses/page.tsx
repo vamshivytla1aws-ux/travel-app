@@ -124,6 +124,10 @@ export default async function BusesPage(props: Props) {
             }}
             defaultQuery={searchParams.q ?? ""}
             defaultStatus={searchParams.status ?? ""}
+            busOptions={buses.map((bus) => ({
+              id: bus.id,
+              label: `${bus.busNumber} (${bus.registrationNumber})`,
+            }))}
           />
         }
       />

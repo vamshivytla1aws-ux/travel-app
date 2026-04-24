@@ -8,6 +8,7 @@ type Props = {
   searchParams: Record<string, string | undefined>;
   defaultQuery?: string;
   defaultStatus?: string;
+  busOptions?: { id: number; label: string }[];
 };
 
 function buildHref(
@@ -32,6 +33,7 @@ export function ModuleExportLauncher({
   searchParams,
   defaultQuery = "",
   defaultStatus = "",
+  busOptions = [],
 }: Props) {
   const fields = MODULE_EXPORT_FIELDS[moduleKey];
   const exportOpen = searchParams.export === "1";
@@ -77,6 +79,26 @@ export function ModuleExportLauncher({
                 <label className="text-xs text-muted-foreground">To Date</label>
                 <input name="to" type="date" className="h-9 rounded-md border border-input px-3 text-sm" />
               </div>
+              {moduleKey === "buses" ? (
+                <div className="grid gap-1 md:col-span-4">
+                  <label className="text-xs text-muted-foreground">Specific Buses (optional)</label>
+                  <select
+                    name="busId"
+                    multiple
+                    size={Math.min(8, Math.max(4, busOptions.length))}
+                    className="rounded-md border border-input px-3 py-2 text-sm"
+                  >
+                    {busOptions.map((bus) => (
+                      <option key={bus.id} value={String(bus.id)}>
+                        {bus.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Leave unselected to export all buses. Use Ctrl/Cmd click to select multiple buses.
+                  </p>
+                </div>
+              ) : null}
               <div className="md:col-span-4 grid gap-2 rounded border p-3 md:grid-cols-3">
                 {fields.map((field) => (
                   <label key={field.key} className="flex items-center gap-2 text-sm">
@@ -97,4 +119,3 @@ export function ModuleExportLauncher({
     </>
   );
 }
-

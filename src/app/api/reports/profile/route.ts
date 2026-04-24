@@ -332,81 +332,106 @@ async function buildDriverProfilePdf(driverId: number) {
   const profile = profileRes.rows[0];
 
   const lines: string[] = [];
+  lines.push(`Driver Profile Form`);
   lines.push(`Driver ID: ${driver.id}`);
+  lines.push("");
+  lines.push("Basic");
   lines.push(`Driver Name: ${driver.full_name}`);
   lines.push(`Contact No: ${driver.phone}`);
   lines.push(`Company: ${toText(driver.company_name)}`);
+  lines.push("");
+  lines.push("Vehicle & License");
+  lines.push(`Vehicle Registration: ${toText(profile?.vehicle_registration_no)}`);
+  lines.push(`Present Reading: ${toText(profile?.present_reading_km)}`);
   lines.push(`Driving License No: ${driver.license_number}`);
   lines.push(`Validity (DL): ${fmtDate(driver.license_expiry)}`);
+  lines.push(`Badge No: ${toText(profile?.badge_no)}`);
+  lines.push(`Validity (Badge): ${fmtDate(profile?.badge_validity)}`);
+  lines.push("");
+  lines.push("Family Details");
+  lines.push(`Father's Name: ${toText(profile?.father_name)}`);
+  lines.push(`Father Contact: ${toText(profile?.father_contact)}`);
+  lines.push(`Mother's Name: ${toText(profile?.mother_name)}`);
+  lines.push(`Mother Contact: ${toText(profile?.mother_contact)}`);
+  lines.push(`Spouse Name: ${toText(profile?.spouse_name)}`);
+  lines.push(`Spouse Contact: ${toText(profile?.spouse_contact)}`);
+  lines.push(`Children 1: ${toText(profile?.child_1_name)}`);
+  lines.push(`Children 2: ${toText(profile?.child_2_name)}`);
+  lines.push("");
+  lines.push("Identity & Banking");
+  lines.push(`Blood Group: ${toText(profile?.blood_group)}`);
+  lines.push(`PAN / Voter ID: ${toText(profile?.pan_or_voter_id)}`);
+  lines.push(`Aadhaar No: ${toText(profile?.aadhaar_no)}`);
+  lines.push(`Bank Name: ${toText(driver.bank_name)}`);
+  lines.push(`Bank Account No: ${toText(driver.bank_account_number)}`);
+  lines.push(`IFSC No: ${toText(driver.bank_ifsc)}`);
+  lines.push("");
+  lines.push("Education & Personal");
+  lines.push(`Education: ${toText(profile?.education)}`);
   lines.push(`Experience: ${toText(driver.experience_years)}`);
+  lines.push(`Date of Birth: ${fmtDate(profile?.date_of_birth)}`);
+  lines.push(`Marital Status: ${toText(profile?.marital_status)}`);
+  lines.push(`Religion: ${toText(profile?.religion)}`);
+  lines.push("");
+  lines.push("Present Address");
   lines.push(
-    `Bank: ${toText(driver.bank_name)} | A/C: ${toText(driver.bank_account_number)} | IFSC: ${toText(driver.bank_ifsc)}`,
+    [
+      profile?.present_village,
+      profile?.present_landmark,
+      profile?.present_post_office,
+      profile?.present_mandal,
+      profile?.present_police_station,
+      profile?.present_district,
+      profile?.present_state,
+      profile?.present_pin_code,
+    ]
+      .map(toText)
+      .filter((value) => value !== "-")
+      .join(", ") || "-",
   );
+  lines.push("");
+  lines.push("Permanent Address");
+  lines.push(
+    [
+      profile?.permanent_village,
+      profile?.permanent_landmark,
+      profile?.permanent_post_office,
+      profile?.permanent_mandal,
+      profile?.permanent_police_station,
+      profile?.permanent_district,
+      profile?.permanent_state,
+      profile?.permanent_pin_code,
+    ]
+      .map(toText)
+      .filter((value) => value !== "-")
+      .join(", ") || "-",
+  );
+  lines.push("");
+  lines.push("Reference Details");
+  lines.push(
+    `Reference 1: ${toText(profile?.reference1_name)} | ${toText(profile?.reference1_relationship)} | ${toText(profile?.reference1_contact)}`,
+  );
+  lines.push(
+    `Reference 2: ${toText(profile?.reference2_name)} | ${toText(profile?.reference2_relationship)} | ${toText(profile?.reference2_contact)}`,
+  );
+  lines.push("");
+  lines.push("Salary Details");
+  lines.push(`Present Salary: ${toText(profile?.present_salary)}`);
+  lines.push(`Salary Expectation: ${toText(profile?.salary_expectation)}`);
+  lines.push(`Salary Offered: ${toText(profile?.salary_offered)}`);
+  lines.push(`Joining Date: ${fmtDate(profile?.joining_date)}`);
+  lines.push("");
+  lines.push("Final Signatures");
+  lines.push(`Candidate Signature / Date: ${toText(profile?.candidate_signature_text)} | ${fmtDate(profile?.candidate_signature_date)}`);
+  lines.push(`Signature of Appointee: ${toText(profile?.appointee_signature_text)}`);
+  lines.push(`Signature of Approval Authority: ${toText(profile?.approval_authority_signature_text)}`);
 
   lines.push("");
-  lines.push("Extended Intake");
+  lines.push("Extended Intake (Raw)");
   if (!profile) {
     lines.push("No extended profile saved");
   } else {
-    lines.push(`Blood Group: ${toText(profile.blood_group)}`);
-    lines.push(`Father: ${toText(profile.father_name)} (${toText(profile.father_contact)})`);
-    lines.push(`Mother: ${toText(profile.mother_name)} (${toText(profile.mother_contact)})`);
-    lines.push(`Spouse: ${toText(profile.spouse_name)} (${toText(profile.spouse_contact)})`);
-    lines.push(`Children: ${toText(profile.child_1_name)}, ${toText(profile.child_2_name)}`);
-    lines.push(`PAN / Voter: ${toText(profile.pan_or_voter_id)}`);
-    lines.push(`Aadhaar: ${toText(profile.aadhaar_no)}`);
-    lines.push(`Vehicle: ${toText(profile.vehicle_registration_no)}`);
-    lines.push(`Present Reading: ${toText(profile.present_reading_km)}`);
-    lines.push(`Badge: ${toText(profile.badge_no)} | Validity: ${fmtDate(profile.badge_validity)}`);
-    lines.push(`Education: ${toText(profile.education)}`);
-    lines.push(`DOB: ${fmtDate(profile.date_of_birth)}`);
-    lines.push(`Marital Status: ${toText(profile.marital_status)}`);
-    lines.push(`Religion: ${toText(profile.religion)}`);
-    lines.push(
-      `Present Address: ${[
-        profile.present_village,
-        profile.present_landmark,
-        profile.present_post_office,
-        profile.present_mandal,
-        profile.present_police_station,
-        profile.present_district,
-        profile.present_state,
-        profile.present_pin_code,
-      ]
-        .map(toText)
-        .filter((value) => value !== "-")
-        .join(", ") || "-"}`,
-    );
-    lines.push(
-      `Permanent Address: ${[
-        profile.permanent_village,
-        profile.permanent_landmark,
-        profile.permanent_post_office,
-        profile.permanent_mandal,
-        profile.permanent_police_station,
-        profile.permanent_district,
-        profile.permanent_state,
-        profile.permanent_pin_code,
-      ]
-        .map(toText)
-        .filter((value) => value !== "-")
-        .join(", ") || "-"}`,
-    );
-    lines.push(
-      `Reference 1: ${toText(profile.reference1_name)} | ${toText(profile.reference1_relationship)} | ${toText(profile.reference1_contact)}`,
-    );
-    lines.push(
-      `Reference 2: ${toText(profile.reference2_name)} | ${toText(profile.reference2_relationship)} | ${toText(profile.reference2_contact)}`,
-    );
-    lines.push(
-      `Salary: Present ${toText(profile.present_salary)} | Expected ${toText(profile.salary_expectation)} | Offered ${toText(profile.salary_offered)}`,
-    );
-    lines.push(`Joining Date: ${fmtDate(profile.joining_date)}`);
-    lines.push(
-      `Candidate Signature / Date: ${toText(profile.candidate_signature_text)} | ${fmtDate(profile.candidate_signature_date)}`,
-    );
-    lines.push(`Appointee Signature: ${toText(profile.appointee_signature_text)}`);
-    lines.push(`Approval Authority: ${toText(profile.approval_authority_signature_text)}`);
+    lines.push(`Profile Fields Loaded: Yes`);
   }
 
   return renderTextPdf("Driver Profile Report", lines);

@@ -71,7 +71,14 @@ function buildWhere(
   return where.length ? `WHERE ${where.join(" AND ")}` : "";
 }
 
-async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string, from?: string, to?: string): Promise<ExportRow[]> {
+async function fetchRows(
+  moduleKey: ExportModuleKey,
+  q?: string,
+  status?: string,
+  from?: string,
+  to?: string,
+  busIds: number[] = [],
+): Promise<ExportRow[]> {
   const params: unknown[] = [];
   const appToday = appTodaySql();
   switch (moduleKey) {
@@ -79,14 +86,32 @@ async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string
       const where = buildWhere("b", params, {
         q,
         status,
-        from,
-        to,
-        dateColumnExpr: appDateFromTimestamptzSql("b.created_at"),
         searchCols: ["bus_number", "registration_number", "make", "model"],
         statusCol: "status",
       });
+      const filters: string[] = where ? [where.replace(/^WHERE\s+/i, "")] : [];
+      if (busIds.length > 0) {
+        params.push(busIds);
+        filters.push(`b.id = ANY($${params.length}::int[])`);
+      }
+      const fuelHistoryWhereParts: string[] = [];
+      if (from?.trim()) {
+        params.push(from.trim());
+        fuelHistoryWhereParts.push(`metric_day >= $${params.length}::date`);
+      }
+      if (to?.trim()) {
+        params.push(to.trim());
+        fuelHistoryWhereParts.push(`metric_day <= $${params.length}::date`);
+      }
+      const fuelHistoryWhere = fuelHistoryWhereParts.length
+        ? `WHERE ${fuelHistoryWhereParts.join(" AND ")}`
+        : "";
+      if (fuelHistoryWhereParts.length > 0) {
+        filters.push(`EXISTS (SELECT 1 FROM fuel_history fhf WHERE fhf.bus_id = b.id)`);
+      }
+      const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
       const result = await query<ExportRow>(
-        `WITH fuel_history AS (
+        `WITH fuel_history_raw AS (
            SELECT
              fe.id,
              fe.bus_id,
@@ -109,10 +134,14 @@ async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string
              fi.liters_issued AS liters,
              fi.amount,
              fi.company_name
-           FROM fuel_issues fi
-         )
-         SELECT
-           b.id::text,
+            FROM fuel_issues fi
+          ),
+          fuel_history AS (
+            SELECT * FROM fuel_history_raw
+            ${fuelHistoryWhere}
+          )
+          SELECT
+            b.id::text,
            b.bus_number,
            b.registration_number,
            b.make,
@@ -145,22 +174,22 @@ async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string
            FROM fuel_history fh2
            WHERE fh2.bus_id = b.id
          ) lf ON true
-         LEFT JOIN LATERAL (
-           SELECT
-             (
+           LEFT JOIN LATERAL (
+             SELECT
+               (
                SUM(fh3.odometer_after_km - fh3.odometer_before_km) /
                NULLIF(SUM(fh3.liters), 0)
              )::text AS previous_day_mileage_kmpl
-           FROM fuel_history fh3
-           WHERE
-             fh3.bus_id = b.id
-             AND fh3.metric_day = ${appToday} - INTERVAL '1 day'
+               FROM fuel_history_raw fh3
+               WHERE
+                 fh3.bus_id = b.id
+                 AND fh3.metric_day = ${appToday} - INTERVAL '1 day'
              AND fh3.odometer_before_km IS NOT NULL
              AND fh3.odometer_after_km IS NOT NULL
          ) pd ON true
-         ${where}
-         GROUP BY b.id, b.bus_number, b.registration_number, b.make, b.model, b.seater, b.status, b.odometer_km, pd.previous_day_mileage_kmpl
-         ORDER BY b.id DESC`,
+           ${whereClause}
+           GROUP BY b.id, b.bus_number, b.registration_number, b.make, b.model, b.seater, b.status, b.odometer_km, pd.previous_day_mileage_kmpl
+           ORDER BY b.id DESC`,
         params,
       );
       return result.rows;
@@ -437,6 +466,14 @@ function pickFields(rows: ExportRow[], fields: string[]) {
   });
 }
 
+function titleCaseFromKey(key: string) {
+  return key
+    .split("_")
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const moduleKey = normalizeModule(url.searchParams.get("module") ?? "overall");
@@ -458,9 +495,13 @@ export async function GET(request: Request) {
     const status = url.searchParams.get("status") ?? "";
     const from = url.searchParams.get("from") ?? "";
     const to = url.searchParams.get("to") ?? "";
+    const busIds = url.searchParams
+      .getAll("busId")
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value > 0);
     const selectedFields = url.searchParams.getAll("field");
 
-    const rawRows = await fetchRows(moduleKey, q, status, from, to);
+    const rawRows = await fetchRows(moduleKey, q, status, from, to, busIds);
     const rows = pickFields(rawRows, selectedFields);
     const headers = rows.length ? Object.keys(rows[0]) : (selectedFields.length ? selectedFields : MODULE_EXPORT_FIELDS[moduleKey].map((f) => f.key));
 
@@ -512,18 +553,37 @@ export async function GET(request: Request) {
     drawLine(`${moduleKey.toUpperCase()} Export Report`, { size: 16, bold: true });
     drawLine(`Generated: ${formatDateTimeInAppTimeZone(new Date())}`, { size: 9, color: [0.25, 0.25, 0.25] });
     drawLine(`Records: ${rows.length}`, { size: 9, color: [0.25, 0.25, 0.25] });
-    drawLine(headers.join(" | "), { size: 8, bold: true });
-
-    rows.forEach((row) => {
-      const line = headers.map((h) => `${h}: ${row[h] ?? "-"}`).join(" | ");
-      if (line.length <= maxLineChars) {
-        drawLine(line);
-        return;
-      }
-      for (let i = 0; i < line.length; i += maxLineChars) {
-        drawLine(line.slice(i, i + maxLineChars));
-      }
-    });
+    if (moduleKey === "drivers") {
+      const labelMap = new Map(MODULE_EXPORT_FIELDS.drivers.map((field) => [field.key, field.label]));
+      rows.forEach((row, index) => {
+        drawLine("");
+        drawLine(`Driver ${index + 1}`, { size: 11, bold: true });
+        headers.forEach((header) => {
+          const label = labelMap.get(header) ?? titleCaseFromKey(header);
+          const value = row[header] == null || String(row[header]).trim() === "" ? "-" : String(row[header]);
+          const line = `${label}: ${value}`;
+          if (line.length <= maxLineChars) {
+            drawLine(line);
+            return;
+          }
+          for (let i = 0; i < line.length; i += maxLineChars) {
+            drawLine(line.slice(i, i + maxLineChars));
+          }
+        });
+      });
+    } else {
+      drawLine(headers.join(" | "), { size: 8, bold: true });
+      rows.forEach((row) => {
+        const line = headers.map((h) => `${h}: ${row[h] ?? "-"}`).join(" | ");
+        if (line.length <= maxLineChars) {
+          drawLine(line);
+          return;
+        }
+        for (let i = 0; i < line.length; i += maxLineChars) {
+          drawLine(line.slice(i, i + maxLineChars));
+        }
+      });
+    }
 
     const binary = await pdfDoc.save();
     return new Response(Buffer.from(binary), {
