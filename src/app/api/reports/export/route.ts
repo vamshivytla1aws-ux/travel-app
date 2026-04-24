@@ -539,7 +539,7 @@ export async function GET(request: Request) {
     const pageHeight = 842;
     const margin = 36;
     const lineHeight = 12;
-    const maxLineChars = 110;
+    const contentWidth = pageWidth - margin * 2;
 
     let page = pdfDoc.addPage([pageWidth, pageHeight]);
     let y = pageHeight - margin;
@@ -563,35 +563,14 @@ export async function GET(request: Request) {
       y -= lineHeight;
     };
 
-    const drawWrappedLine = (
-      text: string,
-      options?: { size?: number; bold?: boolean; color?: [number, number, number] },
-    ) => {
-      if (text.length <= maxLineChars) {
-        drawLine(text, options);
-        return;
+    const clipCellText = (value: string, maxWidth: number, fontSize = 7, bold = false) => {
+      const font = bold ? boldFont : bodyFont;
+      if (font.widthOfTextAtSize(value, fontSize) <= maxWidth) return value;
+      let text = value;
+      while (text.length > 0 && font.widthOfTextAtSize(`${text}...`, fontSize) > maxWidth) {
+        text = text.slice(0, -1);
       }
-      for (let i = 0; i < text.length; i += maxLineChars) {
-        drawLine(text.slice(i, i + maxLineChars), options);
-      }
-    };
-
-    const drawRowBlock = (
-      title: string,
-      row: ExportRow,
-      headersToShow: string[],
-      labelMap: Map<string, string>,
-    ) => {
-      drawLine("");
-      drawWrappedLine(title, { size: 11, bold: true, color: [0.1, 0.1, 0.1] });
-      headersToShow.forEach((header) => {
-        const label = labelMap.get(header) ?? titleCaseFromKey(header);
-        const value = toExportText(row[header]);
-        drawWrappedLine(`${label}: ${value}`);
-      });
-      drawWrappedLine("------------------------------------------------------------", {
-        color: [0.55, 0.55, 0.55],
-      });
+      return text.length > 0 ? `${text}...` : "";
     };
 
     drawLine(`${moduleKey.toUpperCase()} Export Report`, { size: 16, bold: true });
@@ -599,18 +578,121 @@ export async function GET(request: Request) {
     drawLine(`Records: ${rows.length}`, { size: 9, color: [0.25, 0.25, 0.25] });
     const moduleFieldLabels = MODULE_EXPORT_FIELDS[moduleKey] ?? [];
     const labelMap = new Map(moduleFieldLabels.map((field) => [field.key, field.label]));
-    const prettyModuleName = titleCaseFromKey(moduleKey.replace(/-/g, "_"));
-    const singularModuleName = prettyModuleName.endsWith("s")
-      ? prettyModuleName.slice(0, -1)
-      : prettyModuleName;
-    const recordTitlePrefix = moduleKey === "overall" ? "Module" : singularModuleName;
-
     if (rows.length === 0) {
       drawLine("");
       drawLine("No records found for current filters.");
     } else {
-      rows.forEach((row, index) => {
-        drawRowBlock(`${recordTitlePrefix} ${index + 1}`, row, headers, labelMap);
+      const fieldWidths = headers.map((header) => {
+        const label = labelMap.get(header) ?? titleCaseFromKey(header);
+        let maxChars = label.length;
+        const sampleRows = rows.slice(0, 50);
+        sampleRows.forEach((row) => {
+          const valueLen = toExportText(row[header]).length;
+          if (valueLen > maxChars) maxChars = valueLen;
+        });
+        return Math.min(170, Math.max(65, maxChars * 4.4 + 16));
+      });
+
+      const groups: Array<{ keys: string[]; widths: number[] }> = [];
+      let currentKeys: string[] = [];
+      let currentWidths: number[] = [];
+      let currentTotal = 0;
+      headers.forEach((header, index) => {
+        const width = fieldWidths[index];
+        if (currentKeys.length > 0 && currentTotal + width > contentWidth) {
+          groups.push({ keys: currentKeys, widths: currentWidths });
+          currentKeys = [header];
+          currentWidths = [width];
+          currentTotal = width;
+          return;
+        }
+        currentKeys.push(header);
+        currentWidths.push(width);
+        currentTotal += width;
+      });
+      if (currentKeys.length > 0) groups.push({ keys: currentKeys, widths: currentWidths });
+
+      const rowHeight = 17;
+      const cellPaddingX = 4;
+      const headerFontSize = 7;
+      const cellFontSize = 7;
+
+      const drawTableHeader = (keys: string[], widths: number[]) => {
+        if (y - rowHeight < margin) {
+          page = pdfDoc.addPage([pageWidth, pageHeight]);
+          y = pageHeight - margin;
+        }
+        let x = margin;
+        keys.forEach((key, idx) => {
+          const width = widths[idx];
+          page.drawRectangle({
+            x,
+            y: y - rowHeight,
+            width,
+            height: rowHeight,
+            color: rgb(0.93, 0.95, 0.98),
+            borderColor: rgb(0.7, 0.74, 0.82),
+            borderWidth: 0.5,
+          });
+          const label = labelMap.get(key) ?? titleCaseFromKey(key);
+          page.drawText(clipCellText(label, width - cellPaddingX * 2, headerFontSize, true), {
+            x: x + cellPaddingX,
+            y: y - rowHeight + 5,
+            size: headerFontSize,
+            font: boldFont,
+            color: rgb(0.15, 0.2, 0.3),
+          });
+          x += width;
+        });
+        y -= rowHeight;
+      };
+
+      groups.forEach((group, groupIndex) => {
+        drawLine("");
+        drawLine(
+          groups.length > 1
+            ? `Table ${groupIndex + 1}/${groups.length}`
+            : "Table",
+          { size: 9, bold: true, color: [0.18, 0.22, 0.3] },
+        );
+
+        const widthTotal = group.widths.reduce((sum, width) => sum + width, 0);
+        const normalizedWidths =
+          widthTotal > contentWidth
+            ? group.widths.map((width) => (width / widthTotal) * contentWidth)
+            : group.widths;
+
+        drawTableHeader(group.keys, normalizedWidths);
+
+        rows.forEach((row) => {
+          if (y - rowHeight < margin) {
+            page = pdfDoc.addPage([pageWidth, pageHeight]);
+            y = pageHeight - margin;
+            drawTableHeader(group.keys, normalizedWidths);
+          }
+          let x = margin;
+          group.keys.forEach((key, idx) => {
+            const width = normalizedWidths[idx];
+            page.drawRectangle({
+              x,
+              y: y - rowHeight,
+              width,
+              height: rowHeight,
+              borderColor: rgb(0.8, 0.82, 0.86),
+              borderWidth: 0.4,
+            });
+            const value = toExportText(row[key]);
+            page.drawText(clipCellText(value, width - cellPaddingX * 2, cellFontSize), {
+              x: x + cellPaddingX,
+              y: y - rowHeight + 5,
+              size: cellFontSize,
+              font: bodyFont,
+              color: rgb(0.1, 0.1, 0.12),
+            });
+            x += width;
+          });
+          y -= rowHeight;
+        });
       });
     }
 
