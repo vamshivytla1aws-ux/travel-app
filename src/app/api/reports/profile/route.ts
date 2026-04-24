@@ -200,43 +200,263 @@ async function buildBusProfilePdf(busId: number) {
 
   const bus = busRes.rows[0];
   if (!bus) return null;
+  const pdfDoc = await PDFDocument.create();
+  const bodyFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  const lines: string[] = [];
-  lines.push(`Bus ID: ${bus.id}`);
-  lines.push(`Bus Number: ${bus.bus_number}`);
-  lines.push(`Registration: ${bus.registration_number}`);
-  lines.push(`Vehicle: ${bus.make} ${bus.model}`);
-  lines.push(`Seater: ${bus.seater}`);
-  lines.push(`Status: ${bus.status}`);
-  lines.push(`Odometer (KM): ${bus.odometer_km}`);
-  lines.push("");
-  lines.push("Fuel History (Latest 30)");
+  const pageWidth = 595;
+  const pageHeight = 842;
+  const margin = 28;
+  const contentWidth = pageWidth - margin * 2;
+  const sectionHeaderHeight = 18;
+  const tableHeaderHeight = 18;
+  const rowHeight = 16;
+  const keyValueRowHeight = 18;
+  const generatedAt = formatDateTimeInAppTimeZone(new Date());
+
+  let page = pdfDoc.addPage([pageWidth, pageHeight]);
+  let y = pageHeight - margin;
+
+  const ensureSpace = (needed: number) => {
+    if (y - needed < margin) {
+      page = pdfDoc.addPage([pageWidth, pageHeight]);
+      y = pageHeight - margin;
+      page.drawText("JAI BHAVANI TRAVELS", {
+        x: margin,
+        y: y - 2,
+        size: 10,
+        font: boldFont,
+        color: rgb(0.14, 0.2, 0.34),
+      });
+      y -= 14;
+    }
+  };
+
+  const clipText = (text: string, maxWidth: number, size = 8, bold = false) => {
+    const font = bold ? boldFont : bodyFont;
+    if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+    let next = text;
+    while (next.length > 0 && font.widthOfTextAtSize(`${next}...`, size) > maxWidth) {
+      next = next.slice(0, -1);
+    }
+    return next.length ? `${next}...` : "";
+  };
+
+  const drawSectionHeader = (title: string) => {
+    ensureSpace(sectionHeaderHeight + 4);
+    page.drawRectangle({
+      x: margin,
+      y: y - sectionHeaderHeight,
+      width: contentWidth,
+      height: sectionHeaderHeight,
+      color: rgb(0.92, 0.95, 1),
+      borderColor: rgb(0.72, 0.79, 0.95),
+      borderWidth: 1,
+    });
+    page.drawText(title, {
+      x: margin + 6,
+      y: y - sectionHeaderHeight + 5,
+      size: 10,
+      font: boldFont,
+      color: rgb(0.1, 0.2, 0.45),
+    });
+    y -= sectionHeaderHeight + 4;
+  };
+
+  const drawTableHeader = (headers: string[], widths: number[]) => {
+    ensureSpace(tableHeaderHeight);
+    let x = margin;
+    headers.forEach((header, idx) => {
+      page.drawRectangle({
+        x,
+        y: y - tableHeaderHeight,
+        width: widths[idx],
+        height: tableHeaderHeight,
+        color: rgb(0.95, 0.97, 1),
+        borderColor: rgb(0.72, 0.79, 0.95),
+        borderWidth: 0.5,
+      });
+      page.drawText(clipText(header, widths[idx] - 6, 7, true), {
+        x: x + 3,
+        y: y - tableHeaderHeight + 6,
+        size: 7,
+        font: boldFont,
+        color: rgb(0.12, 0.2, 0.35),
+      });
+      x += widths[idx];
+    });
+    y -= tableHeaderHeight;
+  };
+
+  const drawTableRow = (values: string[], widths: number[]) => {
+    ensureSpace(rowHeight);
+    let x = margin;
+    values.forEach((value, idx) => {
+      page.drawRectangle({
+        x,
+        y: y - rowHeight,
+        width: widths[idx],
+        height: rowHeight,
+        borderColor: rgb(0.82, 0.86, 0.92),
+        borderWidth: 0.35,
+      });
+      page.drawText(clipText(value, widths[idx] - 6, 7), {
+        x: x + 3,
+        y: y - rowHeight + 5,
+        size: 7,
+        font: bodyFont,
+        color: rgb(0.1, 0.1, 0.12),
+      });
+      x += widths[idx];
+    });
+    y -= rowHeight;
+  };
+
+  page.drawText("Bio - Data", {
+    x: margin,
+    y: y - 2,
+    size: 14,
+    font: boldFont,
+    color: rgb(0.25, 0.28, 0.34),
+  });
+  page.drawText("JAI BHAVANI TRAVELS", {
+    x: margin,
+    y: y - 26,
+    size: 24,
+    font: boldFont,
+    color: rgb(0.1, 0.12, 0.18),
+  });
+  page.drawText("Bus Profile Report", {
+    x: margin,
+    y: y - 44,
+    size: 11,
+    font: boldFont,
+    color: rgb(0.14, 0.2, 0.34),
+  });
+  page.drawText(`Generated: ${generatedAt}`, {
+    x: margin,
+    y: y - 58,
+    size: 9,
+    font: bodyFont,
+    color: rgb(0.3, 0.34, 0.4),
+  });
+  y -= 72;
+
+  drawSectionHeader("Bus Overview");
+  const keyValues: Array<{ label: string; value: string }> = [
+    { label: "Bus ID", value: String(bus.id) },
+    { label: "Bus Number", value: bus.bus_number },
+    { label: "Registration", value: bus.registration_number },
+    { label: "Make", value: bus.make },
+    { label: "Model", value: bus.model },
+    { label: "Seater", value: bus.seater },
+    { label: "Status", value: bus.status },
+    { label: "Odometer (KM)", value: bus.odometer_km },
+  ];
+  const kvColWidth = (contentWidth - 10) / 2;
+  for (let i = 0; i < keyValues.length; i += 2) {
+    ensureSpace(keyValueRowHeight);
+    [0, 1].forEach((slot) => {
+      const item = keyValues[i + slot];
+      if (!item) return;
+      const x = margin + slot * (kvColWidth + 10);
+      page.drawRectangle({
+        x,
+        y: y - keyValueRowHeight,
+        width: kvColWidth,
+        height: keyValueRowHeight,
+        borderColor: rgb(0.82, 0.86, 0.92),
+        borderWidth: 0.45,
+      });
+      const text = `${item.label}: ${item.value}`;
+      page.drawText(clipText(text, kvColWidth - 8, 8, slot === 0), {
+        x: x + 4,
+        y: y - keyValueRowHeight + 5,
+        size: 8,
+        font: bodyFont,
+        color: rgb(0.1, 0.12, 0.16),
+      });
+    });
+    y -= keyValueRowHeight;
+  }
+
+  drawSectionHeader(`Fuel History (${fuelRes.rows.length})`);
   if (fuelRes.rows.length === 0) {
-    lines.push("No fuel history");
+    ensureSpace(16);
+    page.drawText("No fuel history records available.", {
+      x: margin + 4,
+      y: y - 10,
+      size: 9,
+      font: bodyFont,
+      color: rgb(0.45, 0.48, 0.55),
+    });
+    y -= 16;
   } else {
-    fuelRes.rows.forEach((row, idx) => {
+    const fuelHeaders = ["Date", "Source", "Start", "End", "Liters", "KM/L", "Company", "Amount"];
+    const fuelWidths = [62, 48, 50, 50, 46, 42, 133, 52];
+    drawTableHeader(fuelHeaders, fuelWidths);
+    fuelRes.rows.forEach((row) => {
       const liters = Number(row.liters);
       const start = row.odometer_before_km != null ? Number(row.odometer_before_km) : null;
       const end = row.odometer_after_km != null ? Number(row.odometer_after_km) : null;
       const mileage = start != null && end != null && liters > 0 ? ((end - start) / liters).toFixed(2) : "N/A";
-      lines.push(
-        `${idx + 1}. ${fmtDate(row.filled_at)} | ${row.source} | Start: ${start ?? "-"} | End: ${end ?? "-"} | Liters: ${liters.toFixed(2)} | KM/L: ${mileage} | Company: ${toText(row.company_name)} | Amount: ${Number(row.amount).toFixed(2)}`,
+      drawTableRow(
+        [
+          fmtDate(row.filled_at),
+          row.source,
+          start != null ? start.toFixed(2) : "-",
+          end != null ? end.toFixed(2) : "-",
+          liters.toFixed(2),
+          mileage,
+          toText(row.company_name),
+          Number(row.amount).toFixed(2),
+        ],
+        fuelWidths,
       );
-    });
-  }
-  lines.push("");
-  lines.push("Maintenance (Latest 20)");
-  if (maintenanceRes.rows.length === 0) {
-    lines.push("No maintenance records");
-  } else {
-    maintenanceRes.rows.forEach((row, idx) => {
-      lines.push(
-        `${idx + 1}. ${fmtDate(row.maintenance_date)} | ${toText(row.issue_type)} | Cost: ${Number(row.cost).toFixed(2)} | ${toText(row.description)}`,
-      );
+      if (y - rowHeight < margin) {
+        page = pdfDoc.addPage([pageWidth, pageHeight]);
+        y = pageHeight - margin;
+        drawSectionHeader("Fuel History (continued)");
+        drawTableHeader(fuelHeaders, fuelWidths);
+      }
     });
   }
 
-  return renderTextPdf("Bus Profile Report", lines);
+  drawSectionHeader(`Maintenance History (${maintenanceRes.rows.length})`);
+  if (maintenanceRes.rows.length === 0) {
+    ensureSpace(16);
+    page.drawText("No maintenance records available.", {
+      x: margin + 4,
+      y: y - 10,
+      size: 9,
+      font: bodyFont,
+      color: rgb(0.45, 0.48, 0.55),
+    });
+    y -= 16;
+  } else {
+    const maintenanceHeaders = ["Date", "Issue", "Description", "Cost"];
+    const maintenanceWidths = [80, 110, 260, 73];
+    drawTableHeader(maintenanceHeaders, maintenanceWidths);
+    maintenanceRes.rows.forEach((row) => {
+      drawTableRow(
+        [
+          fmtDate(row.maintenance_date),
+          toText(row.issue_type),
+          toText(row.description),
+          Number(row.cost).toFixed(2),
+        ],
+        maintenanceWidths,
+      );
+      if (y - rowHeight < margin) {
+        page = pdfDoc.addPage([pageWidth, pageHeight]);
+        y = pageHeight - margin;
+        drawSectionHeader("Maintenance History (continued)");
+        drawTableHeader(maintenanceHeaders, maintenanceWidths);
+      }
+    });
+  }
+
+  return Buffer.from(await pdfDoc.save());
 }
 
 async function buildDriverProfilePdf(driverId: number) {
