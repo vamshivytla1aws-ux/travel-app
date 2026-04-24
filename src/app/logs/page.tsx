@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { requireModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
+import { formatDateTimeInAppTimeZone } from "@/lib/timezone";
 
 type Props = {
   searchParams: Promise<{ entity?: string; action?: string; page?: string; pageSize?: string; export?: string }>;
@@ -112,7 +113,7 @@ export default async function LogsPage(props: Props) {
             <TableBody>
               {logs.rows.map((log) => (
                 <TableRow key={log.id}>
-                  <TableCell>{new Date(log.created_at).toLocaleString()}</TableCell>
+                  <TableCell>{formatDateTimeInAppTimeZone(log.created_at)} IST</TableCell>
                   <TableCell>{log.user_email ?? "system"}</TableCell>
                   <TableCell>{log.action}</TableCell>
                   <TableCell>{log.entity_type}</TableCell>
