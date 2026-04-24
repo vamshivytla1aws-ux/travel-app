@@ -14,6 +14,14 @@ type ExportRow = Record<string, string | number | boolean | null>;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+async function tryEnsureTransportEnhancements() {
+  try {
+    await ensureTransportEnhancements();
+  } catch (error) {
+    console.warn("Skipping schema ensure in export route", error);
+  }
+}
+
 function escapeCsv(value: unknown) {
   const raw = value == null ? "" : String(value);
   if (raw.includes(",") || raw.includes('"') || raw.includes("\n")) {
@@ -167,8 +175,9 @@ async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string
         searchCols: ["full_name", "phone", "license_number", "company_name"],
         statusCol: "is_active",
       });
-      const result = await query<ExportRow>(
-        `SELECT
+      try {
+        const result = await query<ExportRow>(
+          `SELECT
            d.id::text,
            d.full_name,
            d.phone,
@@ -233,9 +242,32 @@ async function fetchRows(moduleKey: ExportModuleKey, q?: string, status?: string
          LEFT JOIN driver_profiles dp ON dp.driver_id = d.id
          ${where}
          ORDER BY d.id DESC`,
-        params,
-      );
-      return result.rows;
+          params,
+        );
+        return result.rows;
+      } catch (error) {
+        console.warn("Falling back to base drivers export query", error);
+        const fallback = await query<ExportRow>(
+          `SELECT
+             d.id::text,
+             d.full_name,
+             d.phone,
+             d.company_name,
+             d.license_number,
+             d.license_expiry::text,
+             d.experience_years::text,
+             d.bank_name,
+             d.bank_account_number,
+             d.bank_ifsc,
+             d.is_active::text,
+             d.updated_at::text
+           FROM drivers d
+           ${where}
+           ORDER BY d.id DESC`,
+          params,
+        );
+        return fallback.rows;
+      }
     }
     case "employees": {
       const where = buildWhere("e", params, {
@@ -420,7 +452,7 @@ export async function GET(request: Request) {
   if (!session) return new Response("Forbidden", { status: 403 });
 
   try {
-    await ensureTransportEnhancements();
+    await tryEnsureTransportEnhancements();
     const format = (url.searchParams.get("format") ?? "pdf").toLowerCase();
     const q = url.searchParams.get("q") ?? "";
     const status = url.searchParams.get("status") ?? "";

@@ -10,6 +10,14 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+async function tryEnsureTransportEnhancements() {
+  try {
+    await ensureTransportEnhancements();
+  } catch (error) {
+    console.warn("Skipping schema ensure in profile export route", error);
+  }
+}
+
 function fmtDate(value?: string | null) {
   if (!value) return "-";
   const parsed = new Date(value);
@@ -27,6 +35,58 @@ function addField(doc: any, label: string, value: unknown) {
   doc.font("Helvetica-Bold").fontSize(9).fillColor("#111827").text(`${label}: `, { continued: true });
   doc.font("Helvetica").text(value == null || value === "" ? "-" : String(value));
 }
+
+type DriverProfileRow = {
+  blood_group: string | null;
+  father_name: string | null;
+  father_contact: string | null;
+  mother_name: string | null;
+  mother_contact: string | null;
+  spouse_name: string | null;
+  spouse_contact: string | null;
+  child_1_name: string | null;
+  child_2_name: string | null;
+  pan_or_voter_id: string | null;
+  aadhaar_no: string | null;
+  vehicle_registration_no: string | null;
+  present_reading_km: string | null;
+  badge_no: string | null;
+  badge_validity: string | null;
+  education: string | null;
+  date_of_birth: string | null;
+  marital_status: string | null;
+  religion: string | null;
+  present_village: string | null;
+  present_landmark: string | null;
+  present_post_office: string | null;
+  present_mandal: string | null;
+  present_police_station: string | null;
+  present_district: string | null;
+  present_state: string | null;
+  present_pin_code: string | null;
+  permanent_village: string | null;
+  permanent_landmark: string | null;
+  permanent_post_office: string | null;
+  permanent_mandal: string | null;
+  permanent_police_station: string | null;
+  permanent_district: string | null;
+  permanent_state: string | null;
+  permanent_pin_code: string | null;
+  reference1_name: string | null;
+  reference1_relationship: string | null;
+  reference1_contact: string | null;
+  reference2_name: string | null;
+  reference2_relationship: string | null;
+  reference2_contact: string | null;
+  present_salary: string | null;
+  salary_expectation: string | null;
+  salary_offered: string | null;
+  joining_date: string | null;
+  candidate_signature_text: string | null;
+  candidate_signature_date: string | null;
+  appointee_signature_text: string | null;
+  approval_authority_signature_text: string | null;
+};
 
 async function buildBusProfilePdf(busId: number) {
   const [busRes, fuelRes, maintenanceRes] = await Promise.all([
@@ -168,57 +228,7 @@ async function buildDriverProfilePdf(driverId: number) {
        FROM drivers WHERE id = $1`,
       [driverId],
     ),
-    query<{
-      blood_group: string | null;
-      father_name: string | null;
-      father_contact: string | null;
-      mother_name: string | null;
-      mother_contact: string | null;
-      spouse_name: string | null;
-      spouse_contact: string | null;
-      child_1_name: string | null;
-      child_2_name: string | null;
-      pan_or_voter_id: string | null;
-      aadhaar_no: string | null;
-      vehicle_registration_no: string | null;
-      present_reading_km: string | null;
-      badge_no: string | null;
-      badge_validity: string | null;
-      education: string | null;
-      date_of_birth: string | null;
-      marital_status: string | null;
-      religion: string | null;
-      present_village: string | null;
-      present_landmark: string | null;
-      present_post_office: string | null;
-      present_mandal: string | null;
-      present_police_station: string | null;
-      present_district: string | null;
-      present_state: string | null;
-      present_pin_code: string | null;
-      permanent_village: string | null;
-      permanent_landmark: string | null;
-      permanent_post_office: string | null;
-      permanent_mandal: string | null;
-      permanent_police_station: string | null;
-      permanent_district: string | null;
-      permanent_state: string | null;
-      permanent_pin_code: string | null;
-      reference1_name: string | null;
-      reference1_relationship: string | null;
-      reference1_contact: string | null;
-      reference2_name: string | null;
-      reference2_relationship: string | null;
-      reference2_contact: string | null;
-      present_salary: string | null;
-      salary_expectation: string | null;
-      salary_offered: string | null;
-      joining_date: string | null;
-      candidate_signature_text: string | null;
-      candidate_signature_date: string | null;
-      appointee_signature_text: string | null;
-      approval_authority_signature_text: string | null;
-    }>(
+    query<DriverProfileRow>(
       `SELECT
          blood_group, father_name, father_contact, mother_name, mother_contact, spouse_name, spouse_contact,
          child_1_name, child_2_name, pan_or_voter_id, aadhaar_no, vehicle_registration_no, present_reading_km::text,
@@ -229,10 +239,63 @@ async function buildDriverProfilePdf(driverId: number) {
          reference1_name, reference1_relationship, reference1_contact, reference2_name, reference2_relationship, reference2_contact,
          present_salary::text, salary_expectation::text, salary_offered::text, joining_date::text,
          candidate_signature_text, candidate_signature_date::text, appointee_signature_text, approval_authority_signature_text
-       FROM driver_profiles
-       WHERE driver_id = $1`,
+      FROM driver_profiles
+      WHERE driver_id = $1`,
       [driverId],
-    ),
+    ).catch(async () => {
+      const minimal = await query<DriverProfileRow>(
+        `SELECT NULL::text AS blood_group,
+                NULL::text AS father_name,
+                NULL::text AS father_contact,
+                NULL::text AS mother_name,
+                NULL::text AS mother_contact,
+                NULL::text AS spouse_name,
+                NULL::text AS spouse_contact,
+                NULL::text AS child_1_name,
+                NULL::text AS child_2_name,
+                NULL::text AS pan_or_voter_id,
+                NULL::text AS aadhaar_no,
+                NULL::text AS vehicle_registration_no,
+                NULL::text AS present_reading_km,
+                NULL::text AS badge_no,
+                NULL::text AS badge_validity,
+                NULL::text AS education,
+                NULL::text AS date_of_birth,
+                NULL::text AS marital_status,
+                NULL::text AS religion,
+                NULL::text AS present_village,
+                NULL::text AS present_landmark,
+                NULL::text AS present_post_office,
+                NULL::text AS present_mandal,
+                NULL::text AS present_police_station,
+                NULL::text AS present_district,
+                NULL::text AS present_state,
+                NULL::text AS present_pin_code,
+                NULL::text AS permanent_village,
+                NULL::text AS permanent_landmark,
+                NULL::text AS permanent_post_office,
+                NULL::text AS permanent_mandal,
+                NULL::text AS permanent_police_station,
+                NULL::text AS permanent_district,
+                NULL::text AS permanent_state,
+                NULL::text AS permanent_pin_code,
+                NULL::text AS reference1_name,
+                NULL::text AS reference1_relationship,
+                NULL::text AS reference1_contact,
+                NULL::text AS reference2_name,
+                NULL::text AS reference2_relationship,
+                NULL::text AS reference2_contact,
+                NULL::text AS present_salary,
+                NULL::text AS salary_expectation,
+                NULL::text AS salary_offered,
+                NULL::text AS joining_date,
+                NULL::text AS candidate_signature_text,
+                NULL::text AS candidate_signature_date,
+                NULL::text AS appointee_signature_text,
+                NULL::text AS approval_authority_signature_text`,
+      );
+      return { rows: minimal.rows };
+    }),
   ]);
 
   const driver = driverRes.rows[0];
@@ -335,7 +398,7 @@ export async function GET(request: Request) {
     const session = await requireApiModuleAccess("buses");
     if (!session) return new Response("Forbidden", { status: 403 });
     try {
-      await ensureTransportEnhancements();
+      await tryEnsureTransportEnhancements();
       const pdf = await buildBusProfilePdf(id);
       if (!pdf) return new Response("Not found", { status: 404 });
       return new Response(new Uint8Array(pdf), {
@@ -354,7 +417,7 @@ export async function GET(request: Request) {
     const session = await requireApiModuleAccess("drivers");
     if (!session) return new Response("Forbidden", { status: 403 });
     try {
-      await ensureTransportEnhancements();
+      await tryEnsureTransportEnhancements();
       const pdf = await buildDriverProfilePdf(id);
       if (!pdf) return new Response("Not found", { status: 404 });
       return new Response(new Uint8Array(pdf), {
