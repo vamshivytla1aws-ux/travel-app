@@ -16,6 +16,7 @@ import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 import { EmployeesService } from "@/services/employees.service";
 
 const employeesService = new EmployeesService();
+const MAX_PROFILE_PHOTO_BYTES = 15 * 1024 * 1024;
 
 async function updateEmployeeProfile(formData: FormData) {
   "use server";
@@ -90,16 +91,24 @@ async function uploadEmployeePhoto(formData: FormData) {
   const employeeId = Number(formData.get("employeeId"));
   const file = formData.get("photo");
   if (!employeeId || !(file instanceof File) || file.size === 0) return;
+  if (file.size > MAX_PROFILE_PHOTO_BYTES) {
+    redirect(`/employees/${employeeId}?error=photo_too_large`);
+  }
 
-  const uploaded = await getUploadedFileBuffer(file);
-  const mimeType = normalizeProfilePhotoMime(uploaded.fileName, uploaded.mimeType);
-  await query(
-    `UPDATE employees
-     SET profile_photo_name = $1, profile_photo_mime = $2, profile_photo_data = $3, updated_at = NOW()
-     WHERE id = $4`,
-    [uploaded.fileName, mimeType, uploaded.data, employeeId],
-  );
-  await logAuditEvent({ session, action: "update", entityType: "employee_photo", entityId: employeeId });
+  try {
+    const uploaded = await getUploadedFileBuffer(file);
+    const mimeType = normalizeProfilePhotoMime(uploaded.fileName, uploaded.mimeType);
+    await query(
+      `UPDATE employees
+       SET profile_photo_name = $1, profile_photo_mime = $2, profile_photo_data = $3, updated_at = NOW()
+       WHERE id = $4`,
+      [uploaded.fileName, mimeType, uploaded.data, employeeId],
+    );
+    await logAuditEvent({ session, action: "update", entityType: "employee_photo", entityId: employeeId });
+  } catch (error) {
+    console.error("Employee photo upload failed", { employeeId, error });
+    redirect(`/employees/${employeeId}?error=photo_upload_failed`);
+  }
 
   revalidatePath(`/employees/${employeeId}`);
   revalidatePath("/employees");
@@ -137,6 +146,16 @@ export default async function EmployeeProfilePage(props: Props) {
         {searchParams.error === "duplicate" ? (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             Employee code or email already exists.
+          </div>
+        ) : null}
+        {searchParams.error === "photo_too_large" ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            Photo is too large. Please upload a file up to 15MB.
+          </div>
+        ) : null}
+        {searchParams.error === "photo_upload_failed" ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            Photo upload failed. Please retry with JPG/PNG/WebP.
           </div>
         ) : null}
 

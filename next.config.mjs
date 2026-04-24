@@ -6,6 +6,9 @@ const nextConfig = {
   },
   experimental: {
     serverComponentsExternalPackages: ["pdf.js-extract"],
+    serverActions: {
+      bodySizeLimit: "16mb",
+    },
   },
 };
 

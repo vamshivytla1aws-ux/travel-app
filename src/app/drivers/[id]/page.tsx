@@ -21,6 +21,7 @@ import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 import { DriversService } from "@/services/drivers.service";
 
 const driversService = new DriversService();
+const MAX_PROFILE_PHOTO_BYTES = 15 * 1024 * 1024;
 
 function sectionRow(label: string, value: string | null | undefined) {
   return (
@@ -349,16 +350,24 @@ async function uploadDriverPhoto(formData: FormData) {
   const driverId = Number(formData.get("driverId"));
   const file = formData.get("photo");
   if (!driverId || !(file instanceof File) || file.size === 0) return;
+  if (file.size > MAX_PROFILE_PHOTO_BYTES) {
+    redirect(`/drivers/${driverId}?error=photo_too_large`);
+  }
 
-  const uploaded = await getUploadedFileBuffer(file);
-  const mimeType = normalizeProfilePhotoMime(uploaded.fileName, uploaded.mimeType);
-  await query(
-    `UPDATE drivers
-     SET profile_photo_name = $1, profile_photo_mime = $2, profile_photo_data = $3, updated_at = NOW()
-     WHERE id = $4`,
-    [uploaded.fileName, mimeType, uploaded.data, driverId],
-  );
-  await logAuditEvent({ session, action: "update", entityType: "driver_photo", entityId: driverId });
+  try {
+    const uploaded = await getUploadedFileBuffer(file);
+    const mimeType = normalizeProfilePhotoMime(uploaded.fileName, uploaded.mimeType);
+    await query(
+      `UPDATE drivers
+       SET profile_photo_name = $1, profile_photo_mime = $2, profile_photo_data = $3, updated_at = NOW()
+       WHERE id = $4`,
+      [uploaded.fileName, mimeType, uploaded.data, driverId],
+    );
+    await logAuditEvent({ session, action: "update", entityType: "driver_photo", entityId: driverId });
+  } catch (error) {
+    console.error("Driver photo upload failed", { driverId, error });
+    redirect(`/drivers/${driverId}?error=photo_upload_failed`);
+  }
 
   revalidatePath(`/drivers/${driverId}`);
   revalidatePath("/drivers");
@@ -456,6 +465,12 @@ export default async function DriverProfilePage(props: Props) {
         ) : null}
         {searchParams.error === "invalid_phone" ? (
           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">Contact No must contain 10 to 15 digits.</div>
+        ) : null}
+        {searchParams.error === "photo_too_large" ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">Photo is too large. Please upload a file up to 15MB.</div>
+        ) : null}
+        {searchParams.error === "photo_upload_failed" ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">Photo upload failed. Please retry with JPG/PNG/WebP.</div>
         ) : null}
         {searchParams.docDeleted ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">Driver document deleted successfully.</div>
