@@ -481,6 +481,12 @@ function titleCaseFromKey(key: string) {
     .join(" ");
 }
 
+function toExportText(value: unknown) {
+  if (value == null) return "-";
+  const text = String(value).trim();
+  return text.length > 0 ? text : "-";
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const moduleKey = normalizeModule(url.searchParams.get("module") ?? "overall");
@@ -533,7 +539,7 @@ export async function GET(request: Request) {
     const pageHeight = 842;
     const margin = 36;
     const lineHeight = 12;
-    const maxLineChars = 135;
+    const maxLineChars = 110;
 
     let page = pdfDoc.addPage([pageWidth, pageHeight]);
     let y = pageHeight - margin;
@@ -557,38 +563,54 @@ export async function GET(request: Request) {
       y -= lineHeight;
     };
 
+    const drawWrappedLine = (
+      text: string,
+      options?: { size?: number; bold?: boolean; color?: [number, number, number] },
+    ) => {
+      if (text.length <= maxLineChars) {
+        drawLine(text, options);
+        return;
+      }
+      for (let i = 0; i < text.length; i += maxLineChars) {
+        drawLine(text.slice(i, i + maxLineChars), options);
+      }
+    };
+
+    const drawRowBlock = (
+      title: string,
+      row: ExportRow,
+      headersToShow: string[],
+      labelMap: Map<string, string>,
+    ) => {
+      drawLine("");
+      drawWrappedLine(title, { size: 11, bold: true, color: [0.1, 0.1, 0.1] });
+      headersToShow.forEach((header) => {
+        const label = labelMap.get(header) ?? titleCaseFromKey(header);
+        const value = toExportText(row[header]);
+        drawWrappedLine(`${label}: ${value}`);
+      });
+      drawWrappedLine("------------------------------------------------------------", {
+        color: [0.55, 0.55, 0.55],
+      });
+    };
+
     drawLine(`${moduleKey.toUpperCase()} Export Report`, { size: 16, bold: true });
     drawLine(`Generated: ${formatDateTimeInAppTimeZone(new Date())}`, { size: 9, color: [0.25, 0.25, 0.25] });
     drawLine(`Records: ${rows.length}`, { size: 9, color: [0.25, 0.25, 0.25] });
-    if (moduleKey === "drivers") {
-      const labelMap = new Map(MODULE_EXPORT_FIELDS.drivers.map((field) => [field.key, field.label]));
-      rows.forEach((row, index) => {
-        drawLine("");
-        drawLine(`Driver ${index + 1}`, { size: 11, bold: true });
-        headers.forEach((header) => {
-          const label = labelMap.get(header) ?? titleCaseFromKey(header);
-          const value = row[header] == null || String(row[header]).trim() === "" ? "-" : String(row[header]);
-          const line = `${label}: ${value}`;
-          if (line.length <= maxLineChars) {
-            drawLine(line);
-            return;
-          }
-          for (let i = 0; i < line.length; i += maxLineChars) {
-            drawLine(line.slice(i, i + maxLineChars));
-          }
-        });
-      });
+    const moduleFieldLabels = MODULE_EXPORT_FIELDS[moduleKey] ?? [];
+    const labelMap = new Map(moduleFieldLabels.map((field) => [field.key, field.label]));
+    const prettyModuleName = titleCaseFromKey(moduleKey.replace(/-/g, "_"));
+    const singularModuleName = prettyModuleName.endsWith("s")
+      ? prettyModuleName.slice(0, -1)
+      : prettyModuleName;
+    const recordTitlePrefix = moduleKey === "overall" ? "Module" : singularModuleName;
+
+    if (rows.length === 0) {
+      drawLine("");
+      drawLine("No records found for current filters.");
     } else {
-      drawLine(headers.join(" | "), { size: 8, bold: true });
-      rows.forEach((row) => {
-        const line = headers.map((h) => `${h}: ${row[h] ?? "-"}`).join(" | ");
-        if (line.length <= maxLineChars) {
-          drawLine(line);
-          return;
-        }
-        for (let i = 0; i < line.length; i += maxLineChars) {
-          drawLine(line.slice(i, i + maxLineChars));
-        }
+      rows.forEach((row, index) => {
+        drawRowBlock(`${recordTitlePrefix} ${index + 1}`, row, headers, labelMap);
       });
     }
 
