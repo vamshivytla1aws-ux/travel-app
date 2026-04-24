@@ -79,34 +79,61 @@ export class BusesRepository {
         b.last_service_at
       FROM buses b
       LEFT JOIN (
-        SELECT
-          bus_id,
-          (
-            SUM(odometer_after_km - odometer_before_km) /
-            NULLIF(SUM(liters), 0)
-          )::text AS previous_day_mileage_kmpl
-        FROM (
+        WITH fuel AS (
           SELECT
+            fe.id,
             fe.bus_id,
             fe.odometer_before_km,
             fe.odometer_after_km,
             fe.liters,
-            DATE(fe.filled_at) AS metric_day
+            DATE(fe.filled_at) AS metric_day,
+            fe.filled_at
           FROM fuel_entries fe
           UNION ALL
           SELECT
+            fi.id,
             fi.bus_id,
             fi.odometer_before_km,
             fi.odometer_after_km,
             fi.liters_issued AS liters,
-            fi.issue_date AS metric_day
+            fi.issue_date AS metric_day,
+            (fi.issue_date::text || 'T' || fi.issue_time::text)::timestamp AS filled_at
           FROM fuel_issues fi
-        ) fuel
-        WHERE
-          metric_day = CURRENT_DATE - INTERVAL '1 day'
-          AND odometer_before_km IS NOT NULL
-          AND odometer_after_km IS NOT NULL
-        GROUP BY bus_id
+        ),
+        previous_day AS (
+          SELECT
+            bus_id,
+            (
+              SUM(odometer_after_km - odometer_before_km) /
+              NULLIF(SUM(liters), 0)
+            )::text AS previous_day_mileage_kmpl
+          FROM fuel
+          WHERE
+            metric_day = CURRENT_DATE - INTERVAL '1 day'
+            AND odometer_before_km IS NOT NULL
+            AND odometer_after_km IS NOT NULL
+            AND liters > 0
+          GROUP BY bus_id
+        ),
+        latest_valid AS (
+          SELECT DISTINCT ON (bus_id)
+            bus_id,
+            (
+              (odometer_after_km - odometer_before_km) /
+              NULLIF(liters, 0)
+            )::text AS latest_mileage_kmpl
+          FROM fuel
+          WHERE
+            odometer_before_km IS NOT NULL
+            AND odometer_after_km IS NOT NULL
+            AND liters > 0
+          ORDER BY bus_id, filled_at DESC, id DESC
+        )
+        SELECT
+          COALESCE(previous_day.bus_id, latest_valid.bus_id) AS bus_id,
+          COALESCE(previous_day.previous_day_mileage_kmpl, latest_valid.latest_mileage_kmpl) AS previous_day_mileage_kmpl
+        FROM previous_day
+        FULL OUTER JOIN latest_valid ON latest_valid.bus_id = previous_day.bus_id
       ) pd ON pd.bus_id = b.id
       ${whereSql}
       ORDER BY b.id DESC
@@ -147,34 +174,61 @@ export class BusesRepository {
         b.last_service_at
       FROM buses b
       LEFT JOIN (
-        SELECT
-          bus_id,
-          (
-            SUM(odometer_after_km - odometer_before_km) /
-            NULLIF(SUM(liters), 0)
-          )::text AS previous_day_mileage_kmpl
-        FROM (
+        WITH fuel AS (
           SELECT
+            fe.id,
             fe.bus_id,
             fe.odometer_before_km,
             fe.odometer_after_km,
             fe.liters,
-            DATE(fe.filled_at) AS metric_day
+            DATE(fe.filled_at) AS metric_day,
+            fe.filled_at
           FROM fuel_entries fe
           UNION ALL
           SELECT
+            fi.id,
             fi.bus_id,
             fi.odometer_before_km,
             fi.odometer_after_km,
             fi.liters_issued AS liters,
-            fi.issue_date AS metric_day
+            fi.issue_date AS metric_day,
+            (fi.issue_date::text || 'T' || fi.issue_time::text)::timestamp AS filled_at
           FROM fuel_issues fi
-        ) fuel
-        WHERE
-          metric_day = CURRENT_DATE - INTERVAL '1 day'
-          AND odometer_before_km IS NOT NULL
-          AND odometer_after_km IS NOT NULL
-        GROUP BY bus_id
+        ),
+        previous_day AS (
+          SELECT
+            bus_id,
+            (
+              SUM(odometer_after_km - odometer_before_km) /
+              NULLIF(SUM(liters), 0)
+            )::text AS previous_day_mileage_kmpl
+          FROM fuel
+          WHERE
+            metric_day = CURRENT_DATE - INTERVAL '1 day'
+            AND odometer_before_km IS NOT NULL
+            AND odometer_after_km IS NOT NULL
+            AND liters > 0
+          GROUP BY bus_id
+        ),
+        latest_valid AS (
+          SELECT DISTINCT ON (bus_id)
+            bus_id,
+            (
+              (odometer_after_km - odometer_before_km) /
+              NULLIF(liters, 0)
+            )::text AS latest_mileage_kmpl
+          FROM fuel
+          WHERE
+            odometer_before_km IS NOT NULL
+            AND odometer_after_km IS NOT NULL
+            AND liters > 0
+          ORDER BY bus_id, filled_at DESC, id DESC
+        )
+        SELECT
+          COALESCE(previous_day.bus_id, latest_valid.bus_id) AS bus_id,
+          COALESCE(previous_day.previous_day_mileage_kmpl, latest_valid.latest_mileage_kmpl) AS previous_day_mileage_kmpl
+        FROM previous_day
+        FULL OUTER JOIN latest_valid ON latest_valid.bus_id = previous_day.bus_id
       ) pd ON pd.bus_id = b.id
       ${whereSql}
       ORDER BY b.id DESC
@@ -189,34 +243,61 @@ export class BusesRepository {
               pd.previous_day_mileage_kmpl, b.status, b.last_service_at
        FROM buses b
        LEFT JOIN (
-         SELECT
-           bus_id,
-           (
-             SUM(odometer_after_km - odometer_before_km) /
-             NULLIF(SUM(liters), 0)
-           )::text AS previous_day_mileage_kmpl
-         FROM (
+         WITH fuel AS (
            SELECT
+             fe.id,
              fe.bus_id,
              fe.odometer_before_km,
              fe.odometer_after_km,
              fe.liters,
-             DATE(fe.filled_at) AS metric_day
+             DATE(fe.filled_at) AS metric_day,
+             fe.filled_at
            FROM fuel_entries fe
            UNION ALL
            SELECT
+             fi.id,
              fi.bus_id,
              fi.odometer_before_km,
              fi.odometer_after_km,
              fi.liters_issued AS liters,
-             fi.issue_date AS metric_day
+             fi.issue_date AS metric_day,
+             (fi.issue_date::text || 'T' || fi.issue_time::text)::timestamp AS filled_at
            FROM fuel_issues fi
-         ) fuel
-         WHERE
-           metric_day = CURRENT_DATE - INTERVAL '1 day'
-           AND odometer_before_km IS NOT NULL
-           AND odometer_after_km IS NOT NULL
-         GROUP BY bus_id
+         ),
+         previous_day AS (
+           SELECT
+             bus_id,
+             (
+               SUM(odometer_after_km - odometer_before_km) /
+               NULLIF(SUM(liters), 0)
+             )::text AS previous_day_mileage_kmpl
+           FROM fuel
+           WHERE
+             metric_day = CURRENT_DATE - INTERVAL '1 day'
+             AND odometer_before_km IS NOT NULL
+             AND odometer_after_km IS NOT NULL
+             AND liters > 0
+           GROUP BY bus_id
+         ),
+         latest_valid AS (
+           SELECT DISTINCT ON (bus_id)
+             bus_id,
+             (
+               (odometer_after_km - odometer_before_km) /
+               NULLIF(liters, 0)
+             )::text AS latest_mileage_kmpl
+           FROM fuel
+           WHERE
+             odometer_before_km IS NOT NULL
+             AND odometer_after_km IS NOT NULL
+             AND liters > 0
+           ORDER BY bus_id, filled_at DESC, id DESC
+         )
+         SELECT
+           COALESCE(previous_day.bus_id, latest_valid.bus_id) AS bus_id,
+           COALESCE(previous_day.previous_day_mileage_kmpl, latest_valid.latest_mileage_kmpl) AS previous_day_mileage_kmpl
+         FROM previous_day
+         FULL OUTER JOIN latest_valid ON latest_valid.bus_id = previous_day.bus_id
        ) pd ON pd.bus_id = b.id
        WHERE b.id = $1`,
       [id],

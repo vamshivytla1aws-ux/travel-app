@@ -1,6 +1,7 @@
 import PDFDocument from "pdfkit";
 import { requireApiModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
+import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 
 function fmtDate(value?: string | null) {
   if (!value) return "-";
@@ -316,6 +317,7 @@ async function buildDriverProfilePdf(driverId: number) {
 }
 
 export async function GET(request: Request) {
+  await ensureTransportEnhancements();
   const url = new URL(request.url);
   const type = String(url.searchParams.get("type") ?? "").toLowerCase();
   const id = Number(url.searchParams.get("id") ?? "0");

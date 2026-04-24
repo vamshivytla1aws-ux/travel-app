@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import { requireApiModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { MODULE_EXPORT_FIELDS, type ExportModuleKey } from "@/lib/module-export";
+import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 
 type ExportRow = Record<string, string | number | boolean | null>;
 
@@ -334,6 +335,7 @@ function pickFields(rows: ExportRow[], fields: string[]) {
 }
 
 export async function GET(request: Request) {
+  await ensureTransportEnhancements();
   const url = new URL(request.url);
   const moduleKey = normalizeModule(url.searchParams.get("module") ?? "overall");
   const authModule =
