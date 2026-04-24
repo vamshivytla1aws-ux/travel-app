@@ -427,28 +427,36 @@ async function buildDriverProfilePdf(driverId: number) {
   const photoHeight = 130;
   const photoX = pageWidth - margin - photoWidth;
   const photoY = pageHeight - margin - photoHeight;
+  const headerLeftWidth = photoX - margin - 10;
+  const drawCentered = (
+    text: string,
+    yPos: number,
+    size: number,
+    font: typeof bodyFont,
+    color: [number, number, number],
+  ) => {
+    const textWidth = font.widthOfTextAtSize(text, size);
+    const x = margin + Math.max(0, (headerLeftWidth - textWidth) / 2);
+    page.drawText(text, {
+      x,
+      y: yPos,
+      size,
+      font,
+      color: rgb(...color),
+    });
+  };
 
-  page.drawText("Driver Profile Report", {
-    x: margin,
-    y: pageHeight - margin - 2,
-    size: 18,
-    font: boldFont,
-    color: rgb(0.08, 0.09, 0.11),
-  });
-  page.drawText(`Generated: ${formatDateTimeInAppTimeZone(new Date())}`, {
-    x: margin,
-    y: pageHeight - margin - 18,
-    size: 9,
-    font: bodyFont,
-    color: rgb(0.3, 0.33, 0.4),
-  });
-  page.drawText(`Driver ID: ${driver.id}`, {
-    x: margin,
-    y: pageHeight - margin - 32,
-    size: 9,
-    font: bodyFont,
-    color: rgb(0.3, 0.33, 0.4),
-  });
+  drawCentered("Bio - Data", pageHeight - margin - 4, 16, boldFont, [0.25, 0.28, 0.34]);
+  drawCentered("JAI BHAVANI TRAVELS", pageHeight - margin - 28, 28, boldFont, [0.1, 0.12, 0.18]);
+  drawCentered(
+    "H.No: 11-22 Srinivasanagar, Ramachandrapuram, Sangareddy Dist",
+    pageHeight - margin - 50,
+    10,
+    bodyFont,
+    [0.2, 0.22, 0.27],
+  );
+  drawCentered("Contact no: 9666227227, 9494665519", pageHeight - margin - 64, 12, boldFont, [0.2, 0.22, 0.27]);
+  drawCentered(`Driver ID: ${driver.id}`, pageHeight - margin - 80, 10, bodyFont, [0.3, 0.33, 0.4]);
 
   page.drawRectangle({
     x: photoX,
