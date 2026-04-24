@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { DashboardLiveStats } from "@/components/dashboard/dashboard-live-stats";
+import { DashboardQuickActions } from "@/components/dashboard/dashboard-quick-actions";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
 import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { Gauge } from "lucide-react";
@@ -7,7 +8,7 @@ import { FuelTrendChart } from "@/components/fuel-trend-chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardService } from "@/services/dashboard.service";
 import { FuelTruckService } from "@/services/fuel-truck.service";
-import { requireSession } from "@/lib/auth";
+import { APP_MODULES, requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 import { formatDateTimeInAppTimeZone } from "@/lib/timezone";
 
@@ -15,8 +16,9 @@ const dashboardService = new DashboardService();
 const fuelTruckService = new FuelTruckService();
 
 export default async function DashboardPage() {
-  await requireSession();
+  const session = await requireSession();
   await requireModuleAccess("dashboard");
+  const allowedModules = session.role === "admin" ? [...APP_MODULES] : session.moduleAccess;
   const [data, fuelTruckSummary] = await Promise.all([
     dashboardService.getSummary(),
     fuelTruckService.getSummary(),
@@ -42,6 +44,7 @@ export default async function DashboardPage() {
         <div className="-mt-5 px-1">
           <DashboardLiveStats />
         </div>
+        <DashboardQuickActions allowedModules={allowedModules} />
         <div className="grid gap-4 md:grid-cols-6">
           <Card>
             <CardHeader>

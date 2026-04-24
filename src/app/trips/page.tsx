@@ -5,6 +5,7 @@ import { Timer } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
 import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
+import { FormDirtyGuard } from "@/components/form-dirty-guard";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -158,6 +159,7 @@ export default async function TripsPage(props: Props) {
           </CardHeader>
           <CardContent>
             <form action={editTrip ? updateTrip : createTrip} className="grid gap-3 md:grid-cols-6">
+              <FormDirtyGuard />
               {editTrip ? <input type="hidden" name="tripId" value={editTrip.id} /> : null}
               <div className="grid gap-1">
                 <Label htmlFor="busId">Bus</Label>

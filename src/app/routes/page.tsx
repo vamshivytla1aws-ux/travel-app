@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
 import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
+import { FormDirtyGuard } from "@/components/form-dirty-guard";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -76,14 +77,14 @@ async function createRouteEntry(formData: FormData) {
   const companyFromForm = String(formData.get("companyName") ?? "").trim();
 
   if (!busId || !driverId || !routeName || !assignmentDate) {
-    redirect("/routes?error=Please fill all required fields.");
+    redirect("/routes?create=1&error=Please fill all required fields.");
   }
 
   const bus = await getActiveBus(busId);
-  if (!bus) redirect("/routes?error=Selected bus is not active.");
+  if (!bus) redirect("/routes?create=1&error=Selected bus is not active.");
 
   const driver = await getActiveDriver(driverId);
-  if (!driver) redirect("/routes?error=Selected driver is not active.");
+  if (!driver) redirect("/routes?create=1&error=Selected driver is not active.");
 
   const companyName = companyFromForm || driver.company_name || "Unknown";
   const result = await query<{ id: number }>(
@@ -104,7 +105,8 @@ async function createRouteEntry(formData: FormData) {
   });
 
   revalidatePath("/routes");
-  redirect(`/routes?created=${Date.now()}`);
+  const createAnother = String(formData.get("createAnother") ?? "") === "1";
+  redirect(createAnother ? `/routes?create=1&created=${Date.now()}` : `/routes?created=${Date.now()}`);
 }
 
 async function updateRouteEntry(formData: FormData) {
@@ -442,6 +444,7 @@ export default async function RoutesPage(props: Props) {
             </CardHeader>
             <CardContent>
               <form action={editEntry ? updateRouteEntry : createRouteEntry} className="grid gap-2">
+                <FormDirtyGuard />
                 {editEntry ? <input type="hidden" name="routeId" value={editEntry.id} /> : null}
 
                 <Label htmlFor="busId">Bus Registration No</Label>
@@ -493,6 +496,12 @@ export default async function RoutesPage(props: Props) {
                   ))}
                 </select>
 
+                {!editEntry ? (
+                  <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                    <input type="checkbox" name="createAnother" value="1" />
+                    Save and add next
+                  </label>
+                ) : null}
                 <Button type="submit">{editEntry ? "Update Assignment" : "Create Assignment"}</Button>
               </form>
             </CardContent>

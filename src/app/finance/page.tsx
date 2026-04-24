@@ -71,7 +71,7 @@ async function createLoan(formData: FormData) {
 
   const result = await financeLoansService.createLoan(input, session.id);
   if ("error" in result) {
-    redirect(`/finance?error=${encodeURIComponent(String(result.error))}`);
+    redirect(`/finance?create=1&error=${encodeURIComponent(String(result.error))}`);
   }
 
   await logAuditEvent({
@@ -82,7 +82,8 @@ async function createLoan(formData: FormData) {
     details: { registrationNo: input.registrationNo, loanAccountNumber: input.loanAccountNumber },
   });
   revalidatePath("/finance");
-  redirect(`/finance?created=${Date.now()}`);
+  const createAnother = String(formData.get("createAnother") ?? "") === "1";
+  redirect(createAnother ? `/finance?create=1&created=${Date.now()}` : `/finance?created=${Date.now()}`);
 }
 
 async function deleteLoan(formData: FormData) {
@@ -272,6 +273,7 @@ export default async function FinancePage(props: Props) {
               <FinanceLoanForm
                 action={createLoan}
                 submitLabel="Create Loan"
+                showCreateAnother
                 busOptions={busOptionsResult.rows.map((bus) => ({
                   id: bus.id,
                   busNumber: bus.bus_number,

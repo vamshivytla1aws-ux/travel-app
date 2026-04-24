@@ -5,6 +5,7 @@ import { calculateFinanceDerivedFields, FINANCE_STATUSES, normalizeFinanceStatus
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { FormDirtyGuard } from "@/components/form-dirty-guard";
 import {
   FinanceBusOption,
   FinanceRegistrationSelect,
@@ -39,6 +40,7 @@ type Props = {
   values?: Partial<FinanceLoanFormValues>;
   hiddenFields?: Record<string, string | number>;
   busOptions?: FinanceBusOption[];
+  showCreateAnother?: boolean;
 };
 
 function asNumber(value: string) {
@@ -68,7 +70,14 @@ function inferYearsFromDates(startDate: string, endDate: string): string {
   return years ? String(years) : "";
 }
 
-export function FinanceLoanForm({ action, submitLabel, values, hiddenFields, busOptions = [] }: Props) {
+export function FinanceLoanForm({
+  action,
+  submitLabel,
+  values,
+  hiddenFields,
+  busOptions = [],
+  showCreateAnother = false,
+}: Props) {
   const initialYears = inferYearsFromDates(values?.loanStartDate ?? "", values?.loanEndDate ?? "");
   const [formValues, setFormValues] = useState<FinanceLoanFormValues>({
     registrationNo: values?.registrationNo ?? "",
@@ -155,6 +164,7 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields, bus
 
   return (
     <form action={action} className="grid gap-4">
+      <FormDirtyGuard />
       {hiddenFields
         ? Object.entries(hiddenFields).map(([key, value]) => (
             <input key={key} type="hidden" name={key} value={String(value)} />
@@ -340,6 +350,12 @@ export function FinanceLoanForm({ action, submitLabel, values, hiddenFields, bus
         </div>
       </div>
 
+      {showCreateAnother ? (
+        <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <input type="checkbox" name="createAnother" value="1" />
+          Save and add next
+        </label>
+      ) : null}
       <Button type="submit" disabled={Boolean(dateRangeError)}>{submitLabel}</Button>
     </form>
   );

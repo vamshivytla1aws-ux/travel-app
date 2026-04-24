@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
 import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
+import { FormDirtyGuard } from "@/components/form-dirty-guard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ async function createFuelTruck(formData: FormData) {
   await requireModuleAccess("fuel-truck");
 
   try {
+    const createAnother = String(formData.get("createAnother") ?? "") === "1";
     const truckId = await fuelTruckService.createFuelTruck({
       truckCode: String(formData.get("truckCode") ?? ""),
       truckName: String(formData.get("truckName") ?? ""),
@@ -57,10 +59,10 @@ async function createFuelTruck(formData: FormData) {
       details: { truckCode: String(formData.get("truckCode") ?? "") },
     });
     revalidatePath("/fuel-trucks");
-    redirect(`/fuel-trucks?created=${Date.now()}`);
+    redirect(createAnother ? `/fuel-trucks?action=create&created=${Date.now()}` : `/fuel-trucks?created=${Date.now()}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create fuel tanker";
-    redirect(`/fuel-trucks?error=${encodeURIComponent(message)}`);
+    redirect(`/fuel-trucks?action=create&error=${encodeURIComponent(message)}`);
   }
 }
 
@@ -74,6 +76,7 @@ async function addRefill(formData: FormData) {
     isUploadLikeFile(receiptFile) && receiptFile.size > 0 ? await getUploadedFileBuffer(receiptFile) : null;
 
   try {
+    const createAnother = String(formData.get("createAnother") ?? "") === "1";
     const result = await fuelTruckService.addRefill({
       fuelTruckId: Number(formData.get("fuelTruckId")),
       refillDate: String(formData.get("refillDate") ?? ""),
@@ -112,10 +115,10 @@ async function addRefill(formData: FormData) {
     });
     revalidatePath("/fuel-trucks");
     revalidatePath("/dashboard");
-    redirect(`/fuel-trucks?refilled=${Date.now()}`);
+    redirect(createAnother ? `/fuel-trucks?action=refill&refilled=${Date.now()}` : `/fuel-trucks?refilled=${Date.now()}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to save refill";
-    redirect(`/fuel-trucks?error=${encodeURIComponent(message)}`);
+    redirect(`/fuel-trucks?action=refill&error=${encodeURIComponent(message)}`);
   }
 }
 
@@ -125,9 +128,10 @@ async function addIssue(formData: FormData) {
   await requireModuleAccess("fuel-truck");
 
   try {
+    const createAnother = String(formData.get("createAnother") ?? "") === "1";
     const busId = Number(formData.get("busId"));
     if (!Number.isFinite(busId) || busId <= 0) {
-      redirect(`/fuel-trucks?error=${encodeURIComponent("Please select a bus from the list before saving issue.")}`);
+      redirect(`/fuel-trucks?action=issue&error=${encodeURIComponent("Please select a bus from the list before saving issue.")}`);
     }
     const result = await fuelTruckService.addIssue({
       fuelTruckId: Number(formData.get("fuelTruckId")),
@@ -159,10 +163,10 @@ async function addIssue(formData: FormData) {
     revalidatePath("/fuel-trucks");
     if (busId) revalidatePath(`/buses/${busId}`);
     revalidatePath("/dashboard");
-    redirect(`/fuel-trucks?issued=${Date.now()}`);
+    redirect(createAnother ? `/fuel-trucks?action=issue&issued=${Date.now()}` : `/fuel-trucks?issued=${Date.now()}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to save issue";
-    redirect(`/fuel-trucks?error=${encodeURIComponent(message)}`);
+    redirect(`/fuel-trucks?action=issue&error=${encodeURIComponent(message)}`);
   }
 }
 
@@ -454,6 +458,7 @@ export default async function FuelTrucksPage(props: Props) {
               </CardHeader>
               <CardContent>
                 <form action={createFuelTruck} className="grid gap-2">
+                  <FormDirtyGuard />
                   <p className="text-xs font-medium text-muted-foreground uppercase">Identity</p>
                   <Label htmlFor="truckCode">Truck Code</Label>
                   <Input id="truckCode" name="truckCode" required />
@@ -475,6 +480,10 @@ export default async function FuelTrucksPage(props: Props) {
                   </select>
                   <Label htmlFor="notes">Notes</Label>
                   <Input id="notes" name="notes" />
+                  <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                    <input type="checkbox" name="createAnother" value="1" />
+                    Save and add next
+                  </label>
                   <Button type="submit">Create Fuel Tanker</Button>
                 </form>
               </CardContent>
@@ -495,6 +504,7 @@ export default async function FuelTrucksPage(props: Props) {
               </CardHeader>
               <CardContent>
                 <form action={addRefill} className="grid gap-2">
+                  <FormDirtyGuard />
                   <Label htmlFor="fuelTruckIdRefill">Fuel Tanker</Label>
                   <select id="fuelTruckIdRefill" name="fuelTruckId" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" required>
                     <option value="">Select truck</option>
@@ -532,6 +542,10 @@ export default async function FuelTrucksPage(props: Props) {
                   <Input id="notesRefill" name="notes" />
                   <Label htmlFor="receipt">Receipt (optional)</Label>
                   <Input id="receipt" name="receipt" type="file" />
+                  <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                    <input type="checkbox" name="createAnother" value="1" />
+                    Save and add next
+                  </label>
                   <Button type="submit">Save Refill</Button>
                 </form>
               </CardContent>
@@ -552,6 +566,7 @@ export default async function FuelTrucksPage(props: Props) {
               </CardHeader>
               <CardContent>
                 <form action={addIssue} className="grid gap-2">
+                  <FormDirtyGuard />
                   <Label htmlFor="fuelTruckIdIssue">Fuel Tanker</Label>
                   <select id="fuelTruckIdIssue" name="fuelTruckId" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" required>
                     <option value="">Select truck</option>
@@ -595,6 +610,10 @@ export default async function FuelTrucksPage(props: Props) {
                   <Input id="routeReference" name="routeReference" />
                   <Label htmlFor="remarksIssue">Remarks</Label>
                   <Input id="remarksIssue" name="remarks" />
+                  <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                    <input type="checkbox" name="createAnother" value="1" />
+                    Save and add next
+                  </label>
                   <Button type="submit">Save Issue</Button>
                 </form>
               </CardContent>

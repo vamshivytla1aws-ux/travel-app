@@ -7,6 +7,7 @@ import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { DriverIntakeDefaults, DriverIntakeForm } from "@/components/drivers/driver-intake-form";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
 import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
+import { FormDirtyGuard } from "@/components/form-dirty-guard";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -280,7 +281,7 @@ async function createDriver(formData: FormData) {
   const payload = readDriverPayload({ get: (key) => formData.get(key) as string | null });
   const validation = validateDriverCore(payload.core, payload.profile);
   if (validation) {
-    redirect(`/drivers?error=${validation}`);
+    redirect(`/drivers?create=1&error=${validation}`);
   }
 
   const existing = await query<{ id: number }>(
@@ -291,10 +292,11 @@ async function createDriver(formData: FormData) {
     [payload.core.phone, payload.core.licenseNumber],
   );
   if ((existing.rowCount ?? 0) > 0) {
-    redirect("/drivers?error=duplicate");
+    redirect("/drivers?create=1&error=duplicate");
   }
 
   try {
+    const createAnother = String(formData.get("createAnother") ?? "") === "1";
     const driverId = await withTransaction(async (client) => {
       const created = await client.query<{ id: number }>(
         `INSERT INTO drivers(
@@ -331,11 +333,11 @@ async function createDriver(formData: FormData) {
       details: { phone: payload.core.phone, licenseNumber: payload.core.licenseNumber },
     });
     revalidatePath("/drivers");
-    redirect(`/drivers?created=${Date.now()}`);
+    redirect(createAnother ? `/drivers?create=1&created=${Date.now()}` : `/drivers?created=${Date.now()}`);
   } catch (error) {
     const pgError = error as { code?: string };
     if (pgError?.code === "23505") {
-      redirect("/drivers?error=duplicate_identity");
+      redirect("/drivers?create=1&error=duplicate_identity");
     }
     throw error;
   }
@@ -606,7 +608,12 @@ export default async function DriversPage(props: Props) {
             </CardHeader>
             <CardContent>
               <form action={createDriver} className="space-y-4">
+                <FormDirtyGuard />
                 <DriverIntakeForm defaults={EMPTY_DEFAULTS} buses={busOptions} submitLabel="Save Driver" />
+                <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                  <input type="checkbox" name="createAnother" value="1" />
+                  Save and add next
+                </label>
               </form>
             </CardContent>
           </Card>

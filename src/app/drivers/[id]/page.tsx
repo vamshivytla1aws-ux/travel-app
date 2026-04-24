@@ -5,6 +5,7 @@ import { PoolClient } from "pg";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { DriverIntakeDefaults, DriverIntakeForm } from "@/components/drivers/driver-intake-form";
+import { FormDirtyGuard } from "@/components/form-dirty-guard";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -587,6 +588,7 @@ export default async function DriverProfilePage(props: Props) {
             <CardHeader><CardTitle>Edit Driver Profile</CardTitle></CardHeader>
             <CardContent>
               <form action={updateDriverProfile} className="space-y-4">
+                <FormDirtyGuard />
                 <input type="hidden" name="driverId" value={profile.driver.id} />
                 <DriverIntakeForm defaults={defaults} buses={busOptions} submitLabel="Update Driver" />
               </form>
