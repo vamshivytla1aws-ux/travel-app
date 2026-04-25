@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 import { DriverProfilePayload, readDriverPayload, validateDriverCore } from "@/lib/driver-payload";
-import { getAiScannerEnabled } from "@/lib/app-settings";
+import { getOcrMode } from "@/lib/app-settings";
 import { logAuditEvent } from "@/lib/audit";
 import { ensureDocumentTables, getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
 import { normalizeProfilePhotoMime } from "@/lib/image-mime";
@@ -434,7 +434,7 @@ export default async function DriverProfilePage(props: Props) {
 
   const params = await props.params;
   const searchParams = await props.searchParams;
-  const [profile, buses, aiEnabled] = await Promise.all([
+  const [profile, buses, ocrMode] = await Promise.all([
     driversService.getDriverProfile(Number(params.id)),
     query<{ id: number; bus_number: string; registration_number: string; odometer_km: string }>(
       `SELECT id, bus_number, registration_number, odometer_km::text
@@ -442,7 +442,7 @@ export default async function DriverProfilePage(props: Props) {
        WHERE status = 'active'
        ORDER BY registration_number`,
     ),
-    getAiScannerEnabled(),
+    getOcrMode(),
   ]);
   if (!profile) notFound();
 
@@ -592,7 +592,7 @@ export default async function DriverProfilePage(props: Props) {
               <form action={updateDriverProfile} className="space-y-4">
                 <FormDirtyGuard />
                 <input type="hidden" name="driverId" value={profile.driver.id} />
-              <DriverIntakeForm defaults={defaults} buses={busOptions} aiEnabled={aiEnabled} submitLabel="Update Driver" />
+              <DriverIntakeForm defaults={defaults} buses={busOptions} ocrMode={ocrMode} submitLabel="Update Driver" />
               </form>
             </CardContent>
           </Card>

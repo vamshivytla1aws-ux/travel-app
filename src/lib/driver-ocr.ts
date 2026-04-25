@@ -13,6 +13,12 @@ type OCRExtractionPayload = {
   unmappedText?: unknown;
 };
 
+type OCRResult = {
+  prefill: Partial<Record<DriverIntakeFieldKey, string>>;
+  confidence: Partial<Record<DriverIntakeFieldKey, number>>;
+  unmappedText: string;
+};
+
 const MAX_OCR_FILE_BYTES = 20 * 1024 * 1024;
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -170,7 +176,7 @@ export async function extractDriverIntakeFromScan(input: {
   fileName: string;
   mimeType: string;
   data: Buffer;
-}) {
+}): Promise<OCRResult> {
   if (!ALLOWED_MIME_TYPES.has(input.mimeType.toLowerCase())) {
     throw new Error("Unsupported file format. Use pdf/jpg/jpeg/png/webp.");
   }
@@ -256,3 +262,168 @@ export async function extractDriverIntakeFromScan(input: {
   };
 }
 
+function normalizeFreeText(input: string) {
+  return input
+    .replace(/\r/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function extractLabelValue(text: string, labels: string[]): string {
+  for (const label of labels) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(`${escaped}\\s*[:\\-]?\\s*([^\\n]{2,120})`, "i");
+    const match = text.match(regex);
+    if (match?.[1]) return match[1].trim();
+  }
+  return "";
+}
+
+function extractFirstByRegex(text: string, regex: RegExp): string {
+  const match = text.match(regex);
+  return match?.[1]?.trim() ?? "";
+}
+
+function mapLocalTextToDriverFields(rawText: string): {
+  prefill: Record<string, string>;
+  confidence: Record<string, number>;
+  unmappedText: string;
+} {
+  const text = normalizeFreeText(rawText);
+  const prefill: Record<string, string> = {};
+  const confidence: Record<string, number> = {};
+
+  const mappings: Array<{ key: DriverIntakeFieldKey; labels?: string[]; regex?: RegExp; conf: number }> = [
+    { key: "fullName", labels: ["Driver Name", "Name"], conf: 0.8 },
+    { key: "phone", labels: ["Contact No", "Contact Number", "Mobile"], conf: 0.8 },
+    { key: "bloodGroup", labels: ["Blood Group"], conf: 0.85 },
+    { key: "fatherName", labels: ["Father's Name", "Fathers Name"], conf: 0.85 },
+    { key: "fatherContact", labels: ["Contact Number (Father)", "Father Contact"], conf: 0.8 },
+    { key: "motherName", labels: ["Mother's Name", "Mothers Name"], conf: 0.85 },
+    { key: "motherContact", labels: ["Contact Number (Mother)", "Mother Contact"], conf: 0.8 },
+    { key: "spouseName", labels: ["Spouse Name"], conf: 0.85 },
+    { key: "spouseContact", labels: ["Contact Number (Spouse)", "Spouse Contact"], conf: 0.8 },
+    { key: "child1Name", labels: ["Children's (1)", "Children 1"], conf: 0.75 },
+    { key: "child2Name", labels: ["Children's (2)", "Children 2"], conf: 0.75 },
+    { key: "panOrVoterId", labels: ["PAN Card No / Voter ID", "PAN", "Voter ID"], conf: 0.85 },
+    { key: "aadhaarNo", labels: ["Aadhaar No", "Aadhar No"], conf: 0.9 },
+    { key: "bankAccountNumber", labels: ["Bank Account No"], conf: 0.8 },
+    { key: "bankName", labels: ["Name of the Bank", "Bank Name"], conf: 0.8 },
+    { key: "bankIfsc", labels: ["IFSC No", "IFSC"], conf: 0.85 },
+    { key: "pfAccountNumber", labels: ["PF Account No", "EPF"], conf: 0.75 },
+    { key: "uanNumber", labels: ["UAN No", "UAN"], conf: 0.75 },
+    { key: "esicNumber", labels: ["ESIC No", "ESIC"], conf: 0.75 },
+    { key: "vehicleRegistrationNo", labels: ["Vehicles No", "Vehicle Registration", "Vehicle No"], conf: 0.8 },
+    { key: "presentReadingKm", labels: ["Present Reading"], conf: 0.75 },
+    { key: "licenseNumber", labels: ["Driving License No", "DL No"], conf: 0.9 },
+    { key: "licenseExpiry", labels: ["Validity (DL)", "DL Validity"], conf: 0.85 },
+    { key: "badgeNo", labels: ["Badge No"], conf: 0.85 },
+    { key: "badgeValidity", labels: ["Validity (Badge)", "Badge Validity"], conf: 0.85 },
+    { key: "education", labels: ["Education"], conf: 0.8 },
+    { key: "experienceYears", labels: ["Experience"], conf: 0.75 },
+    { key: "dateOfBirth", labels: ["Date of Birth", "DOB"], conf: 0.85 },
+    { key: "maritalStatus", labels: ["Marital Status"], conf: 0.8 },
+    { key: "religion", labels: ["Religion"], conf: 0.75 },
+    { key: "presentVillage", labels: ["Present Village", "Village"], conf: 0.7 },
+    { key: "presentLandmark", labels: ["Present Land Mark", "Land Mark"], conf: 0.7 },
+    { key: "presentPostOffice", labels: ["Present Post Office", "Post Office"], conf: 0.7 },
+    { key: "presentMandal", labels: ["Present Mandal", "Mandal"], conf: 0.7 },
+    { key: "presentPoliceStation", labels: ["Present Police Station", "Police Station"], conf: 0.7 },
+    { key: "presentDistrict", labels: ["Present District", "District"], conf: 0.7 },
+    { key: "presentState", labels: ["Present State", "State"], conf: 0.7 },
+    { key: "presentPinCode", labels: ["Present Pin Code No", "Pin Code"], conf: 0.7 },
+    { key: "permanentVillage", labels: ["Permanent Village"], conf: 0.7 },
+    { key: "permanentLandmark", labels: ["Permanent Land Mark"], conf: 0.7 },
+    { key: "permanentPostOffice", labels: ["Permanent Post Office"], conf: 0.7 },
+    { key: "permanentMandal", labels: ["Permanent Mandal"], conf: 0.7 },
+    { key: "permanentPoliceStation", labels: ["Permanent Police Station"], conf: 0.7 },
+    { key: "permanentDistrict", labels: ["Permanent District"], conf: 0.7 },
+    { key: "permanentState", labels: ["Permanent State"], conf: 0.7 },
+    { key: "permanentPinCode", labels: ["Permanent Pin Code No"], conf: 0.7 },
+    { key: "reference1Name", labels: ["Reference 1 – Person Name", "Reference 1"], conf: 0.75 },
+    { key: "reference1Relationship", labels: ["Relationship with Person (Ref 1)"], conf: 0.75 },
+    { key: "reference1Contact", labels: ["Contact No (Ref 1)"], conf: 0.75 },
+    { key: "reference2Name", labels: ["Reference 2 – Person Name", "Reference 2"], conf: 0.75 },
+    { key: "reference2Relationship", labels: ["Relationship with Person (Ref 2)"], conf: 0.75 },
+    { key: "reference2Contact", labels: ["Contact No (Ref 2)"], conf: 0.75 },
+    { key: "presentSalary", labels: ["Present Salary"], conf: 0.8 },
+    { key: "salaryExpectation", labels: ["Salary Expectation"], conf: 0.8 },
+    { key: "salaryOffered", labels: ["Salary Offered"], conf: 0.8 },
+    { key: "joiningDate", labels: ["Joining Date"], conf: 0.85 },
+    { key: "candidateSignatureText", labels: ["Candidate Signature / Date", "Candidate Signature"], conf: 0.7 },
+    { key: "appointeeSignatureText", labels: ["Signature of Appointee"], conf: 0.7 },
+    { key: "approvalAuthoritySignatureText", labels: ["Signature of Approval Authority"], conf: 0.7 },
+    { key: "vehicleRegistrationNo", regex: /\b([A-Z]{2}\s?\d{1,2}[A-Z]{1,3}\d{3,4})\b/i, conf: 0.65 },
+    { key: "phone", regex: /\b(\d{10,15})\b/, conf: 0.6 },
+    { key: "aadhaarNo", regex: /\b(\d{12})\b/, conf: 0.6 },
+  ];
+
+  for (const map of mappings) {
+    if (prefill[map.key]) continue;
+    const rawValue = map.labels ? extractLabelValue(text, map.labels) : extractFirstByRegex(text, map.regex!);
+    if (!rawValue) continue;
+    prefill[map.key] = rawValue;
+    confidence[map.key] = map.conf;
+  }
+
+  return {
+    prefill,
+    confidence,
+    unmappedText: text.slice(0, 2000),
+  };
+}
+
+async function extractTextWithNonAiEngine(input: {
+  fileName: string;
+  mimeType: string;
+  data: Buffer;
+}): Promise<string> {
+  const mime = input.mimeType.toLowerCase();
+  if (mime === "application/pdf") {
+    const pdfParseModule = await import("pdf-parse");
+    const pdfParse = (pdfParseModule as { default?: (input: Buffer) => Promise<{ text?: string }> }).default
+      ?? (pdfParseModule as unknown as (input: Buffer) => Promise<{ text?: string }>);
+    const parsed = await pdfParse(input.data);
+    const text = String(parsed.text ?? "").trim();
+    if (text) return text;
+    throw new Error("Non-AI OCR could not read text from this PDF. Try JPG/PNG scan.");
+  }
+
+  const { createWorker } = await import("tesseract.js");
+  const worker = await createWorker("eng");
+  try {
+    const result = await worker.recognize(input.data);
+    return String(result.data?.text ?? "").trim();
+  } finally {
+    await worker.terminate();
+  }
+}
+
+export async function extractDriverIntakeFromScanNonAI(input: {
+  fileName: string;
+  mimeType: string;
+  data: Buffer;
+}): Promise<OCRResult> {
+  if (!ALLOWED_MIME_TYPES.has(input.mimeType.toLowerCase())) {
+    throw new Error("Unsupported file format. Use pdf/jpg/jpeg/png/webp.");
+  }
+  if (input.data.byteLength <= 0) throw new Error("Uploaded file is empty.");
+  if (input.data.byteLength > MAX_OCR_FILE_BYTES) {
+    throw new Error("Uploaded file is too large. Maximum allowed is 20MB.");
+  }
+
+  const rawText = await extractTextWithNonAiEngine(input);
+  if (!rawText) throw new Error("No text was detected by non-AI OCR.");
+
+  const mapped = mapLocalTextToDriverFields(rawText);
+  const prefill = sanitizePrefill(mapped.prefill);
+  const linkedPrefill = await applyBusLinkage(prefill);
+  const confidence = sanitizeConfidence(mapped.confidence);
+
+  return {
+    prefill: linkedPrefill as Partial<Record<DriverIntakeFieldKey, string>>,
+    confidence: confidence as Partial<Record<DriverIntakeFieldKey, number>>,
+    unmappedText: mapped.unmappedText,
+  };
+}

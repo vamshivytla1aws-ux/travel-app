@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BusSearchSelect } from "@/components/fuel-trucks/bus-search-select";
 import { DriverScannerImport } from "@/components/drivers/driver-scanner-import";
+import type { OCRMode } from "@/lib/app-settings";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -86,7 +87,7 @@ export type DriverIntakeDefaults = DriverCoreValues & DriverProfileValues;
 type Props = {
   defaults: DriverIntakeDefaults;
   buses: BusOption[];
-  aiEnabled: boolean;
+  ocrMode: OCRMode;
   submitLabel: string;
 };
 
@@ -94,7 +95,7 @@ function sectionTitle(title: string) {
   return <p className="text-xs font-medium uppercase text-muted-foreground">{title}</p>;
 }
 
-export function DriverIntakeForm({ defaults, buses, aiEnabled, submitLabel }: Props) {
+export function DriverIntakeForm({ defaults, buses, ocrMode, submitLabel }: Props) {
   const [sameAsPresentAddress, setSameAsPresentAddress] = useState(false);
   const [presentAddress, setPresentAddress] = useState({
     village: defaults.presentVillage,
@@ -144,7 +145,7 @@ export function DriverIntakeForm({ defaults, buses, aiEnabled, submitLabel }: Pr
 
   return (
     <div className="space-y-4">
-      <DriverScannerImport aiEnabled={aiEnabled} />
+      <DriverScannerImport ocrMode={ocrMode} />
 
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
         {sectionTitle("Basic")}

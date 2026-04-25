@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusAlert } from "@/components/ui/status-alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getAiScannerEnabled } from "@/lib/app-settings";
+import { getOcrMode } from "@/lib/app-settings";
 import { DriverCorePayload, DriverProfilePayload, readDriverPayload, validateDriverCore } from "@/lib/driver-payload";
 import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
@@ -383,7 +383,7 @@ type Props = {
     pageSize?: string;
     create?: string;
     export?: string;
-    ai?: string;
+    ocr?: string;
   }>;
 };
 
@@ -392,7 +392,7 @@ export default async function DriversPage(props: Props) {
   await requireModuleAccess("drivers");
   await ensureTransportEnhancements();
   const searchParams = await props.searchParams;
-  const [drivers, buses, aiEnabled] = await Promise.all([
+  const [drivers, buses, ocrMode] = await Promise.all([
     driversService.listDrivers(),
     query<{ id: number; bus_number: string; registration_number: string; odometer_km: string }>(
       `SELECT id, bus_number, registration_number, odometer_km::text
@@ -400,7 +400,7 @@ export default async function DriversPage(props: Props) {
        WHERE status = 'active'
        ORDER BY registration_number`,
     ),
-    getAiScannerEnabled(),
+    getOcrMode(),
   ]);
 
   const busOptions = buses.rows.map((bus) => ({
@@ -504,11 +504,14 @@ export default async function DriversPage(props: Props) {
       {searchParams.deleted ? (
         <StatusAlert className="mb-4" tone="warning" message="Driver deleted permanently." />
       ) : null}
-      {searchParams.ai === "enabled" ? (
-        <StatusAlert className="mb-4" tone="success" message="AI is enabled" />
+      {searchParams.ocr === "ai" ? (
+        <StatusAlert className="mb-4" tone="success" message="AI OCR is enabled" />
       ) : null}
-      {searchParams.ai === "disabled" ? (
-        <StatusAlert className="mb-4" tone="warning" message="AI is disabled" />
+      {searchParams.ocr === "non_ai" ? (
+        <StatusAlert className="mb-4" tone="info" message="Non-AI OCR is enabled" />
+      ) : null}
+      {searchParams.ocr === "disabled" ? (
+        <StatusAlert className="mb-4" tone="warning" message="OCR is disabled" />
       ) : null}
       <Card className="border-emerald-200/70 dark:border-emerald-900">
         <CardHeader>
@@ -618,7 +621,7 @@ export default async function DriversPage(props: Props) {
             <CardContent>
               <form action={createDriver} className="space-y-4">
                 <FormDirtyGuard />
-                <DriverIntakeForm defaults={EMPTY_DEFAULTS} buses={busOptions} aiEnabled={aiEnabled} submitLabel="Save Driver" />
+                <DriverIntakeForm defaults={EMPTY_DEFAULTS} buses={busOptions} ocrMode={ocrMode} submitLabel="Save Driver" />
                 <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                   <input type="checkbox" name="createAnother" value="1" />
                   Save and add next

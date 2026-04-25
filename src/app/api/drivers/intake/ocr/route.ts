@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiModuleAccess } from "@/lib/auth";
-import { getAiScannerEnabled } from "@/lib/app-settings";
+import { getOcrMode } from "@/lib/app-settings";
 import { getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
-import { extractDriverIntakeFromScan } from "@/lib/driver-ocr";
+import { extractDriverIntakeFromScan, extractDriverIntakeFromScanNonAI } from "@/lib/driver-ocr";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,9 +12,9 @@ export async function POST(request: NextRequest) {
   const session = await requireApiModuleAccess("drivers");
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   await ensureTransportEnhancements();
-  const aiEnabled = await getAiScannerEnabled();
-  if (!aiEnabled) {
-    return NextResponse.json({ error: "AI is disabled" }, { status: 403 });
+  const mode = await getOcrMode();
+  if (mode === "disabled") {
+    return NextResponse.json({ error: "OCR is disabled" }, { status: 403 });
   }
 
   try {
@@ -25,11 +25,18 @@ export async function POST(request: NextRequest) {
     }
 
     const uploaded = await getUploadedFileBuffer(file);
-    const extracted = await extractDriverIntakeFromScan({
-      fileName: uploaded.fileName,
-      mimeType: uploaded.mimeType,
-      data: uploaded.data,
-    });
+    const extracted =
+      mode === "ai"
+        ? await extractDriverIntakeFromScan({
+            fileName: uploaded.fileName,
+            mimeType: uploaded.mimeType,
+            data: uploaded.data,
+          })
+        : await extractDriverIntakeFromScanNonAI({
+            fileName: uploaded.fileName,
+            mimeType: uploaded.mimeType,
+            data: uploaded.data,
+          });
     return NextResponse.json(extracted);
   } catch (error) {
     console.error("Driver OCR intake failed", error);

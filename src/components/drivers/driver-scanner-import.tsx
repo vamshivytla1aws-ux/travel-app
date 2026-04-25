@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { Upload, WandSparkles, X } from "lucide-react";
+import type { OCRMode } from "@/lib/app-settings";
 import { DRIVER_REQUIRED_FIELDS, DRIVER_SECTION_FIELDS, type DriverIntakeFieldKey } from "@/lib/driver-intake-schema";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,7 +36,7 @@ function toPercent(value?: number) {
   return `${Math.round(value * 100)}%`;
 }
 
-export function DriverScannerImport({ aiEnabled }: { aiEnabled: boolean }) {
+export function DriverScannerImport({ ocrMode }: { ocrMode: OCRMode }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -166,20 +167,25 @@ export function DriverScannerImport({ aiEnabled }: { aiEnabled: boolean }) {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger
             render={
-              <Button type="button" variant="outline" size="sm" className="gap-2" disabled={!aiEnabled}>
+              <Button type="button" variant="outline" size="sm" className="gap-2">
                 <Upload className="h-4 w-4" />
-                Import Scanner
+                Import & Auto Fill
               </Button>
             }
           />
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Import Scanner (PDF/JPG)</DialogTitle>
+              <DialogTitle>Import & Auto Fill (PDF/JPG)</DialogTitle>
               <DialogDescription>
                 Upload one scanner document. We extract fields and prefill this form for your review.
               </DialogDescription>
             </DialogHeader>
             <form className="space-y-3" onSubmit={onExtract}>
+              {ocrMode === "disabled" ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
+                  OCR is disabled. Contact admin to enable AI OCR or Non-AI OCR.
+                </div>
+              ) : null}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -222,7 +228,7 @@ export function DriverScannerImport({ aiEnabled }: { aiEnabled: boolean }) {
                 </div>
               ) : null}
               <DialogFooter className="mt-3" showCloseButton>
-                <Button type="submit" disabled={loading} className="gap-2">
+                <Button type="submit" disabled={loading || ocrMode === "disabled"} className="gap-2">
                   <WandSparkles className="h-4 w-4" />
                   {loading ? "Extracting..." : "Extract & Prefill"}
                 </Button>
@@ -238,10 +244,10 @@ export function DriverScannerImport({ aiEnabled }: { aiEnabled: boolean }) {
           </DialogContent>
         </Dialog>
       </div>
-      <p className={`mt-1 text-xs ${aiEnabled ? "text-emerald-700" : "text-amber-700"}`}>
-        {aiEnabled ? "AI is enabled" : "AI is disabled"}
+      <p className={`mt-1 text-xs ${ocrMode === "disabled" ? "text-amber-700" : "text-emerald-700"}`}>
+        {ocrMode === "ai" ? "AI is enabled" : ocrMode === "non_ai" ? "Non-AI OCR is enabled" : "OCR is disabled"}
       </p>
-      {aiEnabled ? (
+      {ocrMode !== "disabled" ? (
         <p className="mt-1 text-xs text-muted-foreground">
           Low-confidence extracted fields are highlighted in the form. Please review before save.
         </p>
