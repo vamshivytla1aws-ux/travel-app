@@ -24,6 +24,13 @@ type OCRResponse = {
 
 const LOW_CONFIDENCE_THRESHOLD = 0.65;
 const HIGHLIGHT_CLASS_NAMES = ["ring-2", "ring-amber-300", "bg-amber-50"];
+const DRIVER_FIELD_LABELS: Partial<Record<DriverIntakeFieldKey, string>> = {
+  fullName: "Driver Name",
+  phone: "Contact No",
+  licenseNumber: "Driving License No",
+  licenseExpiry: "Validity (DL)",
+  joiningDate: "Joining Date",
+};
 
 function getFieldElement(form: HTMLFormElement, field: DriverIntakeFieldKey) {
   return form.querySelector(
@@ -55,6 +62,10 @@ export function DriverScannerImport({ ocrMode, canUseOcr }: { ocrMode: OCRMode; 
     const prefill = lastExtracted?.prefill ?? {};
     return DRIVER_REQUIRED_FIELDS.filter((field) => !String(prefill[field] ?? "").trim());
   }, [lastExtracted]);
+  const missingRequiredLabels = useMemo(
+    () => missingRequiredFields.map((field) => DRIVER_FIELD_LABELS[field] ?? field),
+    [missingRequiredFields],
+  );
 
   const sectionScores = useMemo(() => {
     const confidence = lastExtracted?.confidence ?? {};
@@ -217,7 +228,7 @@ export function DriverScannerImport({ ocrMode, canUseOcr }: { ocrMode: OCRMode; 
                   </div>
                   {missingRequiredFields.length > 0 ? (
                     <p className="text-xs text-amber-700">
-                      Missing required fields: {missingRequiredFields.join(", ")}
+                      Missing required fields: {missingRequiredLabels.join(", ")}
                     </p>
                   ) : (
                     <p className="text-xs text-emerald-700">All required fields were detected.</p>
