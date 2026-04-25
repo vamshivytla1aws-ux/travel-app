@@ -1,6 +1,6 @@
- "use client";
+"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BusSearchSelect } from "@/components/fuel-trucks/bus-search-select";
 import { DriverScannerImport } from "@/components/drivers/driver-scanner-import";
 import type { OCRMode } from "@/lib/app-settings";
@@ -105,6 +105,32 @@ export function DriverIntakeForm({
   submitLabel,
   showProfilePhotoUpload = true,
 }: Props) {
+  const defaultAppointeeSignature = defaults.appointeeSignatureText || "Mallikarjun PVV";
+  const defaultApprovalSignature = defaults.approvalAuthoritySignatureText || "Bharath Reddy Kasula";
+  const defaultCandidateSignature = defaults.candidateSignatureText || defaults.fullName || "";
+  const defaultCandidateSignatureDate = defaults.candidateSignatureDate || defaults.joiningDate || "";
+
+  const [fullName, setFullName] = useState(defaults.fullName);
+  const [joiningDate, setJoiningDate] = useState(defaults.joiningDate);
+  const [candidateSignatureText, setCandidateSignatureText] = useState(defaultCandidateSignature);
+  const [candidateSignatureDate, setCandidateSignatureDate] = useState(defaultCandidateSignatureDate);
+  const [appointeeSignatureText, setAppointeeSignatureText] = useState(defaultAppointeeSignature);
+  const [approvalAuthoritySignatureText, setApprovalAuthoritySignatureText] = useState(defaultApprovalSignature);
+  const [candidateSignatureTouched, setCandidateSignatureTouched] = useState(Boolean(defaults.candidateSignatureText));
+  const [candidateSignatureDateTouched, setCandidateSignatureDateTouched] = useState(Boolean(defaults.candidateSignatureDate));
+
+  useEffect(() => {
+    if (!candidateSignatureTouched) {
+      setCandidateSignatureText(fullName);
+    }
+  }, [fullName, candidateSignatureTouched]);
+
+  useEffect(() => {
+    if (!candidateSignatureDateTouched) {
+      setCandidateSignatureDate(joiningDate);
+    }
+  }, [joiningDate, candidateSignatureDateTouched]);
+
   const [sameAsPresentAddress, setSameAsPresentAddress] = useState(false);
   const [presentAddress, setPresentAddress] = useState({
     village: defaults.presentVillage,
@@ -163,7 +189,7 @@ export function DriverIntakeForm({
         {sectionTitle("Basic")}
         <div className="grid gap-1">
           <Label htmlFor="fullName">Driver Name</Label>
-          <Input id="fullName" name="fullName" defaultValue={defaults.fullName} required />
+          <Input id="fullName" name="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
         </div>
         <div className="grid gap-1">
           <Label htmlFor="phone">Contact No</Label>
@@ -317,11 +343,11 @@ export function DriverIntakeForm({
 
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-4">
         {sectionTitle("Final Section")}
-        <div className="grid gap-1"><Label htmlFor="joiningDate">Joining Date</Label><Input id="joiningDate" name="joiningDate" type="date" defaultValue={defaults.joiningDate} required /></div>
-        <div className="grid gap-1"><Label htmlFor="candidateSignatureText">Candidate Signature / Name</Label><Input id="candidateSignatureText" name="candidateSignatureText" defaultValue={defaults.candidateSignatureText} /></div>
-        <div className="grid gap-1"><Label htmlFor="candidateSignatureDate">Candidate Signature Date</Label><Input id="candidateSignatureDate" name="candidateSignatureDate" type="date" defaultValue={defaults.candidateSignatureDate} /></div>
-        <div className="grid gap-1"><Label htmlFor="appointeeSignatureText">Signature of Appointee</Label><Input id="appointeeSignatureText" name="appointeeSignatureText" defaultValue={defaults.appointeeSignatureText} /></div>
-        <div className="grid gap-1"><Label htmlFor="approvalAuthoritySignatureText">Signature of Approval Authority</Label><Input id="approvalAuthoritySignatureText" name="approvalAuthoritySignatureText" defaultValue={defaults.approvalAuthoritySignatureText} /></div>
+        <div className="grid gap-1"><Label htmlFor="joiningDate">Joining Date</Label><Input id="joiningDate" name="joiningDate" type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} required /></div>
+        <div className="grid gap-1"><Label htmlFor="candidateSignatureText">Candidate Signature / Name</Label><Input id="candidateSignatureText" name="candidateSignatureText" value={candidateSignatureText} onChange={(e) => { setCandidateSignatureTouched(true); setCandidateSignatureText(e.target.value); }} /></div>
+        <div className="grid gap-1"><Label htmlFor="candidateSignatureDate">Candidate Signature Date</Label><Input id="candidateSignatureDate" name="candidateSignatureDate" type="date" value={candidateSignatureDate} onChange={(e) => { setCandidateSignatureDateTouched(true); setCandidateSignatureDate(e.target.value); }} /></div>
+        <div className="grid gap-1"><Label htmlFor="appointeeSignatureText">Signature of Appointee</Label><Input id="appointeeSignatureText" name="appointeeSignatureText" value={appointeeSignatureText} onChange={(e) => setAppointeeSignatureText(e.target.value)} /></div>
+        <div className="grid gap-1"><Label htmlFor="approvalAuthoritySignatureText">Signature of Approval Authority</Label><Input id="approvalAuthoritySignatureText" name="approvalAuthoritySignatureText" value={approvalAuthoritySignatureText} onChange={(e) => setApprovalAuthoritySignatureText(e.target.value)} /></div>
       </div>
 
       <button className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground">{submitLabel}</button>
