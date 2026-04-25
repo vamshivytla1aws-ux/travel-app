@@ -381,13 +381,29 @@ async function extractTextWithNonAiEngine(input: {
 }): Promise<string> {
   const mime = input.mimeType.toLowerCase();
   if (mime === "application/pdf") {
-    const pdfParseModule = await import("pdf-parse");
-    const pdfParse = (pdfParseModule as { default?: (input: Buffer) => Promise<{ text?: string }> }).default
-      ?? (pdfParseModule as unknown as (input: Buffer) => Promise<{ text?: string }>);
-    const parsed = await pdfParse(input.data);
-    const text = String(parsed.text ?? "").trim();
-    if (text) return text;
-    throw new Error("Non-AI OCR could not read text from this PDF. Try JPG/PNG scan.");
+    // Avoid browser-dependent PDF parsers in Node server runtime (DOMMatrix errors on some hosts).
+    // Best-effort text extraction from PDF content streams for text-based PDFs only.
+    const latin = input.data.toString("latin1");
+    const tokens: string[] = [];
+    const re = /\(([^)]{2,})\)\s*Tj|\[([\s\S]*?)\]\s*TJ/gm;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(latin)) !== null) {
+      if (match[1]) {
+        tokens.push(match[1]);
+      } else if (match[2]) {
+        const nested = match[2].match(/\(([^)]{1,})\)/g) ?? [];
+        nested.forEach((chunk) => tokens.push(chunk.slice(1, -1)));
+      }
+    }
+    const text = tokens
+      .join(" ")
+      .replace(/\\[nrtbf()\\]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (text.length >= 20) return text;
+    throw new Error(
+      "Non-AI OCR cannot reliably read this PDF scan. Upload JPG/PNG image or switch OCR mode to AI OCR for PDF.",
+    );
   }
 
   const { createWorker } = await import("tesseract.js");
