@@ -17,6 +17,9 @@ type OCRResult = {
   prefill: Partial<Record<DriverIntakeFieldKey, string>>;
   confidence: Partial<Record<DriverIntakeFieldKey, number>>;
   unmappedText: string;
+  profilePhotoDataUrl?: string;
+  profilePhotoName?: string;
+  profilePhotoMime?: string;
 };
 
 const MAX_OCR_FILE_BYTES = 20 * 1024 * 1024;
@@ -122,6 +125,87 @@ function getResponseOutputText(payload: Record<string, unknown>): string {
     }
   }
   return "";
+}
+
+function normalizeImageMime(mime: string) {
+  const value = mime.trim().toLowerCase();
+  if (value === "image/jpg") return "image/jpeg";
+  if (value === "image/jpeg" || value === "image/png" || value === "image/webp") return value;
+  return "image/jpeg";
+}
+
+type OCRPhotoPayload = {
+  profilePhotoBase64?: unknown;
+  profilePhotoMime?: unknown;
+};
+
+function parseAiPhotoJson(text: string): { dataUrl: string | null; mimeType: string } {
+  let parsed: OCRPhotoPayload = {};
+  try {
+    parsed = JSON.parse(stripJsonFence(text)) as OCRPhotoPayload;
+  } catch {
+    return { dataUrl: null, mimeType: "image/jpeg" };
+  }
+  const base64 = String(parsed.profilePhotoBase64 ?? "").trim();
+  const mimeType = normalizeImageMime(String(parsed.profilePhotoMime ?? "image/jpeg"));
+  if (!base64) return { dataUrl: null, mimeType };
+  const cleaned = base64.replace(/\s+/g, "");
+  if (!/^[A-Za-z0-9+/=]+$/.test(cleaned)) return { dataUrl: null, mimeType };
+  return { dataUrl: `data:${mimeType};base64,${cleaned}`, mimeType };
+}
+
+async function extractProfilePhotoFromScanWithAI(input: {
+  fileName: string;
+  mimeType: string;
+  data: Buffer;
+}) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return { dataUrl: null as string | null, mimeType: "image/jpeg" };
+
+  const model = process.env.OPENAI_OCR_MODEL || "gpt-4.1-mini";
+  const base64Data = input.data.toString("base64");
+  const contentItem =
+    input.mimeType.toLowerCase() === "application/pdf"
+      ? {
+          type: "input_file",
+          filename: input.fileName || "driver-scan.pdf",
+          file_data: `data:application/pdf;base64,${base64Data}`,
+        }
+      : {
+          type: "input_image",
+          image_url: `data:${input.mimeType};base64,${base64Data}`,
+        };
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0,
+      input: [
+        {
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text:
+                "Extract only the candidate/profile photo from this scanned form/document. Return STRICT JSON only: {\"profilePhotoBase64\":\"...\",\"profilePhotoMime\":\"image/jpeg\"}. If no clear candidate photo exists, return empty base64. Do not include markdown.",
+            },
+          ],
+        },
+        { role: "user", content: [contentItem] },
+      ],
+    }),
+  });
+
+  if (!response.ok) return { dataUrl: null as string | null, mimeType: "image/jpeg" };
+  const payload = (await response.json()) as Record<string, unknown>;
+  const outputText = getResponseOutputText(payload);
+  if (!outputText) return { dataUrl: null as string | null, mimeType: "image/jpeg" };
+  return parseAiPhotoJson(outputText);
 }
 
 async function applyBusLinkage(prefill: Record<string, string>) {
@@ -254,11 +338,15 @@ export async function extractDriverIntakeFromScan(input: {
   );
   const unmappedText =
     typeof parsed.unmappedText === "string" ? parsed.unmappedText.trim() : "";
+  const aiPhoto = await extractProfilePhotoFromScanWithAI(input);
 
   return {
     prefill: linkedPrefill as Partial<Record<DriverIntakeFieldKey, string>>,
     confidence: confidence as Partial<Record<DriverIntakeFieldKey, number>>,
     unmappedText,
+    profilePhotoDataUrl: aiPhoto.dataUrl ?? undefined,
+    profilePhotoName: aiPhoto.dataUrl ? `${input.fileName || "driver-scan"}-profile.jpg` : undefined,
+    profilePhotoMime: aiPhoto.mimeType,
   };
 }
 

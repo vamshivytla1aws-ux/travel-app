@@ -19,6 +19,9 @@ type OCRResponse = {
   prefill?: Partial<Record<DriverIntakeFieldKey, string>>;
   confidence?: Partial<Record<DriverIntakeFieldKey, number>>;
   unmappedText?: string;
+  profilePhotoDataUrl?: string;
+  profilePhotoName?: string;
+  profilePhotoMime?: string;
   error?: string;
 };
 
@@ -204,7 +207,11 @@ export function DriverScannerImport({ ocrMode, canUseOcr }: { ocrMode: OCRMode; 
         return;
       }
       setLastExtracted(data);
-      if (parentForm && file.type.startsWith("image/")) {
+      if (parentForm && data.profilePhotoDataUrl) {
+        setHiddenControlValue(parentForm, "ocrProfilePhotoDataUrl", data.profilePhotoDataUrl);
+        setHiddenControlValue(parentForm, "ocrProfilePhotoName", data.profilePhotoName || file.name || "scanner-photo.jpg");
+        setHiddenControlValue(parentForm, "ocrProfilePhotoMime", data.profilePhotoMime || "image/jpeg");
+      } else if (parentForm && file.type.startsWith("image/")) {
         const dataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result ?? ""));
