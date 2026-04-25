@@ -25,6 +25,14 @@ import { DriversService } from "@/services/drivers.service";
 const driversService = new DriversService();
 const MAX_PROFILE_PHOTO_BYTES = 15 * 1024 * 1024;
 
+function toTitleCase(value: string | null | undefined) {
+  const text = String(value ?? "").trim();
+  if (!text) return "-";
+  return text
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (c) => c.toUpperCase());
+}
+
 function sectionRow(label: string, value: string | null | undefined) {
   return (
     <p>
@@ -533,7 +541,7 @@ export default async function DriverProfilePage(props: Props) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <ProfileAvatar name={profile.driver.full_name} src={profile.driver.has_profile_photo ? `/api/profile-photo/driver/${profile.driver.id}` : null} />
-            <h2 className="text-2xl font-semibold">{profile.driver.full_name}</h2>
+            <h2 className="text-2xl font-semibold">{toTitleCase(profile.driver.full_name)}</h2>
           </div>
           <div className="flex items-center gap-3">
             <a

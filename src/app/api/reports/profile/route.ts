@@ -562,10 +562,10 @@ async function buildDriverProfilePdf(driverId: number) {
   const pageWidth = 595;
   const pageHeight = 842;
   const margin = 20;
-  const sectionHeaderHeight = 12;
-  const rowHeight = 16;
-  const labelSize = 6;
-  const valueSize = 7;
+  const sectionHeaderHeight = 14;
+  const rowHeight = 20;
+  const labelSize = 7;
+  const valueSize = 8;
   const sectionGap = 2;
   const colGap = 8;
   const contentWidth = pageWidth - margin * 2;
@@ -600,7 +600,7 @@ async function buildDriverProfilePdf(driverId: number) {
     });
     page.drawText(title, {
       x: margin + 6,
-      y: y - sectionHeaderHeight + 4,
+      y: y - sectionHeaderHeight + 5,
       size: 8,
       font: boldFont,
       color: rgb(0.1, 0.2, 0.45),
@@ -615,8 +615,8 @@ async function buildDriverProfilePdf(driverId: number) {
       const x = margin + i * (colWidth + colGap);
       if (!field) {
         page.drawLine({
-          start: { x, y: y - 13 },
-          end: { x: x + colWidth, y: y - 13 },
+          start: { x, y: y - 19 },
+          end: { x: x + colWidth, y: y - 19 },
           thickness: 0.6,
           color: rgb(0.8, 0.82, 0.86),
         });
@@ -624,21 +624,21 @@ async function buildDriverProfilePdf(driverId: number) {
       }
       page.drawText(field.label, {
         x,
-        y: y - 7,
+        y: y - 8,
         size: labelSize,
         font: boldFont,
         color: rgb(0.32, 0.36, 0.44),
       });
       page.drawText(fitText(field.value), {
         x,
-        y: y - 11,
+        y: y - 15,
         size: valueSize,
         font: bodyFont,
         color: rgb(0.08, 0.09, 0.11),
       });
       page.drawLine({
-        start: { x, y: y - 13 },
-        end: { x: x + colWidth, y: y - 13 },
+        start: { x, y: y - 19 },
+        end: { x: x + colWidth, y: y - 19 },
         thickness: 0.6,
         color: rgb(0.7, 0.74, 0.82),
       });

@@ -29,6 +29,14 @@ const driversService = new DriversService();
 const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 50, 100] as const;
 const MAX_PROFILE_PHOTO_BYTES = 15 * 1024 * 1024;
 
+function toTitleCase(value: string | null | undefined) {
+  const text = String(value ?? "").trim();
+  if (!text) return "-";
+  return text
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (c) => c.toUpperCase());
+}
+
 function withParams(
   base: Record<string, string | undefined>,
   updates: Record<string, string | undefined>,
@@ -614,9 +622,9 @@ export default async function DriversPage(props: Props) {
               {visibleDrivers.map((driver, index) => (
                 <TableRow key={driver.id}>
                   <TableCell>{startIndex + index + 1}</TableCell>
-                  <TableCell><Link className="text-blue-600 hover:underline" href={`/drivers/${driver.id}`}>{driver.fullName}</Link></TableCell>
+                  <TableCell><Link className="text-blue-600 hover:underline" href={`/drivers/${driver.id}`}>{toTitleCase(driver.fullName)}</Link></TableCell>
                   <TableCell>{driver.phone}</TableCell>
-                  <TableCell>{driver.companyName ?? "-"}</TableCell>
+                  <TableCell>{toTitleCase(driver.companyName)}</TableCell>
                   <TableCell>{driver.licenseNumber}</TableCell>
                   <TableCell className="text-right">
                     <form action={deleteDriver}>
