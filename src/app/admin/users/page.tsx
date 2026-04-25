@@ -26,6 +26,10 @@ function parseModuleAccessFromFormData(formData: FormData): (typeof APP_MODULES)
   return unique as (typeof APP_MODULES)[number][];
 }
 
+function parseOcrAccessFromFormData(formData: FormData): boolean {
+  return String(formData.get("canUseOcr") ?? "") === "1";
+}
+
 async function createUser(formData: FormData) {
   "use server";
   const session = await requireAdminSession();
@@ -37,16 +41,17 @@ async function createUser(formData: FormData) {
   const password = String(formData.get("password"));
   const role = String(formData.get("role")) as "admin" | "dispatcher" | "fuel_manager" | "viewer" | "updater";
   const moduleAccess = parseModuleAccessFromFormData(formData);
+  const canUseOcr = role === "admin" ? true : parseOcrAccessFromFormData(formData);
 
   const existing = await query<{ id: number }>(`SELECT id FROM users WHERE email = $1 LIMIT 1`, [email]);
   if ((existing.rowCount ?? 0) > 0) redirect("/admin/users?error=duplicate");
 
   const passwordHash = await bcrypt.hash(password, 10);
   const result = await query<{ id: number }>(
-    `INSERT INTO users(full_name, email, password_hash, role, module_access)
-     VALUES($1,$2,$3,$4,$5)
+    `INSERT INTO users(full_name, email, password_hash, role, module_access, can_use_ocr)
+     VALUES($1,$2,$3,$4,$5,$6)
      RETURNING id`,
-    [fullName, email, passwordHash, role, role === "admin" ? [...APP_MODULES] : moduleAccess],
+    [fullName, email, passwordHash, role, role === "admin" ? [...APP_MODULES] : moduleAccess, canUseOcr],
   );
 
   await logAuditEvent({
@@ -70,14 +75,16 @@ async function updateUserAccess(formData: FormData) {
   const userId = Number(formData.get("userId"));
   const role = String(formData.get("role")) as "admin" | "dispatcher" | "fuel_manager" | "viewer" | "updater";
   const moduleAccess = parseModuleAccessFromFormData(formData);
+  const canUseOcr = role === "admin" ? true : parseOcrAccessFromFormData(formData);
   if (!userId) return;
   if (userId === session.id && role !== "admin") {
     redirect("/admin/users?error=self-demote");
   }
 
-  await query(`UPDATE users SET role = $1, module_access = $2, updated_at = NOW() WHERE id = $3`, [
+  await query(`UPDATE users SET role = $1, module_access = $2, can_use_ocr = $3, updated_at = NOW() WHERE id = $4`, [
     role,
     role === "admin" ? [...APP_MODULES] : moduleAccess,
+    canUseOcr,
     userId,
   ]);
   await logAuditEvent({
@@ -85,7 +92,7 @@ async function updateUserAccess(formData: FormData) {
     action: "update",
     entityType: "user_access",
     entityId: userId,
-    details: { role, moduleAccess },
+    details: { role, moduleAccess, canUseOcr },
   });
   revalidatePath("/admin/users");
   redirect(`/admin/users?updated=${Date.now()}`);
@@ -171,9 +178,9 @@ async function updateAiScannerSetting(formData: FormData) {
   await ensureTransportEnhancements();
   const nextMode = String(formData.get("ocrMode")) as OCRMode;
   const ocrMode: OCRMode =
-    nextMode === "ai" || nextMode === "non_ai" || nextMode === "disabled"
+    nextMode === "ai" || nextMode === "non_ai"
       ? nextMode
-      : "disabled";
+      : "non_ai";
   await setOcrMode(ocrMode);
   await logAuditEvent({
     session,
@@ -203,7 +210,8 @@ export default async function UsersAdminPage(props: Props) {
     role: string;
     module_access: string[] | null;
     is_active: boolean;
-    }>(`SELECT id, full_name, email, role::text, module_access, is_active FROM users ORDER BY id DESC`),
+    can_use_ocr: boolean;
+    }>(`SELECT id, full_name, email, role::text, module_access, is_active, COALESCE(can_use_ocr, false) AS can_use_ocr FROM users ORDER BY id DESC`),
     getOcrMode(),
   ]);
   const editableModules = APP_MODULES.filter((module) => module !== "user-admin");
@@ -240,7 +248,6 @@ export default async function UsersAdminPage(props: Props) {
       {searchParams.deleted ? <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">User deleted permanently.</div> : null}
       {searchParams.ocr === "ai" ? <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">AI OCR is enabled</div> : null}
       {searchParams.ocr === "non_ai" ? <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">Non-AI OCR is enabled</div> : null}
-      {searchParams.ocr === "disabled" ? <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">OCR is disabled</div> : null}
       <Card className="mb-4">
         <CardHeader><CardTitle>AI Controls</CardTitle></CardHeader>
         <CardContent>
@@ -248,7 +255,7 @@ export default async function UsersAdminPage(props: Props) {
             <p className="text-sm text-muted-foreground">
               Driver Scanner OCR mode:{" "}
               <span className="font-semibold">
-                {ocrMode === "ai" ? "AI OCR" : ocrMode === "non_ai" ? "Non-AI OCR" : "Disabled"}
+                {ocrMode === "ai" ? "AI OCR" : "Non-AI OCR"}
               </span>
             </p>
             <select
@@ -256,7 +263,6 @@ export default async function UsersAdminPage(props: Props) {
               defaultValue={ocrMode}
               className="h-9 rounded-md border border-input bg-background px-3 text-sm"
             >
-              <option value="disabled">Disabled</option>
               <option value="ai">AI OCR</option>
               <option value="non_ai">Non-AI OCR</option>
             </select>
@@ -289,6 +295,9 @@ export default async function UsersAdminPage(props: Props) {
                 ))}
                 <label className="flex items-center gap-2">
                   <input type="checkbox" name="moduleAccess" value="logs" /> logs
+                </label>
+                <label className="flex items-center gap-2 border-t pt-2 font-medium">
+                  <input type="checkbox" name="canUseOcr" value="1" /> OCR Import Access
                 </label>
               </div>
               <button className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground">Create User</button>
@@ -336,6 +345,15 @@ export default async function UsersAdminPage(props: Props) {
                               </label>
                             ))}
                           </div>
+                          <label className="flex items-center gap-2 text-xs">
+                            <input
+                              type="checkbox"
+                              name="canUseOcr"
+                              value="1"
+                              defaultChecked={user.role === "admin" || user.can_use_ocr}
+                            />
+                            OCR Import Access
+                          </label>
                           <button className="h-8 rounded bg-primary px-2 text-xs text-primary-foreground">Update Access</button>
                         </form>
                         <form action={deleteUser}>

@@ -36,7 +36,7 @@ function toPercent(value?: number) {
   return `${Math.round(value * 100)}%`;
 }
 
-export function DriverScannerImport({ ocrMode }: { ocrMode: OCRMode }) {
+export function DriverScannerImport({ ocrMode, canUseOcr }: { ocrMode: OCRMode; canUseOcr: boolean }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -181,11 +181,18 @@ export function DriverScannerImport({ ocrMode }: { ocrMode: OCRMode }) {
               </DialogDescription>
             </DialogHeader>
             <form className="space-y-3" onSubmit={onExtract}>
-              {ocrMode === "disabled" ? (
+              {!canUseOcr ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
-                  OCR is disabled. Contact admin to enable AI OCR or Non-AI OCR.
+                  OCR access is not granted for your account. Contact admin.
                 </div>
               ) : null}
+              {!canUseOcr ? null : (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
+                  {ocrMode === "ai"
+                    ? "AI OCR mode is active."
+                    : "AI is disabled. Non-AI OCR mode is active."}
+                </div>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -228,7 +235,7 @@ export function DriverScannerImport({ ocrMode }: { ocrMode: OCRMode }) {
                 </div>
               ) : null}
               <DialogFooter className="mt-3" showCloseButton>
-                <Button type="submit" disabled={loading || ocrMode === "disabled"} className="gap-2">
+                <Button type="submit" disabled={loading || !canUseOcr} className="gap-2">
                   <WandSparkles className="h-4 w-4" />
                   {loading ? "Extracting..." : "Extract & Prefill"}
                 </Button>
@@ -244,10 +251,14 @@ export function DriverScannerImport({ ocrMode }: { ocrMode: OCRMode }) {
           </DialogContent>
         </Dialog>
       </div>
-      <p className={`mt-1 text-xs ${ocrMode === "disabled" ? "text-amber-700" : "text-emerald-700"}`}>
-        {ocrMode === "ai" ? "AI is enabled" : ocrMode === "non_ai" ? "Non-AI OCR is enabled" : "OCR is disabled"}
+      <p className={`mt-1 text-xs ${canUseOcr ? "text-emerald-700" : "text-amber-700"}`}>
+        {canUseOcr
+          ? ocrMode === "ai"
+            ? "AI is enabled"
+            : "AI is disabled (Non-AI OCR is enabled)"
+          : "OCR access is not granted"}
       </p>
-      {ocrMode !== "disabled" ? (
+      {canUseOcr ? (
         <p className="mt-1 text-xs text-muted-foreground">
           Low-confidence extracted fields are highlighted in the form. Please review before save.
         </p>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiModuleAccess } from "@/lib/auth";
-import { getOcrMode } from "@/lib/app-settings";
+import { getOcrMode, getUserCanUseOcr } from "@/lib/app-settings";
 import { getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 import { extractDriverIntakeFromScan, extractDriverIntakeFromScanNonAI } from "@/lib/driver-ocr";
@@ -12,10 +12,11 @@ export async function POST(request: NextRequest) {
   const session = await requireApiModuleAccess("drivers");
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   await ensureTransportEnhancements();
-  const mode = await getOcrMode();
-  if (mode === "disabled") {
-    return NextResponse.json({ error: "OCR is disabled" }, { status: 403 });
+  const canUseOcr = session.role === "admin" ? true : await getUserCanUseOcr(session.id);
+  if (!canUseOcr) {
+    return NextResponse.json({ error: "OCR access is not granted for this user." }, { status: 403 });
   }
+  const mode = await getOcrMode();
 
   try {
     const formData = await request.formData();

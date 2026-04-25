@@ -88,6 +88,7 @@ type Props = {
   defaults: DriverIntakeDefaults;
   buses: BusOption[];
   ocrMode: OCRMode;
+  canUseOcr: boolean;
   submitLabel: string;
 };
 
@@ -95,7 +96,7 @@ function sectionTitle(title: string) {
   return <p className="text-xs font-medium uppercase text-muted-foreground">{title}</p>;
 }
 
-export function DriverIntakeForm({ defaults, buses, ocrMode, submitLabel }: Props) {
+export function DriverIntakeForm({ defaults, buses, ocrMode, canUseOcr, submitLabel }: Props) {
   const [sameAsPresentAddress, setSameAsPresentAddress] = useState(false);
   const [presentAddress, setPresentAddress] = useState({
     village: defaults.presentVillage,
@@ -145,7 +146,7 @@ export function DriverIntakeForm({ defaults, buses, ocrMode, submitLabel }: Prop
 
   return (
     <div className="space-y-4">
-      <DriverScannerImport ocrMode={ocrMode} />
+      <DriverScannerImport ocrMode={ocrMode} canUseOcr={canUseOcr} />
 
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
         {sectionTitle("Basic")}

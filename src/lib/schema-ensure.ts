@@ -160,6 +160,7 @@ export async function ensureTransportEnhancements() {
   await query(`ALTER TABLE employees ADD COLUMN IF NOT EXISTS profile_photo_data BYTEA;`);
   await query(`ALTER TABLE fuel_entries ADD COLUMN IF NOT EXISTS company_name VARCHAR(120);`);
   await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS module_access TEXT[] NOT NULL DEFAULT ARRAY['dashboard'];`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS can_use_ocr BOOLEAN NOT NULL DEFAULT false;`);
   await query(`
     CREATE TABLE IF NOT EXISTS fuel_trucks (
       id BIGSERIAL PRIMARY KEY,

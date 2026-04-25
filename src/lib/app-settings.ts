@@ -2,11 +2,12 @@ import { query } from "@/lib/db";
 
 const AI_SCANNER_KEY = "ai_scanner_enabled";
 const OCR_MODE_KEY = "ocr_mode";
-export type OCRMode = "disabled" | "ai" | "non_ai";
+export type OCRMode = "ai" | "non_ai";
 
 function normalizeOcrMode(value: string | null | undefined): OCRMode {
-  if (value === "ai" || value === "non_ai" || value === "disabled") return value;
-  return "disabled";
+  if (value === "ai" || value === "non_ai") return value;
+  // backward compatibility: old "disabled" now maps to non_ai mode
+  return "non_ai";
 }
 
 export async function getOcrMode(): Promise<OCRMode> {
@@ -23,7 +24,7 @@ export async function getOcrMode(): Promise<OCRMode> {
 
   // Backward compatibility for existing ai_scanner_enabled flag.
   const legacy = await getAiScannerEnabled();
-  return legacy ? "ai" : "disabled";
+  return legacy ? "ai" : "non_ai";
 }
 
 export async function setOcrMode(mode: OCRMode): Promise<void> {
@@ -36,6 +37,17 @@ export async function setOcrMode(mode: OCRMode): Promise<void> {
   );
   // Keep legacy setting in sync.
   await setAiScannerEnabled(mode === "ai");
+}
+
+export async function getUserCanUseOcr(userId: number): Promise<boolean> {
+  const result = await query<{ can_use_ocr: boolean }>(
+    `SELECT COALESCE(can_use_ocr, false) AS can_use_ocr
+     FROM users
+     WHERE id = $1
+     LIMIT 1`,
+    [userId],
+  );
+  return Boolean(result.rows[0]?.can_use_ocr);
 }
 
 export async function getAiScannerEnabled(): Promise<boolean> {

@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusAlert } from "@/components/ui/status-alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getOcrMode } from "@/lib/app-settings";
+import { getOcrMode, getUserCanUseOcr } from "@/lib/app-settings";
 import { DriverCorePayload, DriverProfilePayload, readDriverPayload, validateDriverCore } from "@/lib/driver-payload";
 import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
@@ -388,11 +388,11 @@ type Props = {
 };
 
 export default async function DriversPage(props: Props) {
-  await requireSession();
+  const session = await requireSession();
   await requireModuleAccess("drivers");
   await ensureTransportEnhancements();
   const searchParams = await props.searchParams;
-  const [drivers, buses, ocrMode] = await Promise.all([
+  const [drivers, buses, ocrMode, canUseOcr] = await Promise.all([
     driversService.listDrivers(),
     query<{ id: number; bus_number: string; registration_number: string; odometer_km: string }>(
       `SELECT id, bus_number, registration_number, odometer_km::text
@@ -401,6 +401,7 @@ export default async function DriversPage(props: Props) {
        ORDER BY registration_number`,
     ),
     getOcrMode(),
+    session.role === "admin" ? Promise.resolve(true) : getUserCanUseOcr(session.id),
   ]);
 
   const busOptions = buses.rows.map((bus) => ({
@@ -621,7 +622,7 @@ export default async function DriversPage(props: Props) {
             <CardContent>
               <form action={createDriver} className="space-y-4">
                 <FormDirtyGuard />
-                <DriverIntakeForm defaults={EMPTY_DEFAULTS} buses={busOptions} ocrMode={ocrMode} submitLabel="Save Driver" />
+                <DriverIntakeForm defaults={EMPTY_DEFAULTS} buses={busOptions} ocrMode={ocrMode} canUseOcr={canUseOcr} submitLabel="Save Driver" />
                 <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                   <input type="checkbox" name="createAnother" value="1" />
                   Save and add next
