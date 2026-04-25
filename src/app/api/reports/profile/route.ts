@@ -561,20 +561,20 @@ async function buildDriverProfilePdf(driverId: number) {
 
   const pageWidth = 595;
   const pageHeight = 842;
-  const margin = 28;
-  const sectionHeaderHeight = 18;
-  const rowHeight = 34;
-  const labelSize = 8;
-  const valueSize = 9;
-  const sectionGap = 6;
-  const colGap = 10;
+  const margin = 20;
+  const sectionHeaderHeight = 12;
+  const rowHeight = 16;
+  const labelSize = 6;
+  const valueSize = 7;
+  const sectionGap = 2;
+  const colGap = 8;
   const contentWidth = pageWidth - margin * 2;
   const colWidth = (contentWidth - colGap * 2) / 3;
 
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
   let y = pageHeight - margin;
 
-  const fitText = (text: string, maxChars = 30) => {
+  const fitText = (text: string, maxChars = 22) => {
     const safe = toText(text);
     if (safe.length <= maxChars) return safe;
     return `${safe.slice(0, maxChars - 3)}...`;
@@ -600,8 +600,8 @@ async function buildDriverProfilePdf(driverId: number) {
     });
     page.drawText(title, {
       x: margin + 6,
-      y: y - sectionHeaderHeight + 7,
-      size: 10,
+      y: y - sectionHeaderHeight + 4,
+      size: 8,
       font: boldFont,
       color: rgb(0.1, 0.2, 0.45),
     });
@@ -615,39 +615,39 @@ async function buildDriverProfilePdf(driverId: number) {
       const x = margin + i * (colWidth + colGap);
       if (!field) {
         page.drawLine({
-          start: { x, y: y - 26 },
-          end: { x: x + colWidth, y: y - 26 },
-          thickness: 0.8,
+          start: { x, y: y - 13 },
+          end: { x: x + colWidth, y: y - 13 },
+          thickness: 0.6,
           color: rgb(0.8, 0.82, 0.86),
         });
         continue;
       }
       page.drawText(field.label, {
         x,
-        y: y - 10,
+        y: y - 7,
         size: labelSize,
         font: boldFont,
         color: rgb(0.32, 0.36, 0.44),
       });
       page.drawText(fitText(field.value), {
         x,
-        y: y - 22,
+        y: y - 11,
         size: valueSize,
         font: bodyFont,
         color: rgb(0.08, 0.09, 0.11),
       });
       page.drawLine({
-        start: { x, y: y - 26 },
-        end: { x: x + colWidth, y: y - 26 },
-        thickness: 0.8,
+        start: { x, y: y - 13 },
+        end: { x: x + colWidth, y: y - 13 },
+        thickness: 0.6,
         color: rgb(0.7, 0.74, 0.82),
       });
     }
     y -= rowHeight;
   };
 
-  const photoWidth = 110;
-  const photoHeight = 130;
+  const photoWidth = 88;
+  const photoHeight = 102;
   const photoX = pageWidth - margin - photoWidth;
   const photoY = pageHeight - margin - photoHeight;
   const headerLeftWidth = photoX - margin - 10;
@@ -669,16 +669,16 @@ async function buildDriverProfilePdf(driverId: number) {
     });
   };
 
-  drawCentered("Bio - Data", pageHeight - margin - 4, 16, boldFont, [0.25, 0.28, 0.34]);
-  drawCentered("JAI BHAVANI TRAVELS", pageHeight - margin - 28, 28, boldFont, [0.1, 0.12, 0.18]);
+  drawCentered("Bio - Data", pageHeight - margin - 2, 11, boldFont, [0.25, 0.28, 0.34]);
+  drawCentered("JAI BHAVANI TRAVELS", pageHeight - margin - 18, 18, boldFont, [0.1, 0.12, 0.18]);
   drawCentered(
     "H.No: 11-22 Srinivasanagar, Ramachandrapuram, Sangareddy Dist",
-    pageHeight - margin - 50,
-    10,
+    pageHeight - margin - 32,
+    7,
     bodyFont,
     [0.2, 0.22, 0.27],
   );
-  drawCentered("Contact no: 9666227227, 9494665519", pageHeight - margin - 64, 12, boldFont, [0.2, 0.22, 0.27]);
+  drawCentered("Contact no: 9666227227, 9494665519", pageHeight - margin - 42, 8, boldFont, [0.2, 0.22, 0.27]);
 
   page.drawRectangle({
     x: photoX,
@@ -690,9 +690,9 @@ async function buildDriverProfilePdf(driverId: number) {
     color: rgb(0.97, 0.98, 1),
   });
   page.drawText("Profile Photo", {
-    x: photoX + 22,
-    y: photoY + photoHeight - 12,
-    size: 8,
+    x: photoX + 16,
+    y: photoY + photoHeight - 9,
+    size: 6,
     font: boldFont,
     color: rgb(0.35, 0.4, 0.5),
   });
@@ -712,13 +712,13 @@ async function buildDriverProfilePdf(driverId: number) {
       }
       const scale = Math.min(
         (photoWidth - 8) / embeddedImage.width,
-        (photoHeight - 20) / embeddedImage.height,
+        (photoHeight - 14) / embeddedImage.height,
       );
       const imageWidth = embeddedImage.width * scale;
       const imageHeight = embeddedImage.height * scale;
       page.drawImage(embeddedImage, {
         x: photoX + (photoWidth - imageWidth) / 2,
-        y: photoY + 4 + (photoHeight - 20 - imageHeight) / 2,
+        y: photoY + 2 + (photoHeight - 14 - imageHeight) / 2,
         width: imageWidth,
         height: imageHeight,
       });
@@ -740,15 +740,15 @@ async function buildDriverProfilePdf(driverId: number) {
     }
   } else {
     page.drawText("No Photo", {
-      x: photoX + 34,
+      x: photoX + 27,
       y: photoY + photoHeight / 2,
-      size: 9,
+      size: 7,
       font: bodyFont,
       color: rgb(0.55, 0.58, 0.66),
     });
   }
 
-  y = photoY - 12;
+  y = photoY - 6;
 
   drawSection("Basic");
   drawRow([

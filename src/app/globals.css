@@ -58,5 +58,41 @@ html.dark {
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: "Segoe UI", "Inter", "Roboto", "Helvetica Neue", Arial, sans-serif;
+    text-rendering: optimizeLegibility;
   }
+}
+
+/* Keep typography consistent and readable across modules */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+label,
+th,
+button {
+  text-transform: capitalize;
+}
+
+/* Override utility uppercase labels to requested capitalization style */
+.uppercase {
+  text-transform: capitalize !important;
+  letter-spacing: normal !important;
+}
+
+html.compact-ui [data-slot="table-head"] {
+  height: 2rem;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.72rem;
+}
+
+html.compact-ui [data-slot="table-cell"] {
+  padding: 0.28rem 0.4rem;
+  font-size: 0.76rem;
+}
+
+html.compact-ui [data-slot="table-row"] {
+  line-height: 1.2;
 }
