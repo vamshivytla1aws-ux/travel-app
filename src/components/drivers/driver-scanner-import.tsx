@@ -38,6 +38,41 @@ function getFieldElement(form: HTMLFormElement, field: DriverIntakeFieldKey) {
   ) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
 }
 
+function setControlValue(
+  element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+  value: string,
+) {
+  let usedNativeSetter = false;
+  if (element instanceof HTMLInputElement) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    if (setter) {
+      setter.call(element, value);
+      usedNativeSetter = true;
+    }
+  } else if (element instanceof HTMLTextAreaElement) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+    if (setter) {
+      setter.call(element, value);
+      usedNativeSetter = true;
+    }
+  } else {
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+    if (setter) {
+      setter.call(element, value);
+      usedNativeSetter = true;
+    }
+  }
+  if (!usedNativeSetter) element.value = value;
+  element.dispatchEvent(new Event("input", { bubbles: true }));
+  element.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function setHiddenControlValue(form: HTMLFormElement, name: string, value: string) {
+  const element = form.querySelector(`[name="${name}"]`) as HTMLInputElement | null;
+  if (!element) return;
+  setControlValue(element, value);
+}
+
 function toPercent(value?: number) {
   if (typeof value !== "number" || Number.isNaN(value)) return null;
   return `${Math.round(value * 100)}%`;
@@ -113,9 +148,7 @@ export function DriverScannerImport({ ocrMode, canUseOcr }: { ocrMode: OCRMode; 
       const element = getFieldElement(form, key);
       if (!element) continue;
       const finalValue = String(value ?? "");
-      element.value = finalValue;
-      element.dispatchEvent(new Event("input", { bubbles: true }));
-      element.dispatchEvent(new Event("change", { bubbles: true }));
+      setControlValue(element, finalValue);
       nextApplied.push(key);
     }
     setAppliedFields(nextApplied);
@@ -129,10 +162,11 @@ export function DriverScannerImport({ ocrMode, canUseOcr }: { ocrMode: OCRMode; 
     for (const field of appliedFields) {
       const element = getFieldElement(form, field);
       if (!element) continue;
-      element.value = "";
-      element.dispatchEvent(new Event("input", { bubbles: true }));
-      element.dispatchEvent(new Event("change", { bubbles: true }));
+      setControlValue(element, "");
     }
+    setHiddenControlValue(form, "ocrProfilePhotoDataUrl", "");
+    setHiddenControlValue(form, "ocrProfilePhotoName", "");
+    setHiddenControlValue(form, "ocrProfilePhotoMime", "");
     setAppliedFields([]);
     setLastExtracted(null);
     setError(null);
@@ -163,6 +197,18 @@ export function DriverScannerImport({ ocrMode, canUseOcr }: { ocrMode: OCRMode; 
         return;
       }
       setLastExtracted(data);
+      const parentForm = resolveForm();
+      if (parentForm && file.type.startsWith("image/")) {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result ?? ""));
+          reader.onerror = () => reject(new Error("Failed to read scanner image"));
+          reader.readAsDataURL(file);
+        });
+        setHiddenControlValue(parentForm, "ocrProfilePhotoDataUrl", dataUrl);
+        setHiddenControlValue(parentForm, "ocrProfilePhotoName", file.name);
+        setHiddenControlValue(parentForm, "ocrProfilePhotoMime", file.type || "image/jpeg");
+      }
       setTimeout(() => applyExtractedValues(), 0);
     } catch {
       setError("Scanner extraction failed. Please retry.");

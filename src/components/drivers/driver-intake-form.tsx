@@ -90,13 +90,21 @@ type Props = {
   ocrMode: OCRMode;
   canUseOcr: boolean;
   submitLabel: string;
+  showProfilePhotoUpload?: boolean;
 };
 
 function sectionTitle(title: string) {
   return <p className="text-xs font-medium uppercase text-muted-foreground">{title}</p>;
 }
 
-export function DriverIntakeForm({ defaults, buses, ocrMode, canUseOcr, submitLabel }: Props) {
+export function DriverIntakeForm({
+  defaults,
+  buses,
+  ocrMode,
+  canUseOcr,
+  submitLabel,
+  showProfilePhotoUpload = true,
+}: Props) {
   const [sameAsPresentAddress, setSameAsPresentAddress] = useState(false);
   const [presentAddress, setPresentAddress] = useState({
     village: defaults.presentVillage,
@@ -147,6 +155,9 @@ export function DriverIntakeForm({ defaults, buses, ocrMode, canUseOcr, submitLa
   return (
     <div className="space-y-4">
       <DriverScannerImport ocrMode={ocrMode} canUseOcr={canUseOcr} />
+      <input type="hidden" name="ocrProfilePhotoDataUrl" defaultValue="" />
+      <input type="hidden" name="ocrProfilePhotoName" defaultValue="" />
+      <input type="hidden" name="ocrProfilePhotoMime" defaultValue="" />
 
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
         {sectionTitle("Basic")}
@@ -162,6 +173,20 @@ export function DriverIntakeForm({ defaults, buses, ocrMode, canUseOcr, submitLa
           <Label htmlFor="bloodGroup">Blood Group</Label>
           <Input id="bloodGroup" name="bloodGroup" defaultValue={defaults.bloodGroup} />
         </div>
+        {showProfilePhotoUpload ? (
+          <div className="grid gap-1 md:col-span-3">
+            <Label htmlFor="profilePhoto">Profile Photo (optional)</Label>
+            <Input
+              id="profilePhoto"
+              name="profilePhoto"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.heic,.heif"
+            />
+            <p className="text-xs text-muted-foreground">
+              You can upload directly here, or use Import & Auto Fill with an image scan.
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-4">

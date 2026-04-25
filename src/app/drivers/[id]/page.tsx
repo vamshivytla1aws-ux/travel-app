@@ -272,6 +272,36 @@ async function upsertDriverProfile(driverId: number, profile: DriverProfilePaylo
   await query(sql, params);
 }
 
+async function readProfilePhotoFromForm(formData: FormData) {
+  const uploadedFile = formData.get("profilePhoto");
+  if (isUploadLikeFile(uploadedFile) && uploadedFile.size > 0) {
+    if (uploadedFile.size > MAX_PROFILE_PHOTO_BYTES) return { error: "too_large" as const };
+    const uploaded = await getUploadedFileBuffer(uploadedFile);
+    return {
+      fileName: uploaded.fileName,
+      mimeType: normalizeProfilePhotoMime(uploaded.fileName, uploaded.mimeType),
+      data: uploaded.data,
+    };
+  }
+
+  const dataUrl = String(formData.get("ocrProfilePhotoDataUrl") ?? "").trim();
+  if (!dataUrl) return null;
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+
+  const fileName = String(formData.get("ocrProfilePhotoName") ?? "").trim() || "scanner-photo.jpg";
+  const rawMime = String(formData.get("ocrProfilePhotoMime") ?? "").trim() || match[1] || "image/jpeg";
+  const data = Buffer.from(match[2], "base64");
+  if (!data.length) return null;
+  if (data.length > MAX_PROFILE_PHOTO_BYTES) return { error: "too_large" as const };
+
+  return {
+    fileName,
+    mimeType: normalizeProfilePhotoMime(fileName, rawMime),
+    data,
+  };
+}
+
 async function updateDriverProfile(formData: FormData) {
   "use server";
   const session = await requireSession(["admin", "dispatcher", "updater"]);
@@ -296,6 +326,10 @@ async function updateDriverProfile(formData: FormData) {
   }
 
   try {
+    const photo = await readProfilePhotoFromForm(formData);
+    if (photo && "error" in photo) {
+      redirect(`/drivers/${driverId}?error=photo_too_large`);
+    }
     await withTransaction(async (client) => {
       await client.query(
         `UPDATE drivers
@@ -311,8 +345,11 @@ async function updateDriverProfile(formData: FormData) {
              license_number = $10,
              license_expiry = $11,
              experience_years = $12,
+             profile_photo_name = COALESCE($13, profile_photo_name),
+             profile_photo_mime = COALESCE($14, profile_photo_mime),
+             profile_photo_data = COALESCE($15, profile_photo_data),
              updated_at = NOW()
-         WHERE id = $13`,
+         WHERE id = $16`,
         [
           payload.core.fullName,
           payload.core.phone,
@@ -326,6 +363,9 @@ async function updateDriverProfile(formData: FormData) {
           payload.core.licenseNumber,
           payload.core.licenseExpiry,
           payload.core.experienceYears,
+          photo?.fileName ?? null,
+          photo?.mimeType ?? null,
+          photo?.data ?? null,
           driverId,
         ],
       );
@@ -336,6 +376,7 @@ async function updateDriverProfile(formData: FormData) {
     if (pgError?.code === "23505") {
       redirect(`/drivers/${driverId}?error=duplicate_identity`);
     }
+    redirect(`/drivers/${driverId}?error=photo_upload_failed`);
     throw error;
   }
 
@@ -593,7 +634,7 @@ export default async function DriverProfilePage(props: Props) {
               <form action={updateDriverProfile} className="space-y-4">
                 <FormDirtyGuard />
                 <input type="hidden" name="driverId" value={profile.driver.id} />
-              <DriverIntakeForm defaults={defaults} buses={busOptions} ocrMode={ocrMode} canUseOcr={canUseOcr} submitLabel="Update Driver" />
+              <DriverIntakeForm defaults={defaults} buses={busOptions} ocrMode={ocrMode} canUseOcr={canUseOcr} submitLabel="Update Driver" showProfilePhotoUpload={false} />
               </form>
             </CardContent>
           </Card>

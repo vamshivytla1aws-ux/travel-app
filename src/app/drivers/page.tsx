@@ -18,6 +18,8 @@ import { getOcrMode, getUserCanUseOcr } from "@/lib/app-settings";
 import { DriverCorePayload, DriverProfilePayload, readDriverPayload, validateDriverCore } from "@/lib/driver-payload";
 import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
+import { getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
+import { normalizeProfilePhotoMime } from "@/lib/image-mime";
 import { query, withTransaction } from "@/lib/db";
 import { PoolClient } from "pg";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
@@ -25,6 +27,7 @@ import { DriversService } from "@/services/drivers.service";
 
 const driversService = new DriversService();
 const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 50, 100] as const;
+const MAX_PROFILE_PHOTO_BYTES = 15 * 1024 * 1024;
 
 function withParams(
   base: Record<string, string | undefined>,
@@ -273,6 +276,36 @@ async function upsertDriverProfile(driverId: number, profile: DriverProfilePaylo
   await query(sql, params);
 }
 
+async function readProfilePhotoFromForm(formData: FormData) {
+  const uploadedFile = formData.get("profilePhoto");
+  if (isUploadLikeFile(uploadedFile) && uploadedFile.size > 0) {
+    if (uploadedFile.size > MAX_PROFILE_PHOTO_BYTES) return { error: "too_large" as const };
+    const uploaded = await getUploadedFileBuffer(uploadedFile);
+    return {
+      fileName: uploaded.fileName,
+      mimeType: normalizeProfilePhotoMime(uploaded.fileName, uploaded.mimeType),
+      data: uploaded.data,
+    };
+  }
+
+  const dataUrl = String(formData.get("ocrProfilePhotoDataUrl") ?? "").trim();
+  if (!dataUrl) return null;
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+
+  const fileName = String(formData.get("ocrProfilePhotoName") ?? "").trim() || "scanner-photo.jpg";
+  const rawMime = String(formData.get("ocrProfilePhotoMime") ?? "").trim() || match[1] || "image/jpeg";
+  const data = Buffer.from(match[2], "base64");
+  if (!data.length) return null;
+  if (data.length > MAX_PROFILE_PHOTO_BYTES) return { error: "too_large" as const };
+
+  return {
+    fileName,
+    mimeType: normalizeProfilePhotoMime(fileName, rawMime),
+    data,
+  };
+}
+
 async function createDriver(formData: FormData) {
   "use server";
   const session = await requireSession(["admin", "dispatcher", "updater"]);
@@ -297,14 +330,18 @@ async function createDriver(formData: FormData) {
   }
 
   try {
+    const photo = await readProfilePhotoFromForm(formData);
+    if (photo && "error" in photo) {
+      redirect("/drivers?create=1&error=photo_too_large");
+    }
     const createAnother = String(formData.get("createAnother") ?? "") === "1";
     const driverId = await withTransaction(async (client) => {
       const created = await client.query<{ id: number }>(
         `INSERT INTO drivers(
           full_name, phone, company_name, bank_name, bank_account_number, bank_ifsc, pf_account_number, uan_number, esic_number,
-          license_number, license_expiry, experience_years
+          license_number, license_expiry, experience_years, profile_photo_name, profile_photo_mime, profile_photo_data
         )
-         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
          RETURNING id`,
         [
           payload.core.fullName,
@@ -319,6 +356,9 @@ async function createDriver(formData: FormData) {
           payload.core.licenseNumber,
           payload.core.licenseExpiry,
           payload.core.experienceYears,
+          photo?.fileName ?? null,
+          photo?.mimeType ?? null,
+          photo?.data ?? null,
         ],
       );
       const id = created.rows[0].id;
@@ -340,6 +380,7 @@ async function createDriver(formData: FormData) {
     if (pgError?.code === "23505") {
       redirect("/drivers?create=1&error=duplicate_identity");
     }
+    redirect("/drivers?create=1&error=photo_upload_failed");
     throw error;
   }
 }
@@ -496,6 +537,12 @@ export default async function DriversPage(props: Props) {
       {searchParams.error === "invalid_license_expiry" ? (
         <StatusAlert className="mb-4" tone="error" message="Driving License validity must be a valid date." />
       ) : null}
+      {searchParams.error === "photo_too_large" ? (
+        <StatusAlert className="mb-4" tone="error" message="Photo is too large. Please upload a file up to 15MB." />
+      ) : null}
+      {searchParams.error === "photo_upload_failed" ? (
+        <StatusAlert className="mb-4" tone="error" message="Photo upload failed. Please retry with JPG/PNG/WebP." />
+      ) : null}
       {searchParams.error === "dependency" ? (
         <StatusAlert className="mb-4" tone="error" message="Driver cannot be deleted because dependent records exist." />
       ) : null}
@@ -622,7 +669,7 @@ export default async function DriversPage(props: Props) {
             <CardContent>
               <form action={createDriver} className="space-y-4">
                 <FormDirtyGuard />
-                <DriverIntakeForm defaults={EMPTY_DEFAULTS} buses={busOptions} ocrMode={ocrMode} canUseOcr={canUseOcr} submitLabel="Save Driver" />
+                <DriverIntakeForm defaults={EMPTY_DEFAULTS} buses={busOptions} ocrMode={ocrMode} canUseOcr={canUseOcr} submitLabel="Save Driver" showProfilePhotoUpload />
                 <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                   <input type="checkbox" name="createAnother" value="1" />
                   Save and add next
