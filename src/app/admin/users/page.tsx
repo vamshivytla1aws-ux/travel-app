@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getAiScannerEnabled, setAiScannerEnabled } from "@/lib/app-settings";
 import { APP_MODULES, normalizeModuleAccess, requireAdminSession, requireModuleAccess } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query, withTransaction } from "@/lib/db";
@@ -163,8 +164,26 @@ async function deleteUser(formData: FormData) {
   redirect(`/admin/users?deleted=${Date.now()}`);
 }
 
+async function updateAiScannerSetting(formData: FormData) {
+  "use server";
+  const session = await requireAdminSession();
+  await requireModuleAccess("user-admin");
+  await ensureTransportEnhancements();
+  const enabled = String(formData.get("enabled")) === "true";
+  await setAiScannerEnabled(enabled);
+  await logAuditEvent({
+    session,
+    action: "update",
+    entityType: "app_setting",
+    details: { key: "ai_scanner_enabled", enabled },
+  });
+  revalidatePath("/admin/users");
+  revalidatePath("/drivers");
+  redirect(`/admin/users?ai=${enabled ? "enabled" : "disabled"}`);
+}
+
 type Props = {
-  searchParams: Promise<{ created?: string; updated?: string; deleted?: string; error?: string; export?: string }>;
+  searchParams: Promise<{ created?: string; updated?: string; deleted?: string; error?: string; export?: string; ai?: string }>;
 };
 
 export default async function UsersAdminPage(props: Props) {
@@ -172,14 +191,17 @@ export default async function UsersAdminPage(props: Props) {
   await requireModuleAccess("user-admin");
   await ensureTransportEnhancements();
   const searchParams = await props.searchParams;
-  const users = await query<{
+  const [users, aiEnabled] = await Promise.all([
+    query<{
     id: number;
     full_name: string;
     email: string;
     role: string;
     module_access: string[] | null;
     is_active: boolean;
-  }>(`SELECT id, full_name, email, role::text, module_access, is_active FROM users ORDER BY id DESC`);
+    }>(`SELECT id, full_name, email, role::text, module_access, is_active FROM users ORDER BY id DESC`),
+    getAiScannerEnabled(),
+  ]);
   const editableModules = APP_MODULES.filter((module) => module !== "user-admin");
 
   return (
@@ -212,6 +234,22 @@ export default async function UsersAdminPage(props: Props) {
       {searchParams.created ? <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">User created successfully.</div> : null}
       {searchParams.updated ? <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">User access updated successfully. User must sign out and sign in again to load latest permissions.</div> : null}
       {searchParams.deleted ? <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">User deleted permanently.</div> : null}
+      {searchParams.ai === "enabled" ? <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">AI is enabled</div> : null}
+      {searchParams.ai === "disabled" ? <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">AI is disabled</div> : null}
+      <Card className="mb-4">
+        <CardHeader><CardTitle>AI Controls</CardTitle></CardHeader>
+        <CardContent>
+          <form action={updateAiScannerSetting} className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-muted-foreground">
+              Driver Scanner OCR is currently <span className="font-semibold">{aiEnabled ? "enabled" : "disabled"}</span>.
+            </p>
+            <input type="hidden" name="enabled" value={aiEnabled ? "false" : "true"} />
+            <button className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground">
+              {aiEnabled ? "Disable AI" : "Enable AI"}
+            </button>
+          </form>
+        </CardContent>
+      </Card>
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader><CardTitle>Create User</CardTitle></CardHeader>

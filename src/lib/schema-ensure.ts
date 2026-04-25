@@ -3,6 +3,13 @@ import { ensureDocumentTables } from "@/lib/document-storage";
 
 export async function ensureTransportEnhancements() {
   await query(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      setting_key VARCHAR(120) PRIMARY KEY,
+      setting_value TEXT NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await query(`
     DO $$
     BEGIN
       IF EXISTS (
