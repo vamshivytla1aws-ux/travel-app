@@ -563,10 +563,10 @@ async function buildDriverProfilePdf(driverId: number) {
   const pageHeight = 842;
   const margin = 20;
   const sectionHeaderHeight = 14;
-  const rowHeight = 20;
+  const rowHeight = 24;
   const labelSize = 7;
   const valueSize = 8;
-  const sectionGap = 2;
+  const sectionGap = 3;
   const colGap = 8;
   const contentWidth = pageWidth - margin * 2;
   const colWidth = (contentWidth - colGap * 2) / 3;
@@ -615,8 +615,8 @@ async function buildDriverProfilePdf(driverId: number) {
       const x = margin + i * (colWidth + colGap);
       if (!field) {
         page.drawLine({
-          start: { x, y: y - 19 },
-          end: { x: x + colWidth, y: y - 19 },
+          start: { x, y: y - 23 },
+          end: { x: x + colWidth, y: y - 23 },
           thickness: 0.6,
           color: rgb(0.8, 0.82, 0.86),
         });
@@ -631,14 +631,14 @@ async function buildDriverProfilePdf(driverId: number) {
       });
       page.drawText(fitText(field.value), {
         x,
-        y: y - 15,
+        y: y - 18,
         size: valueSize,
         font: bodyFont,
         color: rgb(0.08, 0.09, 0.11),
       });
       page.drawLine({
-        start: { x, y: y - 19 },
-        end: { x: x + colWidth, y: y - 19 },
+        start: { x, y: y - 23 },
+        end: { x: x + colWidth, y: y - 23 },
         thickness: 0.6,
         color: rgb(0.7, 0.74, 0.82),
       });
