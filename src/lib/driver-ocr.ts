@@ -25,6 +25,7 @@ type OCRResult = {
 };
 
 const MAX_OCR_FILE_BYTES = 20 * 1024 * 1024;
+const OPENAI_OCR_TIMEOUT_MS = Number(process.env.OPENAI_OCR_TIMEOUT_MS ?? "45000");
 
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -228,15 +229,19 @@ export async function extractDriverIntakeFromScan(input: {
           image_url: `data:${input.mimeType};base64,${base64Data}`,
         };
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.max(10000, OPENAI_OCR_TIMEOUT_MS));
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
+    signal: controller.signal,
     body: JSON.stringify({
       model,
       temperature: 0,
+      max_output_tokens: 2400,
       input: [
         {
           role: "system",
@@ -248,7 +253,7 @@ export async function extractDriverIntakeFromScan(input: {
         },
       ],
     }),
-  });
+  }).finally(() => clearTimeout(timeout));
 
   if (!response.ok) {
     const errText = await response.text();
