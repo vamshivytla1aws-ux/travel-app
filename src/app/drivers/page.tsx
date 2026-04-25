@@ -45,7 +45,7 @@ function withParams(
 const EMPTY_DEFAULTS: DriverIntakeDefaults = {
   fullName: "",
   phone: "",
-  companyName: "",
+  companyName: "JBT",
   licenseNumber: "",
   licenseExpiry: "",
   experienceYears: "0",
@@ -334,7 +334,6 @@ async function createDriver(formData: FormData) {
     if (photo && "error" in photo) {
       redirect("/drivers?create=1&error=photo_too_large");
     }
-    const createAnother = String(formData.get("createAnother") ?? "") === "1";
     const driverId = await withTransaction(async (client) => {
       const created = await client.query<{ id: number }>(
         `INSERT INTO drivers(
@@ -374,7 +373,7 @@ async function createDriver(formData: FormData) {
       details: { phone: payload.core.phone, licenseNumber: payload.core.licenseNumber },
     });
     revalidatePath("/drivers");
-    redirect(createAnother ? `/drivers?create=1&created=${Date.now()}` : `/drivers?created=${Date.now()}`);
+    redirect(`/drivers?created=${Date.now()}`);
   } catch (error) {
     const pgError = error as { code?: string };
     if (pgError?.code === "23505") {
@@ -670,10 +669,6 @@ export default async function DriversPage(props: Props) {
               <form action={createDriver} className="space-y-4">
                 <FormDirtyGuard />
                 <DriverIntakeForm defaults={EMPTY_DEFAULTS} buses={busOptions} ocrMode={ocrMode} canUseOcr={canUseOcr} submitLabel="Save Driver" showProfilePhotoUpload />
-                <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                  <input type="checkbox" name="createAnother" value="1" />
-                  Save and add next
-                </label>
               </form>
             </CardContent>
           </Card>

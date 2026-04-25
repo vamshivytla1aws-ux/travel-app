@@ -187,6 +187,13 @@ export function DriverScannerImport({ ocrMode, canUseOcr }: { ocrMode: OCRMode; 
     payload.set("file", file);
 
     try {
+      const parentForm = resolveForm();
+      if (parentForm) {
+        // Prevent stale OCR photo from a previous import attempt.
+        setHiddenControlValue(parentForm, "ocrProfilePhotoDataUrl", "");
+        setHiddenControlValue(parentForm, "ocrProfilePhotoName", "");
+        setHiddenControlValue(parentForm, "ocrProfilePhotoMime", "");
+      }
       const response = await fetch("/api/drivers/intake/ocr", {
         method: "POST",
         body: payload,
@@ -197,7 +204,6 @@ export function DriverScannerImport({ ocrMode, canUseOcr }: { ocrMode: OCRMode; 
         return;
       }
       setLastExtracted(data);
-      const parentForm = resolveForm();
       if (parentForm && file.type.startsWith("image/")) {
         const dataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
