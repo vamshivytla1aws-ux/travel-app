@@ -387,6 +387,24 @@ export async function ensureTransportEnhancements() {
 
   await query(`CREATE INDEX IF NOT EXISTS idx_trip_runs_date_status ON trip_runs(trip_date, status);`);
   await query(`
+    CREATE TABLE IF NOT EXISTS adhoc_trips (
+      id BIGSERIAL PRIMARY KEY,
+      trip_date DATE NOT NULL DEFAULT CURRENT_DATE,
+      bus_id BIGINT NOT NULL REFERENCES buses(id),
+      driver_id BIGINT NOT NULL REFERENCES drivers(id),
+      from_location VARCHAR(180) NOT NULL,
+      to_location VARCHAR(180) NOT NULL,
+      trip_days INTEGER NOT NULL DEFAULT 1 CHECK (trip_days >= 1),
+      remarks TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_adhoc_trips_date ON adhoc_trips(trip_date DESC, id DESC);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_adhoc_trips_bus ON adhoc_trips(bus_id, id DESC);`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_adhoc_trips_driver ON adhoc_trips(driver_id, id DESC);`);
+
+  await query(`
     CREATE TABLE IF NOT EXISTS finance_loans (
       id BIGSERIAL PRIMARY KEY,
       registration_no VARCHAR(40) NOT NULL,

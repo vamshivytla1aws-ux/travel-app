@@ -2,6 +2,18 @@ import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
 
 export type TripStatus = "planned" | "in_progress" | "completed" | "cancelled";
+export type AdhocTripRow = {
+  id: number;
+  trip_date: string;
+  bus_id: number;
+  driver_id: number;
+  bus_number: string;
+  driver_name: string;
+  from_location: string;
+  to_location: string;
+  trip_days: number;
+  remarks: string | null;
+};
 
 export class TripsService {
   async listTodayTrips() {
@@ -157,6 +169,84 @@ export class TripsService {
            updated_at = NOW()
        WHERE id = $1 AND status IN ('planned', 'in_progress')`,
       [tripId],
+    );
+  }
+
+  async listRecentAdhocTrips() {
+    await ensureTransportEnhancements();
+    const result = await query<AdhocTripRow>(
+      `SELECT
+        at.id,
+        at.trip_date::text,
+        at.bus_id,
+        at.driver_id,
+        b.bus_number,
+        d.full_name as driver_name,
+        at.from_location,
+        at.to_location,
+        at.trip_days,
+        at.remarks
+      FROM adhoc_trips at
+      JOIN buses b ON b.id = at.bus_id
+      JOIN drivers d ON d.id = at.driver_id
+      ORDER BY at.trip_date DESC, at.id DESC
+      LIMIT 50`,
+    );
+    return result.rows;
+  }
+
+  async createAdhocTrip(input: {
+    busId: number;
+    driverId: number;
+    fromLocation: string;
+    toLocation: string;
+    tripDays: number;
+    remarks?: string;
+  }) {
+    await ensureTransportEnhancements();
+    await query(
+      `INSERT INTO adhoc_trips (trip_date, bus_id, driver_id, from_location, to_location, trip_days, remarks)
+       VALUES (CURRENT_DATE, $1, $2, $3, $4, $5, $6)`,
+      [
+        input.busId,
+        input.driverId,
+        input.fromLocation.trim(),
+        input.toLocation.trim(),
+        Math.max(1, Math.floor(input.tripDays)),
+        input.remarks?.trim() ? input.remarks.trim() : null,
+      ],
+    );
+  }
+
+  async updateAdhocTrip(input: {
+    tripId: number;
+    busId: number;
+    driverId: number;
+    fromLocation: string;
+    toLocation: string;
+    tripDays: number;
+    remarks?: string;
+  }) {
+    await ensureTransportEnhancements();
+    await query(
+      `UPDATE adhoc_trips
+       SET bus_id = $1,
+           driver_id = $2,
+           from_location = $3,
+           to_location = $4,
+           trip_days = $5,
+           remarks = $6,
+           updated_at = NOW()
+       WHERE id = $7`,
+      [
+        input.busId,
+        input.driverId,
+        input.fromLocation.trim(),
+        input.toLocation.trim(),
+        Math.max(1, Math.floor(input.tripDays)),
+        input.remarks?.trim() ? input.remarks.trim() : null,
+        input.tripId,
+      ],
     );
   }
 }

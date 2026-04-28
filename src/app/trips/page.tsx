@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
 import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { FormDirtyGuard } from "@/components/form-dirty-guard";
+import { FormMemory } from "@/components/form-memory";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,8 @@ async function createTrip(formData: FormData) {
   });
   await logAuditEvent({ session, action: "create", entityType: "trip" });
   revalidatePath("/trips");
-  redirect(`/trips?created=${Date.now()}`);
+  const createAnother = String(formData.get("createAnother") ?? "") === "1";
+  redirect(createAnother ? `/trips?created=${Date.now()}&fast=1` : `/trips?created=${Date.now()}`);
 }
 
 async function updateTrip(formData: FormData) {
@@ -94,16 +96,63 @@ async function cancelTrip(formData: FormData) {
   revalidatePath("/trips");
 }
 
+async function createAdhocTrip(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
+  await requireModuleAccess("trips");
+  await tripsService.createAdhocTrip({
+    busId: Number(formData.get("adhocBusId")),
+    driverId: Number(formData.get("adhocDriverId")),
+    fromLocation: String(formData.get("adhocFrom") ?? ""),
+    toLocation: String(formData.get("adhocTo") ?? ""),
+    tripDays: Number(formData.get("adhocDays")),
+    remarks: String(formData.get("adhocRemarks") ?? ""),
+  });
+  await logAuditEvent({ session, action: "create", entityType: "adhoc_trip" });
+  revalidatePath("/trips");
+  redirect(`/trips?adhocCreated=${Date.now()}`);
+}
+
+async function updateAdhocTrip(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "updater"]);
+  await requireModuleAccess("trips");
+  const tripId = Number(formData.get("adhocTripId"));
+  await tripsService.updateAdhocTrip({
+    tripId,
+    busId: Number(formData.get("adhocBusId")),
+    driverId: Number(formData.get("adhocDriverId")),
+    fromLocation: String(formData.get("adhocFrom") ?? ""),
+    toLocation: String(formData.get("adhocTo") ?? ""),
+    tripDays: Number(formData.get("adhocDays")),
+    remarks: String(formData.get("adhocRemarks") ?? ""),
+  });
+  await logAuditEvent({ session, action: "update", entityType: "adhoc_trip", entityId: tripId });
+  revalidatePath("/trips");
+  redirect(`/trips?adhocUpdated=${Date.now()}`);
+}
+
 type Props = {
-  searchParams: Promise<{ created?: string; updated?: string; editId?: string; export?: string }>;
+  searchParams: Promise<{
+    created?: string;
+    updated?: string;
+    editId?: string;
+    duplicateId?: string;
+    export?: string;
+    fast?: string;
+    adhocCreated?: string;
+    adhocUpdated?: string;
+    adhocEditId?: string;
+  }>;
 };
 
 export default async function TripsPage(props: Props) {
   await requireSession();
   await requireModuleAccess("trips");
   const searchParams = await props.searchParams;
-  const [trips, buses, drivers, routes] = await Promise.all([
+  const [trips, adhocTrips, buses, drivers, routes] = await Promise.all([
     tripsService.listTodayTrips(),
+    tripsService.listRecentAdhocTrips(),
     query<{ id: number; bus_number: string }>(
       `SELECT id, bus_number FROM buses WHERE status = 'active' ORDER BY bus_number`,
     ),
@@ -118,6 +167,16 @@ export default async function TripsPage(props: Props) {
   const editTrip = Number.isFinite(editId) && editId > 0
     ? trips.find((trip) => trip.id === editId && trip.status === "planned") ?? null
     : null;
+  const duplicateId = Number(searchParams.duplicateId ?? "");
+  const duplicateTrip = !editTrip && Number.isFinite(duplicateId) && duplicateId > 0
+    ? trips.find((trip) => trip.id === duplicateId) ?? null
+    : null;
+  const formSource = editTrip ?? duplicateTrip;
+  const adhocEditId = Number(searchParams.adhocEditId ?? "");
+  const adhocEditTrip =
+    Number.isFinite(adhocEditId) && adhocEditId > 0
+      ? adhocTrips.find((trip) => trip.id === adhocEditId) ?? null
+      : null;
 
   return (
     <AppShell>
@@ -152,6 +211,16 @@ export default async function TripsPage(props: Props) {
             Trip plan updated successfully.
           </div>
         ) : null}
+        {searchParams.adhocCreated ? (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+            Adhoc trip created successfully.
+          </div>
+        ) : null}
+        {searchParams.adhocUpdated ? (
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+            Adhoc trip updated successfully.
+          </div>
+        ) : null}
 
         <Card>
           <CardHeader>
@@ -167,7 +236,7 @@ export default async function TripsPage(props: Props) {
                   id="busId"
                   name="busId"
                   className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-                  defaultValue={editTrip ? String(editTrip.bus_id) : ""}
+                  defaultValue={formSource ? String(formSource.bus_id) : ""}
                   required
                 >
                   <option value="">Select bus</option>
@@ -184,7 +253,7 @@ export default async function TripsPage(props: Props) {
                   id="driverId"
                   name="driverId"
                   className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-                  defaultValue={editTrip ? String(editTrip.driver_id) : ""}
+                  defaultValue={formSource ? String(formSource.driver_id) : ""}
                   required
                 >
                   <option value="">Select driver</option>
@@ -201,7 +270,7 @@ export default async function TripsPage(props: Props) {
                   id="routeId"
                   name="routeId"
                   className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-                  defaultValue={editTrip ? String(editTrip.route_id) : ""}
+                  defaultValue={formSource ? String(formSource.route_id) : ""}
                   required
                 >
                   <option value="">Select route</option>
@@ -218,7 +287,7 @@ export default async function TripsPage(props: Props) {
                   id="shiftLabel"
                   name="shiftLabel"
                   className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-                  defaultValue={editTrip ? String(editTrip.shift_label).toLowerCase() : "morning"}
+                  defaultValue={formSource ? String(formSource.shift_label).toLowerCase() : "morning"}
                   required
                 >
                   {SHIFT_OPTIONS.map((shift) => (
@@ -228,15 +297,31 @@ export default async function TripsPage(props: Props) {
                   ))}
                 </select>
               </div>
-              <div className="grid gap-1">
-                <Label htmlFor="companyName">Company Name</Label>
-                <Input id="companyName" name="companyName" placeholder="Optional company name" defaultValue={editTrip?.company_name ?? ""} />
-              </div>
-              <div className="grid gap-1">
-                <Label htmlFor="remarks">Remarks</Label>
-                <Input id="remarks" name="remarks" placeholder="Optional note" defaultValue={editTrip?.remarks ?? ""} />
-              </div>
+              <details className="md:col-span-6 rounded-md border bg-muted/30 p-2">
+                <summary className="cursor-pointer text-sm font-medium">Advanced fields</summary>
+                <div className="mt-2 grid gap-3 md:grid-cols-2">
+                  <div className="grid gap-1">
+                    <Label htmlFor="companyName">Company Name</Label>
+                    <Input id="companyName" name="companyName" placeholder="Optional company name" defaultValue={formSource?.company_name ?? ""} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="remarks">Remarks</Label>
+                    <Input id="remarks" name="remarks" placeholder="Optional note" defaultValue={formSource?.remarks ?? ""} />
+                  </div>
+                </div>
+              </details>
               <div className="md:col-span-6 flex items-center gap-2">
+                {!editTrip ? (
+                  <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                    <input type="checkbox" name="createAnother" value="1" defaultChecked={searchParams.fast === "1"} />
+                    Save and add next
+                  </label>
+                ) : null}
+                <FormMemory
+                  storageKey="etms:trip-plan"
+                  fields={["busId", "driverId", "routeId", "shiftLabel", "companyName", "remarks"]}
+                  autoApply={searchParams.fast === "1" && !formSource}
+                />
                 <button className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground">
                   {editTrip ? "Update Trip" : "Create Trip"}
                 </button>
@@ -247,6 +332,130 @@ export default async function TripsPage(props: Props) {
                 ) : null}
               </div>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{adhocEditTrip ? "Edit Adhoc Trip" : "Adhoc Trips"}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form action={adhocEditTrip ? updateAdhocTrip : createAdhocTrip} className="grid gap-3 md:grid-cols-6">
+              {adhocEditTrip ? <input type="hidden" name="adhocTripId" value={adhocEditTrip.id} /> : null}
+              <div className="grid gap-1">
+                <Label htmlFor="adhocBusId">Bus</Label>
+                <select
+                  id="adhocBusId"
+                  name="adhocBusId"
+                  className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                  defaultValue={adhocEditTrip ? String(adhocEditTrip.bus_id) : ""}
+                  required
+                >
+                  <option value="">Select bus</option>
+                  {buses.rows.map((bus) => (
+                    <option key={bus.id} value={bus.id}>
+                      {bus.bus_number}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="adhocDriverId">Driver</Label>
+                <select
+                  id="adhocDriverId"
+                  name="adhocDriverId"
+                  className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                  defaultValue={adhocEditTrip ? String(adhocEditTrip.driver_id) : ""}
+                  required
+                >
+                  <option value="">Select driver</option>
+                  {drivers.rows.map((driver) => (
+                    <option key={driver.id} value={driver.id}>
+                      {driver.full_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="adhocFrom">From</Label>
+                <Input id="adhocFrom" name="adhocFrom" placeholder="Start location" defaultValue={adhocEditTrip?.from_location ?? ""} required />
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="adhocTo">To</Label>
+                <Input id="adhocTo" name="adhocTo" placeholder="Destination" defaultValue={adhocEditTrip?.to_location ?? ""} required />
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="adhocDays">Days</Label>
+                <Input
+                  id="adhocDays"
+                  name="adhocDays"
+                  type="number"
+                  min={1}
+                  step={1}
+                  defaultValue={adhocEditTrip ? String(adhocEditTrip.trip_days) : "1"}
+                  required
+                />
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="adhocRemarks">Remarks</Label>
+                <Input id="adhocRemarks" name="adhocRemarks" placeholder="Optional note" defaultValue={adhocEditTrip?.remarks ?? ""} />
+              </div>
+              <div className="md:col-span-6 flex items-center gap-2">
+                <button className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground">
+                  {adhocEditTrip ? "Update Adhoc Trip" : "Create Adhoc Trip"}
+                </button>
+                {adhocEditTrip ? (
+                  <Link href="/trips" className="inline-flex h-9 items-center rounded-md border border-input px-4 text-sm">
+                    Cancel Edit
+                  </Link>
+                ) : null}
+              </div>
+            </form>
+
+            <div className="mt-4 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>S.No</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Bus</TableHead>
+                    <TableHead>Driver</TableHead>
+                    <TableHead>From</TableHead>
+                    <TableHead>To</TableHead>
+                    <TableHead>Days</TableHead>
+                    <TableHead>Remarks</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {adhocTrips.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center text-muted-foreground">
+                        No adhoc trips created yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    adhocTrips.map((trip, index) => (
+                      <TableRow key={trip.id}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell>{trip.trip_date}</TableCell>
+                        <TableCell>{trip.bus_number}</TableCell>
+                        <TableCell>{trip.driver_name}</TableCell>
+                        <TableCell>{trip.from_location}</TableCell>
+                        <TableCell>{trip.to_location}</TableCell>
+                        <TableCell>{trip.trip_days}</TableCell>
+                        <TableCell>{trip.remarks ?? "-"}</TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/trips?adhocEditId=${trip.id}`} className="inline-flex h-8 items-center rounded border px-3 text-xs">
+                            Edit
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
 
@@ -314,6 +523,9 @@ export default async function TripsPage(props: Props) {
                           <div className="flex justify-end gap-2">
                             <Link href={`/trips?editId=${trip.id}`} className="inline-flex h-8 items-center rounded border px-3 text-xs">
                               Edit
+                            </Link>
+                            <Link href={`/trips?duplicateId=${trip.id}`} className="inline-flex h-8 items-center rounded border px-3 text-xs">
+                              Duplicate
                             </Link>
                             <form action={startTrip} className="flex items-center gap-2">
                               <input type="hidden" name="tripId" value={trip.id} />
