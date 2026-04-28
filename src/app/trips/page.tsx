@@ -100,9 +100,14 @@ async function createAdhocTrip(formData: FormData) {
   "use server";
   const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("trips");
+  const amountRaw = String(formData.get("adhocAmount") ?? "").trim();
+  const amount = amountRaw.length > 0 ? Number(amountRaw) : null;
   await tripsService.createAdhocTrip({
     busId: Number(formData.get("adhocBusId")),
     driverId: Number(formData.get("adhocDriverId")),
+    customerName: String(formData.get("adhocCustomerName") ?? ""),
+    customerPhone: String(formData.get("adhocCustomerPhone") ?? ""),
+    amount: Number.isFinite(amount as number) ? amount : null,
     fromLocation: String(formData.get("adhocFrom") ?? ""),
     toLocation: String(formData.get("adhocTo") ?? ""),
     tripDays: Number(formData.get("adhocDays")),
@@ -118,10 +123,15 @@ async function updateAdhocTrip(formData: FormData) {
   const session = await requireSession(["admin", "dispatcher", "updater"]);
   await requireModuleAccess("trips");
   const tripId = Number(formData.get("adhocTripId"));
+  const amountRaw = String(formData.get("adhocAmount") ?? "").trim();
+  const amount = amountRaw.length > 0 ? Number(amountRaw) : null;
   await tripsService.updateAdhocTrip({
     tripId,
     busId: Number(formData.get("adhocBusId")),
     driverId: Number(formData.get("adhocDriverId")),
+    customerName: String(formData.get("adhocCustomerName") ?? ""),
+    customerPhone: String(formData.get("adhocCustomerPhone") ?? ""),
+    amount: Number.isFinite(amount as number) ? amount : null,
     fromLocation: String(formData.get("adhocFrom") ?? ""),
     toLocation: String(formData.get("adhocTo") ?? ""),
     tripDays: Number(formData.get("adhocDays")),
@@ -377,6 +387,25 @@ export default async function TripsPage(props: Props) {
                 </select>
               </div>
               <div className="grid gap-1">
+                <Label htmlFor="adhocCustomerName">Customer Name</Label>
+                <Input id="adhocCustomerName" name="adhocCustomerName" defaultValue={adhocEditTrip?.customer_name ?? ""} required />
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="adhocCustomerPhone">Phone Number</Label>
+                <Input id="adhocCustomerPhone" name="adhocCustomerPhone" defaultValue={adhocEditTrip?.customer_phone ?? ""} required />
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="adhocAmount">Amount</Label>
+                <Input
+                  id="adhocAmount"
+                  name="adhocAmount"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  defaultValue={adhocEditTrip?.amount ?? ""}
+                />
+              </div>
+              <div className="grid gap-1">
                 <Label htmlFor="adhocFrom">From</Label>
                 <Input id="adhocFrom" name="adhocFrom" placeholder="Start location" defaultValue={adhocEditTrip?.from_location ?? ""} required />
               </div>
@@ -420,6 +449,9 @@ export default async function TripsPage(props: Props) {
                     <TableHead>Date</TableHead>
                     <TableHead>Bus</TableHead>
                     <TableHead>Driver</TableHead>
+                    <TableHead>Customer Name</TableHead>
+                    <TableHead>Phone Number</TableHead>
+                    <TableHead>Amount</TableHead>
                     <TableHead>From</TableHead>
                     <TableHead>To</TableHead>
                     <TableHead>Days</TableHead>
@@ -430,7 +462,7 @@ export default async function TripsPage(props: Props) {
                 <TableBody>
                   {adhocTrips.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center text-muted-foreground">
+                      <TableCell colSpan={12} className="text-center text-muted-foreground">
                         No adhoc trips created yet.
                       </TableCell>
                     </TableRow>
@@ -441,6 +473,9 @@ export default async function TripsPage(props: Props) {
                         <TableCell>{trip.trip_date}</TableCell>
                         <TableCell>{trip.bus_number}</TableCell>
                         <TableCell>{trip.driver_name}</TableCell>
+                        <TableCell>{trip.customer_name}</TableCell>
+                        <TableCell>{trip.customer_phone}</TableCell>
+                        <TableCell>{trip.amount != null ? Number(trip.amount).toFixed(2) : "-"}</TableCell>
                         <TableCell>{trip.from_location}</TableCell>
                         <TableCell>{trip.to_location}</TableCell>
                         <TableCell>{trip.trip_days}</TableCell>

@@ -9,6 +9,9 @@ export type AdhocTripRow = {
   driver_id: number;
   bus_number: string;
   driver_name: string;
+  customer_name: string;
+  customer_phone: string;
+  amount: string | null;
   from_location: string;
   to_location: string;
   trip_days: number;
@@ -182,6 +185,9 @@ export class TripsService {
         at.driver_id,
         b.bus_number,
         d.full_name as driver_name,
+        at.customer_name,
+        at.customer_phone,
+        at.amount::text,
         at.from_location,
         at.to_location,
         at.trip_days,
@@ -198,6 +204,9 @@ export class TripsService {
   async createAdhocTrip(input: {
     busId: number;
     driverId: number;
+    customerName: string;
+    customerPhone: string;
+    amount?: number | null;
     fromLocation: string;
     toLocation: string;
     tripDays: number;
@@ -205,11 +214,14 @@ export class TripsService {
   }) {
     await ensureTransportEnhancements();
     await query(
-      `INSERT INTO adhoc_trips (trip_date, bus_id, driver_id, from_location, to_location, trip_days, remarks)
-       VALUES (CURRENT_DATE, $1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO adhoc_trips (trip_date, bus_id, driver_id, customer_name, customer_phone, amount, from_location, to_location, trip_days, remarks)
+       VALUES (CURRENT_DATE, $1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         input.busId,
         input.driverId,
+        input.customerName.trim(),
+        input.customerPhone.trim(),
+        input.amount ?? null,
         input.fromLocation.trim(),
         input.toLocation.trim(),
         Math.max(1, Math.floor(input.tripDays)),
@@ -222,6 +234,9 @@ export class TripsService {
     tripId: number;
     busId: number;
     driverId: number;
+    customerName: string;
+    customerPhone: string;
+    amount?: number | null;
     fromLocation: string;
     toLocation: string;
     tripDays: number;
@@ -232,15 +247,21 @@ export class TripsService {
       `UPDATE adhoc_trips
        SET bus_id = $1,
            driver_id = $2,
-           from_location = $3,
-           to_location = $4,
-           trip_days = $5,
-           remarks = $6,
+           customer_name = $3,
+           customer_phone = $4,
+           amount = $5,
+           from_location = $6,
+           to_location = $7,
+           trip_days = $8,
+           remarks = $9,
            updated_at = NOW()
-       WHERE id = $7`,
+       WHERE id = $10`,
       [
         input.busId,
         input.driverId,
+        input.customerName.trim(),
+        input.customerPhone.trim(),
+        input.amount ?? null,
         input.fromLocation.trim(),
         input.toLocation.trim(),
         Math.max(1, Math.floor(input.tripDays)),
