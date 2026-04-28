@@ -8,6 +8,7 @@ export type AdhocTripRow = {
   bus_id: number;
   driver_id: number;
   bus_number: string;
+  registration_number: string;
   driver_name: string;
   customer_name: string;
   customer_phone: string;
@@ -31,6 +32,7 @@ export class TripsService {
       company_name: string | null;
       status: TripStatus;
       bus_number: string;
+      registration_number: string;
       driver_name: string;
       route_name: string;
       started_at: string | null;
@@ -52,6 +54,7 @@ export class TripsService {
         tr.company_name,
         tr.status::text as status,
         b.bus_number,
+        b.registration_number,
         d.full_name as driver_name,
         r.route_name,
         tr.started_at::text,
@@ -175,8 +178,12 @@ export class TripsService {
     );
   }
 
-  async listRecentAdhocTrips() {
+  async listRecentAdhocTrips(page = 1, pageSize = 10) {
     await ensureTransportEnhancements();
+    const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+    const safePageSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 10;
+    const offset = (safePage - 1) * safePageSize;
+    const countResult = await query<{ count: string }>(`SELECT COUNT(*)::text as count FROM adhoc_trips`);
     const result = await query<AdhocTripRow>(
       `SELECT
         at.id,
@@ -184,6 +191,7 @@ export class TripsService {
         at.bus_id,
         at.driver_id,
         b.bus_number,
+        b.registration_number,
         d.full_name as driver_name,
         at.customer_name,
         at.customer_phone,
@@ -196,9 +204,15 @@ export class TripsService {
       JOIN buses b ON b.id = at.bus_id
       JOIN drivers d ON d.id = at.driver_id
       ORDER BY at.trip_date DESC, at.id DESC
-      LIMIT 50`,
+      LIMIT $1 OFFSET $2`,
+      [safePageSize, offset],
     );
-    return result.rows;
+    return {
+      rows: result.rows,
+      total: Number(countResult.rows[0]?.count ?? 0),
+      page: safePage,
+      pageSize: safePageSize,
+    };
   }
 
   async createAdhocTrip(input: {
@@ -269,5 +283,10 @@ export class TripsService {
         input.tripId,
       ],
     );
+  }
+
+  async deleteAdhocTrip(tripId: number) {
+    await ensureTransportEnhancements();
+    await query(`DELETE FROM adhoc_trips WHERE id = $1`, [tripId]);
   }
 }
