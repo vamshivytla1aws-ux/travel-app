@@ -9,6 +9,7 @@ export type AdhocTripRow = {
   driver_id: number;
   bus_number: string;
   registration_number: string;
+  seater: number | null;
   driver_name: string;
   customer_name: string;
   customer_phone: string;
@@ -192,6 +193,7 @@ export class TripsService {
         at.driver_id,
         b.bus_number,
         b.registration_number,
+        COALESCE(at.seaters, b.seater)::int as seater,
         d.full_name as driver_name,
         at.customer_name,
         at.customer_phone,
@@ -219,6 +221,7 @@ export class TripsService {
     plannedDate: string;
     busId: number;
     driverId: number;
+    seaters?: number | null;
     customerName: string;
     customerPhone: string;
     amount?: number | null;
@@ -229,12 +232,13 @@ export class TripsService {
   }) {
     await ensureTransportEnhancements();
     await query(
-      `INSERT INTO adhoc_trips (trip_date, bus_id, driver_id, customer_name, customer_phone, amount, from_location, to_location, trip_days, remarks)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      `INSERT INTO adhoc_trips (trip_date, bus_id, driver_id, seaters, customer_name, customer_phone, amount, from_location, to_location, trip_days, remarks)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         input.plannedDate,
         input.busId,
         input.driverId,
+        input.seaters ?? null,
         input.customerName.trim(),
         input.customerPhone.trim(),
         input.amount ?? null,
@@ -251,6 +255,7 @@ export class TripsService {
     plannedDate: string;
     busId: number;
     driverId: number;
+    seaters?: number | null;
     customerName: string;
     customerPhone: string;
     amount?: number | null;
@@ -265,19 +270,21 @@ export class TripsService {
        SET trip_date = $1,
            bus_id = $2,
            driver_id = $3,
-           customer_name = $4,
-           customer_phone = $5,
-           amount = $6,
-           from_location = $7,
-           to_location = $8,
-           trip_days = $9,
-           remarks = $10,
+           seaters = $4,
+           customer_name = $5,
+           customer_phone = $6,
+           amount = $7,
+           from_location = $8,
+           to_location = $9,
+           trip_days = $10,
+           remarks = $11,
            updated_at = NOW()
-       WHERE id = $11`,
+       WHERE id = $12`,
       [
         input.plannedDate,
         input.busId,
         input.driverId,
+        input.seaters ?? null,
         input.customerName.trim(),
         input.customerPhone.trim(),
         input.amount ?? null,

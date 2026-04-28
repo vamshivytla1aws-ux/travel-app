@@ -149,11 +149,12 @@ async function createAdhocTrip(formData: FormData) {
   await requireModuleAccess("trips");
   const amountRaw = String(formData.get("adhocAmount") ?? "").trim();
   const amount = amountRaw.length > 0 ? Number(amountRaw) : null;
+  const seatersRaw = String(formData.get("adhocSeaters") ?? "").trim();
   const busRegistration = String(formData.get("adhocBusRegistration") ?? "").trim();
   const driverName = String(formData.get("adhocDriverName") ?? "").trim();
   const [busRow, driverRow] = await Promise.all([
-    query<{ id: number }>(
-      `SELECT id FROM buses
+    query<{ id: number; seater: number | null }>(
+      `SELECT id, seater FROM buses
        WHERE status = 'active'
          AND (registration_number ILIKE $1 OR bus_number ILIKE $1)
        ORDER BY id DESC
@@ -169,7 +170,10 @@ async function createAdhocTrip(formData: FormData) {
     ),
   ]);
   const busId = Number(busRow.rows[0]?.id ?? 0);
+  const busSeater = Number(busRow.rows[0]?.seater ?? 0);
   const driverId = Number(driverRow.rows[0]?.id ?? 0);
+  const seatersParsed = seatersRaw.length > 0 ? Number(seatersRaw) : null;
+  const seaters = Number.isFinite(seatersParsed as number) ? seatersParsed : busSeater;
   if (!busId || !driverId) {
     redirect(`/trips?error=${Date.now()}`);
   }
@@ -177,6 +181,7 @@ async function createAdhocTrip(formData: FormData) {
     plannedDate: String(formData.get("adhocPlannedDate") ?? ""),
     busId,
     driverId,
+    seaters,
     customerName: String(formData.get("adhocCustomerName") ?? ""),
     customerPhone: String(formData.get("adhocCustomerPhone") ?? ""),
     amount: Number.isFinite(amount as number) ? amount : null,
@@ -197,11 +202,12 @@ async function updateAdhocTrip(formData: FormData) {
   const tripId = Number(formData.get("adhocTripId"));
   const amountRaw = String(formData.get("adhocAmount") ?? "").trim();
   const amount = amountRaw.length > 0 ? Number(amountRaw) : null;
+  const seatersRaw = String(formData.get("adhocSeaters") ?? "").trim();
   const busRegistration = String(formData.get("adhocBusRegistration") ?? "").trim();
   const driverName = String(formData.get("adhocDriverName") ?? "").trim();
   const [busRow, driverRow] = await Promise.all([
-    query<{ id: number }>(
-      `SELECT id FROM buses
+    query<{ id: number; seater: number | null }>(
+      `SELECT id, seater FROM buses
        WHERE status = 'active'
          AND (registration_number ILIKE $1 OR bus_number ILIKE $1)
        ORDER BY id DESC
@@ -217,7 +223,10 @@ async function updateAdhocTrip(formData: FormData) {
     ),
   ]);
   const busId = Number(busRow.rows[0]?.id ?? 0);
+  const busSeater = Number(busRow.rows[0]?.seater ?? 0);
   const driverId = Number(driverRow.rows[0]?.id ?? 0);
+  const seatersParsed = seatersRaw.length > 0 ? Number(seatersRaw) : null;
+  const seaters = Number.isFinite(seatersParsed as number) ? seatersParsed : busSeater;
   if (!busId || !driverId) {
     redirect(`/trips?error=${Date.now()}`);
   }
@@ -226,6 +235,7 @@ async function updateAdhocTrip(formData: FormData) {
     plannedDate: String(formData.get("adhocPlannedDate") ?? ""),
     busId,
     driverId,
+    seaters,
     customerName: String(formData.get("adhocCustomerName") ?? ""),
     customerPhone: String(formData.get("adhocCustomerPhone") ?? ""),
     amount: Number.isFinite(amount as number) ? amount : null,
@@ -496,6 +506,19 @@ export default async function TripsPage(props: Props) {
                 />
               </div>
               <div className="grid gap-1">
+                <Label htmlFor="adhocSeaters">Seaters</Label>
+                <Input
+                  id="adhocSeaters"
+                  name="adhocSeaters"
+                  type="number"
+                  min={0}
+                  step={1}
+                  placeholder="Enter seaters"
+                  defaultValue={adhocEditTrip?.seater ?? ""}
+                  required
+                />
+              </div>
+              <div className="grid gap-1">
                 <Label htmlFor="adhocCustomerName">Customer Name</Label>
                 <Input id="adhocCustomerName" name="adhocCustomerName" defaultValue={adhocEditTrip?.customer_name ?? ""} required />
               </div>
@@ -567,6 +590,7 @@ export default async function TripsPage(props: Props) {
                     <TableHead>S.No</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Registration</TableHead>
+                    <TableHead>Seaters</TableHead>
                     <TableHead>Driver</TableHead>
                     <TableHead>Customer Name</TableHead>
                     <TableHead>Phone Number</TableHead>
@@ -581,7 +605,7 @@ export default async function TripsPage(props: Props) {
                 <TableBody>
                   {adhocTrips.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={12} className="text-center text-muted-foreground">
+                      <TableCell colSpan={13} className="text-center text-muted-foreground">
                         No adhoc trips created yet.
                       </TableCell>
                     </TableRow>
@@ -591,6 +615,7 @@ export default async function TripsPage(props: Props) {
                         <TableCell>{(adhocPage - 1) * 10 + index + 1}</TableCell>
                         <TableCell>{trip.trip_date}</TableCell>
                         <TableCell>{trip.registration_number}</TableCell>
+                        <TableCell>{trip.seater}</TableCell>
                         <TableCell>{trip.driver_name}</TableCell>
                         <TableCell>{trip.customer_name}</TableCell>
                         <TableCell>{trip.customer_phone}</TableCell>
@@ -600,17 +625,25 @@ export default async function TripsPage(props: Props) {
                         <TableCell>{trip.trip_days}</TableCell>
                         <TableCell>{trip.remarks ?? "-"}</TableCell>
                         <TableCell className="text-right">
-                          <div className="inline-flex items-center gap-2">
-                            <Link href={`/trips?adhocEditId=${trip.id}&adhocPage=${adhocPage}`} className="inline-flex h-8 items-center rounded border px-3 text-xs">
-                              Edit
-                            </Link>
-                            <form action={deleteAdhocTrip}>
-                              <input type="hidden" name="adhocTripId" value={trip.id} />
-                              <button className="inline-flex h-8 items-center rounded border border-red-300 px-3 text-xs text-red-600">
-                                Delete
-                              </button>
-                            </form>
-                          </div>
+                          <details className="relative inline-block text-left">
+                            <summary className="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded border text-base leading-none">
+                              ...
+                            </summary>
+                            <div className="absolute right-0 z-20 mt-1 w-28 rounded-md border bg-background p-1 shadow-md">
+                              <Link
+                                href={`/trips?adhocEditId=${trip.id}&adhocPage=${adhocPage}`}
+                                className="block rounded px-2 py-1 text-left text-xs hover:bg-muted"
+                              >
+                                Edit
+                              </Link>
+                              <form action={deleteAdhocTrip}>
+                                <input type="hidden" name="adhocTripId" value={trip.id} />
+                                <button className="block w-full rounded px-2 py-1 text-left text-xs text-red-600 hover:bg-red-50">
+                                  Delete
+                                </button>
+                              </form>
+                            </div>
+                          </details>
                         </TableCell>
                       </TableRow>
                     ))

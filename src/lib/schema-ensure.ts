@@ -406,6 +406,21 @@ export async function ensureTransportEnhancements() {
   await query(`ALTER TABLE adhoc_trips ADD COLUMN IF NOT EXISTS customer_name VARCHAR(160) NOT NULL DEFAULT '';`);
   await query(`ALTER TABLE adhoc_trips ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(20) NOT NULL DEFAULT '';`);
   await query(`ALTER TABLE adhoc_trips ADD COLUMN IF NOT EXISTS amount NUMERIC(14,2);`);
+  await query(`ALTER TABLE adhoc_trips ADD COLUMN IF NOT EXISTS seaters INTEGER;`);
+  await query(`UPDATE adhoc_trips at SET seaters = b.seater FROM buses b WHERE at.bus_id = b.id AND at.seaters IS NULL;`);
+  await query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'adhoc_trips_seaters_non_negative'
+      ) THEN
+        ALTER TABLE adhoc_trips
+        ADD CONSTRAINT adhoc_trips_seaters_non_negative
+        CHECK (seaters IS NULL OR seaters >= 0);
+      END IF;
+    END $$;
+  `);
   await query(`CREATE INDEX IF NOT EXISTS idx_adhoc_trips_date ON adhoc_trips(trip_date DESC, id DESC);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_adhoc_trips_bus ON adhoc_trips(bus_id, id DESC);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_adhoc_trips_driver ON adhoc_trips(driver_id, id DESC);`);
