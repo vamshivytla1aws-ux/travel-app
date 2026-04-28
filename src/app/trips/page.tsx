@@ -6,7 +6,6 @@ import { AppShell } from "@/components/app-shell";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
 import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { FormDirtyGuard } from "@/components/form-dirty-guard";
-import { FormMemory } from "@/components/form-memory";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -327,11 +326,6 @@ export default async function TripsPage(props: Props) {
                     Save and add next
                   </label>
                 ) : null}
-                <FormMemory
-                  storageKey="etms:trip-plan"
-                  fields={["busId", "driverId", "routeId", "shiftLabel", "companyName", "remarks"]}
-                  autoApply={searchParams.fast === "1" && !formSource}
-                />
                 <button className="h-9 rounded-md bg-primary px-4 text-sm text-primary-foreground">
                   {editTrip ? "Update Trip" : "Create Trip"}
                 </button>
