@@ -216,6 +216,7 @@ export class TripsService {
   }
 
   async createAdhocTrip(input: {
+    plannedDate: string;
     busId: number;
     driverId: number;
     customerName: string;
@@ -229,8 +230,9 @@ export class TripsService {
     await ensureTransportEnhancements();
     await query(
       `INSERT INTO adhoc_trips (trip_date, bus_id, driver_id, customer_name, customer_phone, amount, from_location, to_location, trip_days, remarks)
-       VALUES (CURRENT_DATE, $1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
+        input.plannedDate,
         input.busId,
         input.driverId,
         input.customerName.trim(),
@@ -246,6 +248,7 @@ export class TripsService {
 
   async updateAdhocTrip(input: {
     tripId: number;
+    plannedDate: string;
     busId: number;
     driverId: number;
     customerName: string;
@@ -259,18 +262,20 @@ export class TripsService {
     await ensureTransportEnhancements();
     await query(
       `UPDATE adhoc_trips
-       SET bus_id = $1,
-           driver_id = $2,
-           customer_name = $3,
-           customer_phone = $4,
-           amount = $5,
-           from_location = $6,
-           to_location = $7,
-           trip_days = $8,
-           remarks = $9,
+       SET trip_date = $1,
+           bus_id = $2,
+           driver_id = $3,
+           customer_name = $4,
+           customer_phone = $5,
+           amount = $6,
+           from_location = $7,
+           to_location = $8,
+           trip_days = $9,
+           remarks = $10,
            updated_at = NOW()
-       WHERE id = $10`,
+       WHERE id = $11`,
       [
+        input.plannedDate,
         input.busId,
         input.driverId,
         input.customerName.trim(),

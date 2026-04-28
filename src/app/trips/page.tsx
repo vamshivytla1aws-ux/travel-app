@@ -174,6 +174,7 @@ async function createAdhocTrip(formData: FormData) {
     redirect(`/trips?error=${Date.now()}`);
   }
   await tripsService.createAdhocTrip({
+    plannedDate: String(formData.get("adhocPlannedDate") ?? ""),
     busId,
     driverId,
     customerName: String(formData.get("adhocCustomerName") ?? ""),
@@ -222,6 +223,7 @@ async function updateAdhocTrip(formData: FormData) {
   }
   await tripsService.updateAdhocTrip({
     tripId,
+    plannedDate: String(formData.get("adhocPlannedDate") ?? ""),
     busId,
     driverId,
     customerName: String(formData.get("adhocCustomerName") ?? ""),
@@ -283,6 +285,7 @@ export default async function TripsPage(props: Props) {
     ),
   ]);
   const adhocTrips = adhocTripsResult.rows;
+  const todayIso = new Date().toISOString().slice(0, 10);
   const adhocTotalPages = Math.max(1, Math.ceil(adhocTripsResult.total / adhocTripsResult.pageSize));
   const editId = Number(searchParams.editId ?? "");
   const editTrip = Number.isFinite(editId) && editId > 0
@@ -460,6 +463,16 @@ export default async function TripsPage(props: Props) {
           <CardContent>
             <form action={adhocEditTrip ? updateAdhocTrip : createAdhocTrip} className="grid gap-3 md:grid-cols-6">
               {adhocEditTrip ? <input type="hidden" name="adhocTripId" value={adhocEditTrip.id} /> : null}
+              <div className="grid gap-1">
+                <Label htmlFor="adhocPlannedDate">Planned Date</Label>
+                <Input
+                  id="adhocPlannedDate"
+                  name="adhocPlannedDate"
+                  type="date"
+                  defaultValue={adhocEditTrip?.trip_date ?? todayIso}
+                  required
+                />
+              </div>
               <div className="grid gap-1">
                 <Label htmlFor="adhocBusRegistration">Registration</Label>
                 <Input
