@@ -6,7 +6,6 @@ import { WebOnly } from "@/components/enterprise/web-only";
 import { APP_MODULES, clearSessionCookie, getSession, type AppModule } from "@/lib/auth";
 import { enterpriseContainer } from "@/lib/ui-core";
 import { Button } from "@/components/ui/button";
-import { CompactModeToggle } from "@/components/ui/compact-mode-toggle";
 
 async function logout() {
   "use server";
@@ -33,7 +32,6 @@ export async function AppShell({ children }: { children: ReactNode }) {
               <div className="hidden items-center gap-3 text-sm lg:flex">
                 {session ? (
                   <>
-                    <CompactModeToggle />
                     <span className="text-slate-300">{session.fullName}</span>
                     <form action={logout}>
                       <Button
