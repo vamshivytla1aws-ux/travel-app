@@ -57,6 +57,7 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
   const [open, setOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [isNativeApp, setIsNativeApp] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const filteredGroups = navGroups
     .map((group) => ({
       label: group.label,
@@ -88,8 +89,15 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
     const nativeByBridge = maybeCapacitor?.isNativePlatform?.() === true;
     setIsNativeApp(nativeByBridge);
   }, []);
+  useEffect(() => {
+    const media = globalThis.matchMedia("(max-width: 1023px)");
+    const sync = () => setIsMobileViewport(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
 
-  if (isNativeApp) {
+  if (isNativeApp || isMobileViewport) {
     return (
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger

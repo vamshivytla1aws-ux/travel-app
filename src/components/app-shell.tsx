@@ -6,6 +6,7 @@ import { WebOnly } from "@/components/enterprise/web-only";
 import { APP_MODULES, clearSessionCookie, getSession, type AppModule } from "@/lib/auth";
 import { enterpriseContainer } from "@/lib/ui-core";
 import { Button } from "@/components/ui/button";
+import { CompactModeToggle } from "@/components/ui/compact-mode-toggle";
 
 async function logout() {
   "use server";
@@ -29,9 +30,10 @@ export async function AppShell({ children }: { children: ReactNode }) {
               <h1 className="text-lg font-semibold text-white">Jai Bhavani Travels Tracking System</h1>
             </div>
             <WebOnly>
-              <div className="flex items-center gap-3 text-sm">
+              <div className="hidden items-center gap-3 text-sm lg:flex">
                 {session ? (
                   <>
+                    <CompactModeToggle />
                     <span className="text-slate-300">{session.fullName}</span>
                     <form action={logout}>
                       <Button
@@ -56,10 +58,12 @@ export async function AppShell({ children }: { children: ReactNode }) {
             userFullName={session?.fullName}
             userRole={session?.role}
           />
-          <EnterpriseBreadcrumbs />
+          <div className="hidden md:flex">
+            <EnterpriseBreadcrumbs />
+          </div>
         </div>
       </header>
-      <main className={`${enterpriseContainer} py-6`}>{children}</main>
+      <main className={`${enterpriseContainer} py-4 md:py-6`}>{children}</main>
     </div>
   );
 }

@@ -96,3 +96,29 @@ html.compact-ui [data-slot="table-cell"] {
 html.compact-ui [data-slot="table-row"] {
   line-height: 1.2;
 }
+
+@media (max-width: 1023px) {
+  [data-slot="table-head"] {
+    height: 2.2rem;
+    padding: 0.35rem 0.45rem;
+    font-size: 0.74rem;
+    white-space: nowrap;
+  }
+
+  [data-slot="table-cell"] {
+    padding: 0.4rem 0.45rem;
+    font-size: 0.8rem;
+    vertical-align: top;
+  }
+
+  [data-slot="table-row"] {
+    line-height: 1.25;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    min-height: 2.5rem;
+  }
+}
