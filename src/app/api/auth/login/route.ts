@@ -40,13 +40,13 @@ export async function POST(request: Request) {
     password === "Admin@123";
 
   if (!user && !fallbackAllowed) {
-    return NextResponse.redirect(new URL("/login?error=invalid", publicBase));
+    return NextResponse.redirect(new URL("/login?error=invalid", publicBase), { status: 303 });
   }
 
   if (user) {
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      return NextResponse.redirect(new URL("/login?error=invalid", publicBase));
+      return NextResponse.redirect(new URL("/login?error=invalid", publicBase), { status: 303 });
     }
   }
 
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
         },
       );
 
-  const response = NextResponse.redirect(new URL("/dashboard", publicBase));
+  const response = NextResponse.redirect(new URL("/dashboard", publicBase), { status: 303 });
   response.cookies.set("etms_session", finalToken, {
     httpOnly: true,
     sameSite: "lax",

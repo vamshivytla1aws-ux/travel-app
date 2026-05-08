@@ -209,14 +209,19 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
             ) : null}
             {userRole ? (
               <div className="space-y-1.5 border-t border-slate-700 pt-3">
-                <Link
-                  href="/api/auth/logout"
-                  onClick={() => setOpen(false)}
-                  className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-rose-200 transition-colors hover:bg-rose-900/30 hover:text-rose-100"
+                <form
+                  action="/api/auth/logout"
+                  method="post"
+                  onSubmit={() => setOpen(false)}
                 >
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </Link>
+                  <button
+                    type="submit"
+                    className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-rose-200 transition-colors hover:bg-rose-900/30 hover:text-rose-100"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </button>
+                </form>
               </div>
             ) : null}
           </nav>

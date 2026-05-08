@@ -8,11 +8,10 @@ function resolveRedirectTarget(request: Request) {
 
 export async function GET(request: Request) {
   await clearSessionCookie();
-  return NextResponse.redirect(resolveRedirectTarget(request));
+  return NextResponse.redirect(resolveRedirectTarget(request), { status: 303 });
 }
 
 export async function POST(request: Request) {
   await clearSessionCookie();
-  return NextResponse.redirect(resolveRedirectTarget(request));
+  return NextResponse.redirect(resolveRedirectTarget(request), { status: 303 });
 }
-
