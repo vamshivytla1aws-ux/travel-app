@@ -106,7 +106,7 @@ async function createRouteEntry(formData: FormData) {
 
   revalidatePath("/routes");
   const createAnother = String(formData.get("createAnother") ?? "") === "1";
-  redirect(createAnother ? `/routes?create=1&created=${Date.now()}` : `/routes?created=${Date.now()}`);
+  redirect(createAnother ? `/routes?create=1&created=${Date.now()}&fast=1` : `/routes?created=${Date.now()}`);
 }
 
 async function updateRouteEntry(formData: FormData) {
@@ -187,7 +187,9 @@ type Props = {
     page?: string;
     pageSize?: string;
     editId?: string;
+    duplicateId?: string;
     create?: string;
+    fast?: string;
     export?: string;
   }>;
 };
@@ -251,8 +253,13 @@ export default async function RoutesPage(props: Props) {
   const editEntry = Number.isFinite(editId) && editId > 0
     ? entriesResult.rows.find((entry) => entry.id === editId) ?? null
     : null;
+  const duplicateId = Number(searchParams.duplicateId ?? "");
+  const duplicateEntry = !editEntry && Number.isFinite(duplicateId) && duplicateId > 0
+    ? entriesResult.rows.find((entry) => entry.id === duplicateId) ?? null
+    : null;
+  const formSource = editEntry ?? duplicateEntry;
   const showCreateModal = String(searchParams.create ?? "") === "1";
-  const showFormModal = showCreateModal || Boolean(editEntry);
+  const showFormModal = showCreateModal || Boolean(editEntry) || Boolean(duplicateEntry);
   const queryBase = new URLSearchParams();
   if (searchParams.q) queryBase.set("q", String(searchParams.q));
   if (searchParams.shift) queryBase.set("shift", String(searchParams.shift));
@@ -374,6 +381,16 @@ export default async function RoutesPage(props: Props) {
                         >
                           Edit
                         </Link>
+                        <Link
+                          href={`/routes?${(() => {
+                            const params = new URLSearchParams(queryBase);
+                            params.set("duplicateId", String(entry.id));
+                            return params.toString();
+                          })()}`}
+                          className={buttonVariants({ variant: "outline", size: "sm" })}
+                        >
+                          Duplicate
+                        </Link>
                         <form action={deleteRouteEntry}>
                           <input type="hidden" name="routeId" value={entry.id} />
                           <ConfirmSubmitButton
@@ -448,7 +465,7 @@ export default async function RoutesPage(props: Props) {
                 {editEntry ? <input type="hidden" name="routeId" value={editEntry.id} /> : null}
 
                 <Label htmlFor="busId">Bus Registration No</Label>
-                <select id="busId" name="busId" defaultValue={editEntry ? String(editEntry.bus_id) : ""} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" required>
+                <select id="busId" name="busId" defaultValue={formSource ? String(formSource.bus_id) : ""} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" required>
                   <option value="">Select bus</option>
                   {buses.rows.map((bus) => (
                     <option key={bus.id} value={bus.id}>
@@ -458,7 +475,7 @@ export default async function RoutesPage(props: Props) {
                 </select>
 
                 <Label htmlFor="driverId">Driver</Label>
-                <select id="driverId" name="driverId" defaultValue={editEntry ? String(editEntry.driver_id) : ""} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" required>
+                <select id="driverId" name="driverId" defaultValue={formSource ? String(formSource.driver_id) : ""} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" required>
                   <option value="">Select driver</option>
                   {drivers.rows.map((driver) => (
                     <option key={driver.id} value={driver.id}>
@@ -468,7 +485,7 @@ export default async function RoutesPage(props: Props) {
                 </select>
 
                 <Label htmlFor="companyName">Company</Label>
-                <Input id="companyName" name="companyName" list="company-list" defaultValue={editEntry?.company_name ?? ""} placeholder="Editable company name" />
+                <Input id="companyName" name="companyName" list="company-list" defaultValue={formSource?.company_name ?? ""} placeholder="Editable company name" />
                 <datalist id="company-list">
                   {companies.map((company) => (
                     <option key={company} value={company} />
@@ -476,19 +493,19 @@ export default async function RoutesPage(props: Props) {
                 </datalist>
 
                 <Label htmlFor="routeName">Route Name</Label>
-                <Input id="routeName" name="routeName" defaultValue={editEntry?.route_name ?? ""} required />
+                <Input id="routeName" name="routeName" defaultValue={formSource?.route_name ?? ""} required />
 
                 <Label htmlFor="assignmentDate">Assignment Date</Label>
                 <Input
                   id="assignmentDate"
                   name="assignmentDate"
                   type="date"
-                  defaultValue={editEntry?.assignment_date ?? new Date().toISOString().slice(0, 10)}
+                  defaultValue={formSource?.assignment_date ?? new Date().toISOString().slice(0, 10)}
                   required
                 />
 
                 <Label htmlFor="shift">Shift</Label>
-                <select id="shift" name="shift" defaultValue={editEntry?.shift ?? "general"} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm">
+                <select id="shift" name="shift" defaultValue={formSource?.shift ?? "general"} className="h-10 rounded-md border border-input bg-transparent px-3 text-sm">
                   {SHIFT_OPTIONS.map((shift) => (
                     <option key={shift} value={shift}>
                       {shift.charAt(0).toUpperCase() + shift.slice(1)}
@@ -498,7 +515,7 @@ export default async function RoutesPage(props: Props) {
 
                 {!editEntry ? (
                   <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                    <input type="checkbox" name="createAnother" value="1" />
+                    <input type="checkbox" name="createAnother" value="1" defaultChecked={searchParams.fast === "1"} />
                     Save and add next
                   </label>
                 ) : null}
