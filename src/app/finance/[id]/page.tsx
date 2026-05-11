@@ -14,6 +14,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { normalizeFinanceStatus } from "@/lib/finance";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
+import { formatDateInAppTimeZone } from "@/lib/timezone";
 import { safeDecodeURIComponent } from "@/lib/url";
 import { FinanceLoansService } from "@/services/finance-loans.service";
 
@@ -177,7 +178,7 @@ export default async function FinanceLoanDetailPage(props: Props) {
             <p><strong>Status:</strong> {loan.status}</p>
             <p><strong>Outstanding Principal:</strong> {formatCurrency(loan.outstandingPrincipal)}</p>
             <p><strong>Outstanding Interest:</strong> {formatCurrency(loan.outstandingInterest)}</p>
-            <p><strong>Next EMI Date:</strong> {loan.nextEmiDate ? new Date(loan.nextEmiDate).toLocaleDateString() : "-"}</p>
+                <p><strong>Next EMI Date:</strong> {loan.nextEmiDate ? formatDateInAppTimeZone(loan.nextEmiDate) : "-"}</p>
             <div className="pt-3">
               <form action={deleteLoan}>
                 <input type="hidden" name="loanId" value={loan.id} />

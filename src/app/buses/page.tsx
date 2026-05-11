@@ -22,6 +22,7 @@ import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
+import { formatDateInAppTimeZone } from "@/lib/timezone";
 import { BusesService } from "@/services/buses.service";
 
 const busesService = new BusesService();
@@ -153,7 +154,7 @@ export default async function BusesPage(props: Props) {
       ) : null}
       <Card className="border-slate-300">
         <CardHeader className="border-b border-slate-300 bg-white">
-          <CardTitle className="text-base font-semibold">Bus Fleet - {new Date().toLocaleDateString()}</CardTitle>
+          <CardTitle className="text-base font-semibold">Bus Fleet - {formatDateInAppTimeZone(new Date())}</CardTitle>
           <BusesLiveCount />
         </CardHeader>
         <CardContent className="space-y-5 bg-[#f5f5f5] p-5">

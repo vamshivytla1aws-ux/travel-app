@@ -17,6 +17,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { normalizeFinanceStatus } from "@/lib/finance";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
+import { formatDateInAppTimeZone } from "@/lib/timezone";
 import { safeDecodeURIComponent } from "@/lib/url";
 import { FinanceLoansService } from "@/services/finance-loans.service";
 
@@ -225,7 +226,7 @@ export default async function FinancePage(props: Props) {
                     <TableCell>{loan.monthsLeft}</TableCell>
                     <TableCell>{formatCurrency(loan.outstandingPrincipal)}</TableCell>
                     <TableCell>{formatCurrency(loan.outstandingInterest)}</TableCell>
-                    <TableCell>{loan.nextEmiDate ? new Date(loan.nextEmiDate).toLocaleDateString() : "-"}</TableCell>
+                    <TableCell>{loan.nextEmiDate ? formatDateInAppTimeZone(loan.nextEmiDate) : "-"}</TableCell>
                     <TableCell>
                       <Badge variant={statusTone(loan.status)}>{loan.status}</Badge>
                     </TableCell>

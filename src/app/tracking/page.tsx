@@ -10,6 +10,7 @@ import Link from "next/link";
 import { requireSession } from "@/lib/auth";
 import { requireModuleAccess } from "@/lib/auth";
 import { query } from "@/lib/db";
+import { formatDateTimeInAppTimeZone } from "@/lib/timezone";
 
 const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 50, 100] as const;
 
@@ -103,7 +104,7 @@ export default async function TrackingPage(props: Props) {
               {visibleLogs.map((log, idx) => (
                 <TableRow key={`${log.bus_number}-${idx}`}>
                   <TableCell>{log.bus_number}</TableCell>
-                  <TableCell>{new Date(log.logged_at).toLocaleString()}</TableCell>
+                  <TableCell>{formatDateTimeInAppTimeZone(log.logged_at)}</TableCell>
                   <TableCell>{Number(log.latitude).toFixed(5)}</TableCell>
                   <TableCell>{Number(log.longitude).toFixed(5)}</TableCell>
                   <TableCell>{Number(log.speed_kmph).toFixed(1)}</TableCell>

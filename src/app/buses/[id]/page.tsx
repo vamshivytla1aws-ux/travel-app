@@ -13,6 +13,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { ensureDocumentTables, getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
 import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
+import { formatDateInAppTimeZone, formatDateTimeInAppTimeZone } from "@/lib/timezone";
 import { BusesService } from "@/services/buses.service";
 import { FuelService } from "@/services/fuel.service";
 import { FuelTruckService } from "@/services/fuel-truck.service";
@@ -650,7 +651,7 @@ export default async function BusDetailPage(props: Props) {
                 <TableBody>
                   {detail.fuelHistory.map((entry) => (
                     <TableRow key={entry.id}>
-                      <TableCell>{new Date(entry.filledAt).toLocaleDateString()}</TableCell>
+                            <TableCell>{formatDateInAppTimeZone(entry.filledAt)}</TableCell>
                       <TableCell>
                         <Badge variant={entry.source === "TANKER" ? "default" : "secondary"}>
                           {entry.source === "TANKER" ? "Tanker" : "Manual"}
@@ -812,7 +813,7 @@ export default async function BusDetailPage(props: Props) {
                 <TableBody>
                   {detail.maintenance.map((record) => (
                     <TableRow key={record.id}>
-                      <TableCell>{new Date(record.maintenance_date).toLocaleDateString()}</TableCell>
+                            <TableCell>{formatDateInAppTimeZone(record.maintenance_date)}</TableCell>
                       <TableCell>{record.issue_type}</TableCell>
                       <TableCell>{Number(record.cost).toFixed(2)}</TableCell>
                       <TableCell className="text-right">
@@ -904,7 +905,7 @@ export default async function BusDetailPage(props: Props) {
                     <div>
                       <p className="font-medium">{document.document_name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {document.document_type} - {new Date(document.uploaded_at).toLocaleString()}
+                            {document.document_type} - {formatDateTimeInAppTimeZone(document.uploaded_at)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -958,7 +959,7 @@ export default async function BusDetailPage(props: Props) {
                 ) : (
                   detail.routeAssignments.map((entry) => (
                     <TableRow key={entry.id}>
-                      <TableCell>{new Date(entry.assignment_date).toLocaleDateString()}</TableCell>
+                          <TableCell>{formatDateInAppTimeZone(entry.assignment_date)}</TableCell>
                       <TableCell>{entry.route_name}</TableCell>
                       <TableCell className="capitalize">{entry.shift}</TableCell>
                       <TableCell>{entry.company_name ?? "-"}</TableCell>

@@ -20,6 +20,7 @@ import { ensureDocumentTables, getUploadedFileBuffer, isUploadLikeFile } from "@
 import { normalizeProfilePhotoMime } from "@/lib/image-mime";
 import { query, withTransaction } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
+import { formatDateInAppTimeZone, formatDateTimeInAppTimeZone } from "@/lib/timezone";
 import { DriversService } from "@/services/drivers.service";
 
 const driversService = new DriversService();
@@ -563,8 +564,8 @@ export default async function DriverProfilePage(props: Props) {
               {sectionRow("Phone", profile.driver.phone)}
               {sectionRow("Company", profile.driver.company_name)}
               {sectionRow("License", profile.driver.license_number)}
-              {sectionRow("DL Validity", profile.driver.license_expiry ? new Date(profile.driver.license_expiry).toLocaleDateString() : "-")}
-              {sectionRow("Joining Date", profile.profile?.joiningDate ? new Date(profile.profile.joiningDate).toLocaleDateString() : "-")}
+            {sectionRow("DL Validity", profile.driver.license_expiry ? formatDateInAppTimeZone(profile.driver.license_expiry) : "-")}
+            {sectionRow("Joining Date", profile.profile?.joiningDate ? formatDateInAppTimeZone(profile.profile.joiningDate) : "-")}
                 {sectionRow("Vehicle", profile.profile?.vehicleRegistrationNo)}
                 {sectionRow("Present Reading", profile.profile?.presentReadingKm != null ? String(profile.profile.presentReadingKm) : "-")}
                 {sectionRow("ESIC", profile.driver.esic_number)}
@@ -689,7 +690,7 @@ export default async function DriverProfilePage(props: Props) {
                 <div key={document.id} className="flex items-center justify-between rounded border p-2 text-sm">
                   <div>
                     <p className="font-medium">{document.document_name}</p>
-                    <p className="text-xs text-muted-foreground">{document.document_type} - {new Date(document.uploaded_at).toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">{document.document_type} - {formatDateTimeInAppTimeZone(document.uploaded_at)}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <a className="text-blue-600 hover:underline" href={`/api/documents/driver/${document.id}`} target="_blank" rel="noreferrer">View</a>
@@ -726,7 +727,7 @@ export default async function DriverProfilePage(props: Props) {
                 ) : (
                   profile.routeAssignments.map((entry) => (
                     <TableRow key={entry.id}>
-                      <TableCell>{new Date(entry.assignment_date).toLocaleDateString()}</TableCell>
+                  <TableCell>{formatDateInAppTimeZone(entry.assignment_date)}</TableCell>
                       <TableCell>{entry.route_name}</TableCell>
                       <TableCell className="capitalize">{entry.shift}</TableCell>
                       <TableCell>{entry.company_name ?? "-"}</TableCell>

@@ -17,6 +17,7 @@ import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
+import { formatDateInAppTimeZone } from "@/lib/timezone";
 import { safeDecodeURIComponent } from "@/lib/url";
 
 const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 50, 100] as const;
@@ -367,7 +368,7 @@ export default async function RoutesPage(props: Props) {
                     <TableCell>{entry.driver_name}</TableCell>
                     <TableCell>{entry.company_name ?? "-"}</TableCell>
                     <TableCell>{entry.route_name}</TableCell>
-                    <TableCell>{new Date(entry.assignment_date).toLocaleDateString()}</TableCell>
+                      <TableCell>{formatDateInAppTimeZone(entry.assignment_date)}</TableCell>
                     <TableCell className="capitalize">{entry.shift}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

@@ -13,6 +13,7 @@ import { query } from "@/lib/db";
 import { getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
 import { normalizeProfilePhotoMime } from "@/lib/image-mime";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
+import { formatDateInAppTimeZone } from "@/lib/timezone";
 import { EmployeesService } from "@/services/employees.service";
 
 const employeesService = new EmployeesService();
@@ -183,8 +184,8 @@ export default async function EmployeeProfilePage(props: Props) {
               <p>Company: {employee.companyName ?? "-"}</p>
               <p>Gender: {employee.gender ?? "-"}</p>
               <p>Blood Group: {employee.bloodGroup ?? "-"}</p>
-              <p>Valid From: {employee.validFrom ? new Date(employee.validFrom).toLocaleDateString() : "-"}</p>
-              <p>Valid To: {employee.validTo ? new Date(employee.validTo).toLocaleDateString() : "-"}</p>
+              <p>Valid From: {employee.validFrom ? formatDateInAppTimeZone(employee.validFrom) : "-"}</p>
+              <p>Valid To: {employee.validTo ? formatDateInAppTimeZone(employee.validTo) : "-"}</p>
             </CardContent>
           </Card>
           <Card>
