@@ -161,7 +161,7 @@ async function fetchRows(
                )::text
              ELSE NULL
            END AS overall_mileage_kmpl,
-           TO_CHAR(MAX(fh.filled_at), 'YYYY-MM-DD"T"HH24:MI:SS') AS last_fuel_date,
+           TO_CHAR(MAX(fh.filled_at), 'YYYY-MM-DD HH24:MI:SS') AS last_fuel_date,
            MAX(CASE WHEN fh.filled_at = lf.latest_filled_at THEN fh.odometer_before_km END)::text AS last_odometer_start,
            MAX(CASE WHEN fh.filled_at = lf.latest_filled_at THEN fh.odometer_after_km END)::text AS last_odometer_end,
            MAX(CASE WHEN fh.filled_at = lf.latest_filled_at THEN fh.liters END)::text AS last_fuel_liters,
@@ -487,6 +487,45 @@ function toExportText(value: unknown) {
   return text.length > 0 ? text : "-";
 }
 
+function toOneDecimal(value: unknown) {
+  if (value == null) return "-";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "-";
+  return num.toFixed(1);
+}
+
+function formatBusDate(value: unknown) {
+  if (value == null) return "-";
+  const text = String(value).trim();
+  if (!text) return "-";
+  const normalized = text.includes("T") ? text.replace("T", " ") : text;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return normalized;
+  return formatDateTimeInAppTimeZone(parsed);
+}
+
+function formatBusFieldValue(key: string, value: unknown) {
+  const oneDecimalFields = new Set([
+    "odometer_km",
+    "previous_day_mileage_kmpl",
+    "total_fuel_liters",
+    "total_fuel_amount",
+    "total_km_run",
+    "overall_mileage_kmpl",
+    "last_odometer_start",
+    "last_odometer_end",
+    "last_fuel_liters",
+    "last_fuel_amount",
+  ]);
+  if (key === "last_fuel_date") {
+    return formatBusDate(value);
+  }
+  if (oneDecimalFields.has(key)) {
+    return toOneDecimal(value);
+  }
+  return toExportText(value);
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const moduleKey = normalizeModule(url.searchParams.get("module") ?? "overall");
@@ -518,10 +557,19 @@ export async function GET(request: Request) {
     const rows = pickFields(rawRows, selectedFields);
     const headers = rows.length ? Object.keys(rows[0]) : (selectedFields.length ? selectedFields : MODULE_EXPORT_FIELDS[moduleKey].map((f) => f.key));
 
+    const moduleFieldLabels = MODULE_EXPORT_FIELDS[moduleKey] ?? [];
+    const labelMap = new Map(moduleFieldLabels.map((field) => [field.key, field.label]));
+
     if (format === "excel") {
-      const csvLines = [headers.join(",")];
+      const csvLines = [headers.map((key) => escapeCsv(labelMap.get(key) ?? titleCaseFromKey(key))).join(",")];
       for (const row of rows) {
-        csvLines.push(headers.map((key) => escapeCsv(row[key])).join(","));
+        csvLines.push(
+          headers
+            .map((key) =>
+              escapeCsv(moduleKey === "buses" ? formatBusFieldValue(key, row[key]) : toExportText(row[key])),
+            )
+            .join(","),
+        );
       }
       const csv = csvLines.join("\n");
       return new Response(csv, {
@@ -576,12 +624,86 @@ export async function GET(request: Request) {
     drawLine(`${moduleKey.toUpperCase()} Export Report`, { size: 16, bold: true });
     drawLine(`Generated: ${formatDateTimeInAppTimeZone(new Date())}`, { size: 9, color: [0.25, 0.25, 0.25] });
     drawLine(`Records: ${rows.length}`, { size: 9, color: [0.25, 0.25, 0.25] });
-    const moduleFieldLabels = MODULE_EXPORT_FIELDS[moduleKey] ?? [];
-    const labelMap = new Map(moduleFieldLabels.map((field) => [field.key, field.label]));
     if (rows.length === 0) {
       drawLine("");
       drawLine("No records found for current filters.");
     } else {
+      if (moduleKey === "buses") {
+        const cardPadding = 10;
+        const rowHeight = 16;
+        const labelWidth = 180;
+        const cardHeaderHeight = 22;
+        const cardSpacing = 8;
+        const fieldLabels = headers.map((header) => labelMap.get(header) ?? titleCaseFromKey(header));
+
+        rows.forEach((row, idx) => {
+          const cardBodyHeight = cardPadding * 2 + headers.length * rowHeight;
+          const cardTotalHeight = cardHeaderHeight + cardBodyHeight + cardSpacing;
+          if (y - cardTotalHeight < margin) {
+            page = pdfDoc.addPage([pageWidth, pageHeight]);
+            y = pageHeight - margin;
+          }
+
+          page.drawRectangle({
+            x: margin,
+            y: y - cardHeaderHeight,
+            width: contentWidth,
+            height: cardHeaderHeight,
+            color: rgb(0.93, 0.95, 0.98),
+            borderColor: rgb(0.7, 0.74, 0.82),
+            borderWidth: 0.6,
+          });
+          page.drawText(`Bus ${idx + 1}`, {
+            x: margin + cardPadding,
+            y: y - cardHeaderHeight + 7,
+            size: 10,
+            font: boldFont,
+            color: rgb(0.12, 0.18, 0.28),
+          });
+          y -= cardHeaderHeight;
+
+          page.drawRectangle({
+            x: margin,
+            y: y - cardBodyHeight,
+            width: contentWidth,
+            height: cardBodyHeight,
+            borderColor: rgb(0.84, 0.86, 0.9),
+            borderWidth: 0.6,
+          });
+
+          let rowY = y - cardPadding - 4;
+          headers.forEach((key, keyIndex) => {
+            const label = fieldLabels[keyIndex];
+            const value = formatBusFieldValue(key, row[key]);
+            page.drawText(`${label}:`, {
+              x: margin + cardPadding,
+              y: rowY,
+              size: 8.5,
+              font: boldFont,
+              color: rgb(0.16, 0.2, 0.3),
+            });
+            page.drawText(clipCellText(value, contentWidth - labelWidth - cardPadding * 2, 8.5), {
+              x: margin + labelWidth,
+              y: rowY,
+              size: 8.5,
+              font: bodyFont,
+              color: rgb(0.08, 0.08, 0.1),
+            });
+            rowY -= rowHeight;
+          });
+
+          y -= cardBodyHeight + cardSpacing;
+        });
+
+        const binary = await pdfDoc.save();
+        return new Response(Buffer.from(binary), {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="${moduleKey}-export.pdf"`,
+          },
+        });
+      }
+
       const fieldWidths = headers.map((header) => {
         const label = labelMap.get(header) ?? titleCaseFromKey(header);
         let maxChars = label.length;
