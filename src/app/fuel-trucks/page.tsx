@@ -17,6 +17,7 @@ import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
+import { formatDateInAppTimeZone } from "@/lib/timezone";
 import { safeDecodeURIComponent } from "@/lib/url";
 import { FuelTruckService } from "@/services/fuel-truck.service";
 import { BusSearchSelect } from "@/components/fuel-trucks/bus-search-select";
@@ -780,7 +781,7 @@ export default async function FuelTrucksPage(props: Props) {
                       {visibleRefillRows.map((row, idx) => (
                         <TableRow key={`${row.truck_code}-${idx}`}>
                           <TableCell>{refillStart + idx + 1}</TableCell>
-                          <TableCell>{row.refill_date}</TableCell>
+                        <TableCell>{formatDateInAppTimeZone(row.refill_date)}</TableCell>
                           <TableCell>{row.truck_code}</TableCell>
                           <TableCell>{row.fuel_station_name ?? "-"}</TableCell>
                           <TableCell className="text-right">{Number(row.quantity_liters).toFixed(2)}</TableCell>
@@ -849,7 +850,7 @@ export default async function FuelTrucksPage(props: Props) {
                       {visibleIssueRows.map((row, idx) => (
                         <TableRow key={`${row.truck_code}-${idx}`}>
                           <TableCell>{issueStart + idx + 1}</TableCell>
-                          <TableCell>{row.issue_date}</TableCell>
+                        <TableCell>{formatDateInAppTimeZone(row.issue_date)}</TableCell>
                           <TableCell>{row.truck_code}</TableCell>
                           <TableCell>
                             {row.bus_id ? (

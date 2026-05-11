@@ -12,6 +12,7 @@ import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
+import { formatDateInAppTimeZone } from "@/lib/timezone";
 import { safeDecodeURIComponent } from "@/lib/url";
 import { FuelTruckService } from "@/services/fuel-truck.service";
 import { BusSearchSelect } from "@/components/fuel-trucks/bus-search-select";
@@ -438,7 +439,7 @@ export default async function FuelTruckDetailPage(props: Props) {
                   {detail.ledger.map((entry) => (
                     <TableRow key={entry.id}>
                       <TableCell>
-                        {entry.transactionDate} {entry.transactionTime.slice(0, 5)}
+                        {formatDateInAppTimeZone(entry.transactionDate)} {entry.transactionTime.slice(0, 5)}
                       </TableCell>
                       <TableCell>{entry.transactionType}</TableCell>
                       <TableCell className="text-right">{entry.openingStock.toFixed(2)}</TableCell>
@@ -467,7 +468,7 @@ export default async function FuelTruckDetailPage(props: Props) {
               {detail.refills.map((refill) => (
                 <div key={refill.id} className="rounded border p-2">
                   <p className="font-medium">
-                    {refill.refillDate} {refill.refillTime.slice(0, 5)}
+                    {formatDateInAppTimeZone(refill.refillDate)} {refill.refillTime.slice(0, 5)}
                   </p>
                   <p>{refill.quantityLiters.toFixed(2)} L @ {refill.ratePerLiter.toFixed(2)}</p>
                   <p>{refill.fuelStationName ?? "-"}</p>
@@ -568,7 +569,7 @@ export default async function FuelTruckDetailPage(props: Props) {
               <TableBody>
                 {detail.issues.map((issue) => (
                   <TableRow key={issue.id}>
-                    <TableCell>{issue.issueDate} {issue.issueTime.slice(0, 5)}</TableCell>
+                    <TableCell>{formatDateInAppTimeZone(issue.issueDate)} {issue.issueTime.slice(0, 5)}</TableCell>
                     <TableCell>{issue.busNumber ?? issue.busId}</TableCell>
                     <TableCell>{issue.odometerBeforeKm != null ? issue.odometerBeforeKm.toFixed(2) : "-"}</TableCell>
                     <TableCell>{issue.odometerAfterKm != null ? issue.odometerAfterKm.toFixed(2) : "-"}</TableCell>
