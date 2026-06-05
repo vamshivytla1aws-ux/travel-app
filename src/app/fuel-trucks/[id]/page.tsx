@@ -14,6 +14,7 @@ import { query } from "@/lib/db";
 import { measureAsync } from "@/lib/dev-bench";
 import { getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
 import { formatDateInAppTimeZone } from "@/lib/timezone";
+import type { FuelIssue, FuelTruck, FuelTruckLedgerEntry, FuelTruckRefill } from "@/lib/types";
 import { safeDecodeURIComponent } from "@/lib/url";
 import { FuelTruckService } from "@/services/fuel-truck.service";
 import { BusSearchSelect } from "@/components/fuel-trucks/bus-search-select";
@@ -21,6 +22,13 @@ import { RefillAmountFields } from "@/components/fuel-trucks/refill-amount-field
 
 const fuelTruckService = new FuelTruckService();
 const DETAIL_ENTRY_ACTIONS = new Set(["refill", "issue"]);
+
+type FuelTruckDetailView = {
+  truck: FuelTruck;
+  refills: FuelTruckRefill[];
+  issues: FuelIssue[];
+  ledger: FuelTruckLedgerEntry[];
+};
 
 function optionalNumber(formData: FormData, key: string): number | null {
   const raw = String(formData.get(key) ?? "").trim();
@@ -221,7 +229,7 @@ type Props = {
 export default async function FuelTruckDetailPage(props: Props) {
   await requireSession();
   await requireModuleAccess("fuel-truck");
-  const { searchParams, detailAction, isEntryFlow, truckData, buses } = await measureAsync(
+  const { searchParams, detailAction, isEntryFlow, detail, buses } = await measureAsync(
     "fuel-trucks/detail total",
     async () => {
       const params = await props.params;
@@ -245,18 +253,20 @@ export default async function FuelTruckDetailPage(props: Props) {
           : Promise.resolve({ rows: [] as { id: number; bus_number: string; registration_number: string; odometer_km: string | null }[] }),
       ]);
 
-      return { searchParams, detailAction, isEntryFlow, truckData, buses };
+      if (!truckData) notFound();
+
+      const detail: FuelTruckDetailView = isEntryFlow
+        ? {
+            truck: truckData as FuelTruck,
+            refills: [],
+            issues: [],
+            ledger: [],
+          }
+        : (truckData as FuelTruckDetailView);
+
+      return { searchParams, detailAction, isEntryFlow, detail, buses };
     },
   );
-  if (!truckData) notFound();
-  const detail = isEntryFlow
-    ? {
-        truck: truckData,
-        refills: [],
-        issues: [],
-        ledger: [],
-      }
-    : truckData;
   const editIssueId = Number(searchParams.editIssueId ?? "");
   const issueToEdit = Number.isFinite(editIssueId) && editIssueId > 0
     ? detail.issues.find((issue) => issue.id === editIssueId) ?? null
