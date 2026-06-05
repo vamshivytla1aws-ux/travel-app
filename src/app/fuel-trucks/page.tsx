@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
+import { measureAsync } from "@/lib/dev-bench";
 import { getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
 import { formatDateInAppTimeZone } from "@/lib/timezone";
 import { safeDecodeURIComponent } from "@/lib/url";
@@ -25,6 +26,25 @@ import { RefillAmountFields } from "@/components/fuel-trucks/refill-amount-field
 
 const fuelTruckService = new FuelTruckService();
 const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 50, 100] as const;
+const ENTRY_ACTIONS = new Set(["create", "refill", "issue"]);
+const EMPTY_SUMMARY = {
+  truckStocks: [],
+  today: {
+    refilledLiters: 0,
+    issuedLiters: 0,
+  },
+  lowStock: [],
+  recentRefills: [],
+  recentIssues: [],
+};
+const EMPTY_REPORTS = {
+  refillReport: [],
+  issueReport: [],
+  truckWiseStock: [],
+  busWiseIssue: [],
+  dailySummary: [],
+  monthlySummary: [],
+};
 
 function optionalNumber(formData: FormData, key: string): number | null {
   const raw = String(formData.get(key) ?? "").trim();
@@ -248,31 +268,53 @@ async function deleteIssueReportEntry(formData: FormData) {
 export default async function FuelTrucksPage(props: Props) {
   await requireSession();
   await requireModuleAccess("fuel-truck");
-  const searchParams = await props.searchParams;
+  const { searchParams, modalAction, isEntryFlow, needsBuses, trucks, summary, buses, reports } = await measureAsync(
+    "fuel-trucks/page total",
+    async () => {
+      const searchParams = await props.searchParams;
+      const modalAction = String(searchParams.action ?? "");
+      const isEntryFlow = ENTRY_ACTIONS.has(modalAction);
+      const needsBuses = !isEntryFlow || modalAction === "issue";
 
-  const [trucks, summary, buses, reports] = await Promise.all([
-    fuelTruckService.listFuelTrucks(
-      String(searchParams.q ?? ""),
-      (searchParams.status === "active" || searchParams.status === "inactive"
-        ? searchParams.status
-        : undefined) as "active" | "inactive" | undefined,
-    ),
-    fuelTruckService.getSummary(),
-    query<{ id: number; bus_number: string; registration_number: string; odometer_km: string | null }>(
-      `SELECT id, bus_number, registration_number, odometer_km::text
-       FROM buses
-       WHERE status = 'active'
-       ORDER BY bus_number`,
-    ),
-    fuelTruckService.getReports({
-      fromDate: searchParams.fromDate,
-      toDate: searchParams.toDate,
-      fuelTruckId: searchParams.fuelTruckId ? Number(searchParams.fuelTruckId) : undefined,
-      busId: searchParams.busId ? Number(searchParams.busId) : undefined,
-      fuelStation: searchParams.fuelStation,
-      driver: searchParams.driver,
-    }),
-  ]);
+      const [trucks, summary, buses, reports] = await Promise.all([
+        measureAsync("fuel-trucks/page listFuelTrucks", () =>
+          fuelTruckService.listFuelTrucks(
+            String(searchParams.q ?? ""),
+            (searchParams.status === "active" || searchParams.status === "inactive"
+              ? searchParams.status
+              : undefined) as "active" | "inactive" | undefined,
+          ),
+        ),
+        isEntryFlow
+          ? Promise.resolve(EMPTY_SUMMARY)
+          : measureAsync("fuel-trucks/page getSummary", () => fuelTruckService.getSummary()),
+        needsBuses
+          ? measureAsync("fuel-trucks/page buses", () =>
+              query<{ id: number; bus_number: string; registration_number: string; odometer_km: string | null }>(
+                `SELECT id, bus_number, registration_number, odometer_km::text
+                 FROM buses
+                 WHERE status = 'active'
+                 ORDER BY bus_number`,
+              ),
+            )
+          : Promise.resolve({ rows: [] as { id: number; bus_number: string; registration_number: string; odometer_km: string | null }[] }),
+        isEntryFlow
+          ? Promise.resolve(EMPTY_REPORTS)
+          : measureAsync("fuel-trucks/page getReports", () =>
+              fuelTruckService.getReports({
+                fromDate: searchParams.fromDate,
+                toDate: searchParams.toDate,
+                fuelTruckId: searchParams.fuelTruckId ? Number(searchParams.fuelTruckId) : undefined,
+                busId: searchParams.busId ? Number(searchParams.busId) : undefined,
+                fuelStation: searchParams.fuelStation,
+                driver: searchParams.driver,
+              }),
+            ),
+      ]);
+
+      return { searchParams, modalAction, isEntryFlow, needsBuses, trucks, summary, buses, reports };
+    },
+  );
 
   const now = new Date();
   const defaultDate = now.toISOString().slice(0, 10);
@@ -316,7 +358,6 @@ export default async function FuelTrucksPage(props: Props) {
   const createActionHref = `/fuel-trucks?${createParams.toString()}`;
   const refillActionHref = `/fuel-trucks?${refillParams.toString()}`;
   const issueActionHref = `/fuel-trucks?${issueParams.toString()}`;
-  const modalAction = String(searchParams.action ?? "");
   const reportPageSize = 15;
   const requestedRefillPage = Number(searchParams.refillPage ?? "1");
   const requestedIssuePage = Number(searchParams.issuePage ?? "1");
@@ -402,32 +443,34 @@ export default async function FuelTrucksPage(props: Props) {
           <StatusAlert tone="error" message={safeDecodeURIComponent(searchParams.error)} />
         ) : null}
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Total Fuel Trucks</CardTitle>
-            </CardHeader>
-            <CardContent className="text-2xl font-bold">{summary.truckStocks.length}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Refilled Today (L)</CardTitle>
-            </CardHeader>
-            <CardContent className="text-2xl font-bold">{summary.today.refilledLiters.toFixed(2)}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Issued Today (L)</CardTitle>
-            </CardHeader>
-            <CardContent className="text-2xl font-bold">{summary.today.issuedLiters.toFixed(2)}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Low Stock Alerts</CardTitle>
-            </CardHeader>
-            <CardContent className="text-2xl font-bold">{summary.lowStock.length}</CardContent>
-          </Card>
-        </div>
+        {!isEntryFlow ? (
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Total Fuel Trucks</CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-bold">{summary.truckStocks.length}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Refilled Today (L)</CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-bold">{summary.today.refilledLiters.toFixed(2)}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Issued Today (L)</CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-bold">{summary.today.issuedLiters.toFixed(2)}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Low Stock Alerts</CardTitle>
+              </CardHeader>
+              <CardContent className="text-2xl font-bold">{summary.lowStock.length}</CardContent>
+            </Card>
+          </div>
+        ) : null}
 
         <Card>
           <CardHeader>
@@ -731,105 +774,106 @@ export default async function FuelTrucksPage(props: Props) {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Reports & Ledger Filters</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form className="grid gap-2 rounded-md border bg-background p-3 md:grid-cols-7">
-              <Input name="fromDate" type="date" defaultValue={searchParams.fromDate ?? ""} />
-              <Input name="toDate" type="date" defaultValue={searchParams.toDate ?? ""} />
-              <select name="fuelTruckId" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" defaultValue={searchParams.fuelTruckId ?? ""}>
-                <option value="">All fuel tankers</option>
-                {trucks.map((truck) => (
-                  <option key={truck.id} value={truck.id}>
-                    {truck.truckCode}
-                  </option>
-                ))}
-              </select>
-              <select name="busId" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" defaultValue={searchParams.busId ?? ""}>
-                <option value="">All buses</option>
-                {buses.rows.map((bus) => (
-                  <option key={bus.id} value={bus.id}>
-                    {bus.registration_number} - {bus.bus_number}
-                  </option>
-                ))}
-              </select>
-              <Input name="fuelStation" placeholder="Fuel station" defaultValue={searchParams.fuelStation ?? ""} />
-              <Input name="driver" placeholder="Driver name" defaultValue={searchParams.driver ?? ""} />
-              <Button type="submit">Run</Button>
-            </form>
+        {!isEntryFlow ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Reports & Ledger Filters</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <form className="grid gap-2 rounded-md border bg-background p-3 md:grid-cols-7">
+                <Input name="fromDate" type="date" defaultValue={searchParams.fromDate ?? ""} />
+                <Input name="toDate" type="date" defaultValue={searchParams.toDate ?? ""} />
+                <select name="fuelTruckId" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" defaultValue={searchParams.fuelTruckId ?? ""}>
+                  <option value="">All fuel tankers</option>
+                  {trucks.map((truck) => (
+                    <option key={truck.id} value={truck.id}>
+                      {truck.truckCode}
+                    </option>
+                  ))}
+                </select>
+                <select name="busId" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" defaultValue={searchParams.busId ?? ""}>
+                  <option value="">All buses</option>
+                  {buses.rows.map((bus) => (
+                    <option key={bus.id} value={bus.id}>
+                      {bus.registration_number} - {bus.bus_number}
+                    </option>
+                  ))}
+                </select>
+                <Input name="fuelStation" placeholder="Fuel station" defaultValue={searchParams.fuelStation ?? ""} />
+                <Input name="driver" placeholder="Driver name" defaultValue={searchParams.driver ?? ""} />
+                <Button type="submit">Run</Button>
+              </form>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Refill Report</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>S.No</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Truck</TableHead>
-                        <TableHead>Station</TableHead>
-                        <TableHead className="text-right">Liters</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {visibleRefillRows.map((row, idx) => (
-                        <TableRow key={`${row.truck_code}-${idx}`}>
-                          <TableCell>{refillStart + idx + 1}</TableCell>
-                        <TableCell>{formatDateInAppTimeZone(row.refill_date)}</TableCell>
-                          <TableCell>{row.truck_code}</TableCell>
-                          <TableCell>{row.fuel_station_name ?? "-"}</TableCell>
-                          <TableCell className="text-right">{Number(row.quantity_liters).toFixed(2)}</TableCell>
-                          <TableCell className="text-right">
-                            <form action={deleteRefillReportEntry}>
-                              <input type="hidden" name="refillId" value={row.id} />
-                              <ConfirmSubmitButton
-                                label="Delete"
-                                message="Delete this refill report entry?"
-                                className="text-red-600 hover:underline"
-                              />
-                            </form>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {reports.refillReport.length === 0 ? (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Refill Report</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
-                            No refill records for current filters.
-                          </TableCell>
+                          <TableHead>S.No</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Truck</TableHead>
+                          <TableHead>Station</TableHead>
+                          <TableHead className="text-right">Liters</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ) : null}
-                    </TableBody>
-                  </Table>
-                  <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
-                    <span>
-                      Showing {refillTotal === 0 ? 0 : refillStart + 1}-{Math.min(refillStart + reportPageSize, refillTotal)} of {refillTotal}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={reportPageHref("refill", Math.max(1, refillPage - 1))}
-                        className={`rounded border px-2 py-1 ${refillPage <= 1 ? "pointer-events-none opacity-50" : ""}`}
-                      >
-                        Prev
-                      </Link>
-                      <span>{refillPage}/{refillTotalPages}</span>
-                      <Link
-                        href={reportPageHref("refill", Math.min(refillTotalPages, refillPage + 1))}
-                        className={`rounded border px-2 py-1 ${refillPage >= refillTotalPages ? "pointer-events-none opacity-50" : ""}`}
-                      >
-                        Next
-                      </Link>
+                      </TableHeader>
+                      <TableBody>
+                        {visibleRefillRows.map((row, idx) => (
+                          <TableRow key={`${row.truck_code}-${idx}`}>
+                            <TableCell>{refillStart + idx + 1}</TableCell>
+                          <TableCell>{formatDateInAppTimeZone(row.refill_date)}</TableCell>
+                            <TableCell>{row.truck_code}</TableCell>
+                            <TableCell>{row.fuel_station_name ?? "-"}</TableCell>
+                            <TableCell className="text-right">{Number(row.quantity_liters).toFixed(2)}</TableCell>
+                            <TableCell className="text-right">
+                              <form action={deleteRefillReportEntry}>
+                                <input type="hidden" name="refillId" value={row.id} />
+                                <ConfirmSubmitButton
+                                  label="Delete"
+                                  message="Delete this refill report entry?"
+                                  className="text-red-600 hover:underline"
+                                />
+                              </form>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {reports.refillReport.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground">
+                              No refill records for current filters.
+                            </TableCell>
+                          </TableRow>
+                        ) : null}
+                      </TableBody>
+                    </Table>
+                    <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
+                      <span>
+                        Showing {refillTotal === 0 ? 0 : refillStart + 1}-{Math.min(refillStart + reportPageSize, refillTotal)} of {refillTotal}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={reportPageHref("refill", Math.max(1, refillPage - 1))}
+                          className={`rounded border px-2 py-1 ${refillPage <= 1 ? "pointer-events-none opacity-50" : ""}`}
+                        >
+                          Prev
+                        </Link>
+                        <span>{refillPage}/{refillTotalPages}</span>
+                        <Link
+                          href={reportPageHref("refill", Math.min(refillTotalPages, refillPage + 1))}
+                          className={`rounded border px-2 py-1 ${refillPage >= refillTotalPages ? "pointer-events-none opacity-50" : ""}`}
+                        >
+                          Next
+                        </Link>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
 
-              <Card>
+                <Card>
                 <CardHeader>
                   <CardTitle>Issue Report</CardTitle>
                 </CardHeader>
@@ -926,10 +970,11 @@ export default async function FuelTrucksPage(props: Props) {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
-            </div>
-          </CardContent>
-        </Card>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </AppShell>
   );

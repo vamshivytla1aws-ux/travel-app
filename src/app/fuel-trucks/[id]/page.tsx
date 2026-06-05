@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
+import { measureAsync } from "@/lib/dev-bench";
 import { getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
 import { formatDateInAppTimeZone } from "@/lib/timezone";
 import { safeDecodeURIComponent } from "@/lib/url";
@@ -19,6 +20,7 @@ import { BusSearchSelect } from "@/components/fuel-trucks/bus-search-select";
 import { RefillAmountFields } from "@/components/fuel-trucks/refill-amount-fields";
 
 const fuelTruckService = new FuelTruckService();
+const DETAIL_ENTRY_ACTIONS = new Set(["refill", "issue"]);
 
 function optionalNumber(formData: FormData, key: string): number | null {
   const raw = String(formData.get(key) ?? "").trim();
@@ -205,25 +207,56 @@ async function updateTruckIssue(formData: FormData) {
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ updated?: string; refilled?: string; issued?: string; issueUpdated?: string; editIssueId?: string; error?: string }>;
+  searchParams: Promise<{
+    updated?: string;
+    refilled?: string;
+    issued?: string;
+    issueUpdated?: string;
+    editIssueId?: string;
+    action?: string;
+    error?: string;
+  }>;
 };
 
 export default async function FuelTruckDetailPage(props: Props) {
   await requireSession();
   await requireModuleAccess("fuel-truck");
+  const { searchParams, detailAction, isEntryFlow, truckData, buses } = await measureAsync(
+    "fuel-trucks/detail total",
+    async () => {
+      const params = await props.params;
+      const searchParams = await props.searchParams;
+      const id = Number(params.id);
+      if (!id) notFound();
+      const detailAction = String(searchParams.action ?? "");
+      const isEntryFlow = DETAIL_ENTRY_ACTIONS.has(detailAction);
+      const needsBuses = !isEntryFlow || detailAction === "issue";
 
-  const params = await props.params;
-  const searchParams = await props.searchParams;
-  const id = Number(params.id);
-  if (!id) notFound();
+      const [truckData, buses] = await Promise.all([
+        isEntryFlow
+          ? measureAsync("fuel-trucks/detail getFuelTruck", () => fuelTruckService.getFuelTruck(id))
+          : measureAsync("fuel-trucks/detail getFuelTruckDetail", () => fuelTruckService.getFuelTruckDetail(id)),
+        needsBuses
+          ? measureAsync("fuel-trucks/detail buses", () =>
+              query<{ id: number; bus_number: string; registration_number: string; odometer_km: string | null }>(
+                `SELECT id, bus_number, registration_number, odometer_km::text FROM buses WHERE status = 'active' ORDER BY bus_number`,
+              ),
+            )
+          : Promise.resolve({ rows: [] as { id: number; bus_number: string; registration_number: string; odometer_km: string | null }[] }),
+      ]);
 
-  const [detail, buses] = await Promise.all([
-    fuelTruckService.getFuelTruckDetail(id),
-    query<{ id: number; bus_number: string; registration_number: string; odometer_km: string | null }>(
-      `SELECT id, bus_number, registration_number, odometer_km::text FROM buses WHERE status = 'active' ORDER BY bus_number`,
-    ),
-  ]);
-  if (!detail) notFound();
+      return { searchParams, detailAction, isEntryFlow, truckData, buses };
+    },
+  );
+  if (!truckData) notFound();
+  const detail = isEntryFlow
+    ? {
+        truck: truckData,
+        refills: [],
+        issues: [],
+        ledger: [],
+      }
+    : truckData;
   const editIssueId = Number(searchParams.editIssueId ?? "");
   const issueToEdit = Number.isFinite(editIssueId) && editIssueId > 0
     ? detail.issues.find((issue) => issue.id === editIssueId) ?? null
@@ -232,6 +265,9 @@ export default async function FuelTruckDetailPage(props: Props) {
   const now = new Date();
   const defaultDate = now.toISOString().slice(0, 10);
   const defaultTime = now.toTimeString().slice(0, 5);
+  const refillActionHref = `/fuel-trucks/${detail.truck.id}?action=refill`;
+  const issueActionHref = `/fuel-trucks/${detail.truck.id}?action=issue`;
+  const baseDetailHref = `/fuel-trucks/${detail.truck.id}`;
 
   return (
     <AppShell>
@@ -256,9 +292,17 @@ export default async function FuelTruckDetailPage(props: Props) {
           <h2 className="text-2xl font-semibold">
             {detail.truck.truckCode} - {detail.truck.truckName}
           </h2>
-          <Link href="/fuel-trucks" className="text-sm text-blue-600 hover:underline">
-            Back to Fuel Tankers
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href={refillActionHref} className="text-sm text-blue-600 hover:underline">
+              Add Refill
+            </Link>
+            <Link href={issueActionHref} className="text-sm text-blue-600 hover:underline">
+              Add Issue
+            </Link>
+            <Link href="/fuel-trucks" className="text-sm text-blue-600 hover:underline">
+              Back to Fuel Tankers
+            </Link>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -326,105 +370,122 @@ export default async function FuelTruckDetailPage(props: Props) {
           </Card>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Add Refill</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form action={addTruckRefill} className="grid gap-2">
-                <input type="hidden" name="fuelTruckId" value={detail.truck.id} />
-                <Label htmlFor="refillDate">Date</Label>
-                <Input id="refillDate" name="refillDate" type="date" defaultValue={defaultDate} required />
-                <Label htmlFor="refillTime">Time</Label>
-                <Input id="refillTime" name="refillTime" type="time" defaultValue={defaultTime} required />
-                <Label htmlFor="odometerReading">Odometer</Label>
-                <Input id="odometerReading" name="odometerReading" type="number" step="0.01" />
-                <Label htmlFor="fuelStationName">Fuel Station</Label>
-                <Input id="fuelStationName" name="fuelStationName" required />
-                <Label htmlFor="vendorName">Vendor</Label>
-                <Input id="vendorName" name="vendorName" />
-                <RefillAmountFields
-                  quantityId="quantityLiters"
-                  quantityName="quantityLiters"
-                  rateId="ratePerLiter"
-                  rateName="ratePerLiter"
-                  totalId="totalAmount"
-                  totalName="totalAmount"
-                />
-                <Label htmlFor="billNumber">Bill Number</Label>
-                <Input id="billNumber" name="billNumber" />
-                <Label htmlFor="paymentMode">Payment Mode</Label>
-                <Input id="paymentMode" name="paymentMode" />
-                <Label htmlFor="driverName">Driver</Label>
-                <Input id="driverName" name="driverName" />
-                <Label htmlFor="notes">Notes</Label>
-                <Input id="notes" name="notes" />
-                <Label htmlFor="receipt">Receipt</Label>
-                <Input id="receipt" name="receipt" type="file" />
-                <Button type="submit">Save Refill</Button>
-              </form>
-            </CardContent>
-          </Card>
+        {detailAction === "refill" ? (
+          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-12">
+            <Card className="max-h-[85vh] w-full max-w-2xl overflow-y-auto">
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle>Add Refill</CardTitle>
+                  <Link href={baseDetailHref} className="inline-flex h-9 items-center rounded-md border px-3 text-sm">
+                    Close
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <form action={addTruckRefill} className="grid gap-2">
+                  <input type="hidden" name="fuelTruckId" value={detail.truck.id} />
+                  <Label htmlFor="refillDate">Date</Label>
+                  <Input id="refillDate" name="refillDate" type="date" defaultValue={defaultDate} required />
+                  <Label htmlFor="refillTime">Time</Label>
+                  <Input id="refillTime" name="refillTime" type="time" defaultValue={defaultTime} required />
+                  <Label htmlFor="odometerReading">Odometer</Label>
+                  <Input id="odometerReading" name="odometerReading" type="number" step="0.01" />
+                  <Label htmlFor="fuelStationName">Fuel Station</Label>
+                  <Input id="fuelStationName" name="fuelStationName" required />
+                  <Label htmlFor="vendorName">Vendor</Label>
+                  <Input id="vendorName" name="vendorName" />
+                  <RefillAmountFields
+                    quantityId="quantityLiters"
+                    quantityName="quantityLiters"
+                    rateId="ratePerLiter"
+                    rateName="ratePerLiter"
+                    totalId="totalAmount"
+                    totalName="totalAmount"
+                  />
+                  <Label htmlFor="billNumber">Bill Number</Label>
+                  <Input id="billNumber" name="billNumber" />
+                  <Label htmlFor="paymentMode">Payment Mode</Label>
+                  <Input id="paymentMode" name="paymentMode" />
+                  <Label htmlFor="driverName">Driver</Label>
+                  <Input id="driverName" name="driverName" />
+                  <Label htmlFor="notes">Notes</Label>
+                  <Input id="notes" name="notes" />
+                  <Label htmlFor="receipt">Receipt</Label>
+                  <Input id="receipt" name="receipt" type="file" />
+                  <Button type="submit">Save Refill</Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Add Issue to Bus</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form action={addTruckIssue} className="grid gap-2">
-                <input type="hidden" name="fuelTruckId" value={detail.truck.id} />
-                <Label htmlFor="busId">Bus</Label>
-                <BusSearchSelect
-                  id="busId"
-                  name="busId"
-                  required
-                  buses={buses.rows.map((bus) => ({
-                    id: bus.id,
-                    busNumber: bus.bus_number,
-                    registrationNumber: bus.registration_number,
-                    latestOdometerKm: bus.odometer_km != null ? Number(bus.odometer_km) : null,
-                  }))}
-                  oldOdometerTargetId="odometerBeforeKm"
-                />
-                <Label htmlFor="issueDate">Issue Date</Label>
-                <Input id="issueDate" name="issueDate" type="date" defaultValue={defaultDate} required />
-                <Label htmlFor="issueTime">Issue Time</Label>
-                <Input id="issueTime" name="issueTime" type="time" defaultValue={defaultTime} required />
-                <Label htmlFor="litersIssued">Liters Issued</Label>
-                <Input id="litersIssued" name="litersIssued" type="number" step="0.01" required />
-                <Label htmlFor="odometerBeforeKm">Old Odometer (km)</Label>
-                <Input id="odometerBeforeKm" name="odometerBeforeKm" type="number" step="0.01" min="0" />
-                <Label htmlFor="odometerAfterKm">New Odometer (km)</Label>
-                <Input id="odometerAfterKm" name="odometerAfterKm" type="number" step="0.01" min="0" />
-                <Label htmlFor="amount">Amount</Label>
-                <Input id="amount" name="amount" type="number" step="0.01" defaultValue="0" />
-                <Label htmlFor="companyName">Company</Label>
-                <Input id="companyName" name="companyName" />
-                <p className="text-xs text-muted-foreground">
-                  Odometer is optional. If unavailable now, mileage will show as N/A until updated later.
-                </p>
-                <Label htmlFor="issuedByName">Issued By</Label>
-                <Input id="issuedByName" name="issuedByName" />
-                <Label htmlFor="busDriverName">Bus Driver / Operator</Label>
-                <Input id="busDriverName" name="busDriverName" />
-                <Label htmlFor="routeReference">Route / Trip Reference</Label>
-                <Input id="routeReference" name="routeReference" />
-                <Label htmlFor="remarks">Remarks</Label>
-                <Input id="remarks" name="remarks" />
-                <Button type="submit">Save Issue</Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+        {detailAction === "issue" ? (
+          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-12">
+            <Card className="max-h-[85vh] w-full max-w-2xl overflow-y-auto">
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle>Add Issue to Bus</CardTitle>
+                  <Link href={baseDetailHref} className="inline-flex h-9 items-center rounded-md border px-3 text-sm">
+                    Close
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <form action={addTruckIssue} className="grid gap-2">
+                  <input type="hidden" name="fuelTruckId" value={detail.truck.id} />
+                  <Label htmlFor="busId">Bus</Label>
+                  <BusSearchSelect
+                    id="busId"
+                    name="busId"
+                    required
+                    buses={buses.rows.map((bus) => ({
+                      id: bus.id,
+                      busNumber: bus.bus_number,
+                      registrationNumber: bus.registration_number,
+                      latestOdometerKm: bus.odometer_km != null ? Number(bus.odometer_km) : null,
+                    }))}
+                    oldOdometerTargetId="odometerBeforeKm"
+                  />
+                  <Label htmlFor="issueDate">Issue Date</Label>
+                  <Input id="issueDate" name="issueDate" type="date" defaultValue={defaultDate} required />
+                  <Label htmlFor="issueTime">Issue Time</Label>
+                  <Input id="issueTime" name="issueTime" type="time" defaultValue={defaultTime} required />
+                  <Label htmlFor="litersIssued">Liters Issued</Label>
+                  <Input id="litersIssued" name="litersIssued" type="number" step="0.01" required />
+                  <Label htmlFor="odometerBeforeKm">Old Odometer (km)</Label>
+                  <Input id="odometerBeforeKm" name="odometerBeforeKm" type="number" step="0.01" min="0" />
+                  <Label htmlFor="odometerAfterKm">New Odometer (km)</Label>
+                  <Input id="odometerAfterKm" name="odometerAfterKm" type="number" step="0.01" min="0" />
+                  <Label htmlFor="amount">Amount</Label>
+                  <Input id="amount" name="amount" type="number" step="0.01" defaultValue="0" />
+                  <Label htmlFor="companyName">Company</Label>
+                  <Input id="companyName" name="companyName" />
+                  <p className="text-xs text-muted-foreground">
+                    Odometer is optional. If unavailable now, mileage will show as N/A until updated later.
+                  </p>
+                  <Label htmlFor="issuedByName">Issued By</Label>
+                  <Input id="issuedByName" name="issuedByName" />
+                  <Label htmlFor="busDriverName">Bus Driver / Operator</Label>
+                  <Input id="busDriverName" name="busDriverName" />
+                  <Label htmlFor="routeReference">Route / Trip Reference</Label>
+                  <Input id="routeReference" name="routeReference" />
+                  <Label htmlFor="remarks">Remarks</Label>
+                  <Input id="remarks" name="remarks" />
+                  <Button type="submit">Save Issue</Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle>Stock Ledger</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
+        {!isEntryFlow ? (
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Stock Ledger</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
@@ -456,43 +517,45 @@ export default async function FuelTruckDetailPage(props: Props) {
                     </TableRow>
                   ) : null}
                 </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                </Table>
+              </CardContent>
+            </Card>
 
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Refills</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {detail.refills.map((refill) => (
+                  <div key={refill.id} className="rounded border p-2">
+                    <p className="font-medium">
+                      {formatDateInAppTimeZone(refill.refillDate)} {refill.refillTime.slice(0, 5)}
+                    </p>
+                    <p>{refill.quantityLiters.toFixed(2)} L @ {refill.ratePerLiter.toFixed(2)}</p>
+                    <p>{refill.fuelStationName ?? "-"}</p>
+                    {refill.receiptFileName ? (
+                      <Link className="text-blue-600 hover:underline" href={`/api/fuel-trucks/refills/${refill.id}/receipt`} target="_blank">
+                        View Receipt
+                      </Link>
+                    ) : null}
+                  </div>
+                ))}
+                {detail.refills.length === 0 ? (
+                  <p className="text-muted-foreground">No refill records yet.</p>
+                ) : null}
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
+
+        {!isEntryFlow ? (
           <Card>
             <CardHeader>
-              <CardTitle>Recent Refills</CardTitle>
+              <CardTitle>Recent Issues</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {detail.refills.map((refill) => (
-                <div key={refill.id} className="rounded border p-2">
-                  <p className="font-medium">
-                    {formatDateInAppTimeZone(refill.refillDate)} {refill.refillTime.slice(0, 5)}
-                  </p>
-                  <p>{refill.quantityLiters.toFixed(2)} L @ {refill.ratePerLiter.toFixed(2)}</p>
-                  <p>{refill.fuelStationName ?? "-"}</p>
-                  {refill.receiptFileName ? (
-                    <Link className="text-blue-600 hover:underline" href={`/api/fuel-trucks/refills/${refill.id}/receipt`} target="_blank">
-                      View Receipt
-                    </Link>
-                  ) : null}
-                </div>
-              ))}
-              {detail.refills.length === 0 ? (
-                <p className="text-muted-foreground">No refill records yet.</p>
-              ) : null}
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Issues</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {issueToEdit ? (
-              <form action={updateTruckIssue} className="mb-4 grid gap-2 rounded-md border p-3">
+            <CardContent>
+              {issueToEdit ? (
+                <form action={updateTruckIssue} className="mb-4 grid gap-2 rounded-md border p-3">
                 <input type="hidden" name="fuelTruckId" value={detail.truck.id} />
                 <input type="hidden" name="issueId" value={issueToEdit.id} />
                 <input type="hidden" name="busId" value={issueToEdit.busId} />
@@ -548,9 +611,9 @@ export default async function FuelTruckDetailPage(props: Props) {
                     Cancel
                   </Link>
                 </div>
-              </form>
-            ) : null}
-            <Table>
+                </form>
+              ) : null}
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
@@ -594,9 +657,10 @@ export default async function FuelTruckDetailPage(props: Props) {
                   </TableRow>
                 ) : null}
               </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </Table>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </AppShell>
   );

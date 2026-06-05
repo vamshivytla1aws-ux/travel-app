@@ -1,7 +1,11 @@
 import { query } from "@/lib/db";
 import { ensureDocumentTables } from "@/lib/document-storage";
 
-export async function ensureTransportEnhancements() {
+const globalForTransportEnhancements = globalThis as typeof globalThis & {
+  transportEnhancementsPromise?: Promise<void>;
+};
+
+async function runTransportEnhancements() {
   await query(`
     CREATE TABLE IF NOT EXISTS app_settings (
       setting_key VARCHAR(120) PRIMARY KEY,
@@ -476,4 +480,14 @@ export async function ensureTransportEnhancements() {
   await query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);`);
   await query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);`);
   await ensureDocumentTables();
+}
+
+export async function ensureTransportEnhancements() {
+  if (!globalForTransportEnhancements.transportEnhancementsPromise) {
+    globalForTransportEnhancements.transportEnhancementsPromise = runTransportEnhancements().catch((error) => {
+      globalForTransportEnhancements.transportEnhancementsPromise = undefined;
+      throw error;
+    });
+  }
+  await globalForTransportEnhancements.transportEnhancementsPromise;
 }
