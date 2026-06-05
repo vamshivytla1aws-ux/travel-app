@@ -39,137 +39,143 @@ function optionalNumber(formData: FormData, key: string): number | null {
 
 async function updateFuelTruck(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
-  await requireModuleAccess("fuel-truck");
-  const id = Number(formData.get("id"));
-  if (!id) return;
+  await measureAsync("fuel-trucks/detail action updateFuelTruck", async () => {
+    const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
+    await requireModuleAccess("fuel-truck");
+    const id = Number(formData.get("id"));
+    if (!id) return;
 
-  try {
-    await fuelTruckService.updateFuelTruck({
-      id,
-      truckCode: String(formData.get("truckCode") ?? ""),
-      truckName: String(formData.get("truckName") ?? ""),
-      registrationNumber: String(formData.get("registrationNumber") ?? ""),
-      tankCapacityLiters: Number(formData.get("tankCapacityLiters") ?? 0),
-      currentAvailableLiters: Number(formData.get("currentAvailableLiters") ?? 0),
-      lowStockThresholdLiters: Number(formData.get("lowStockThresholdLiters") ?? 0),
-      status: String(formData.get("status") ?? "active") as "active" | "inactive",
-      notes: String(formData.get("notes") ?? ""),
-      userId: session.id,
-    });
+    try {
+      await fuelTruckService.updateFuelTruck({
+        id,
+        truckCode: String(formData.get("truckCode") ?? ""),
+        truckName: String(formData.get("truckName") ?? ""),
+        registrationNumber: String(formData.get("registrationNumber") ?? ""),
+        tankCapacityLiters: Number(formData.get("tankCapacityLiters") ?? 0),
+        currentAvailableLiters: Number(formData.get("currentAvailableLiters") ?? 0),
+        lowStockThresholdLiters: Number(formData.get("lowStockThresholdLiters") ?? 0),
+        status: String(formData.get("status") ?? "active") as "active" | "inactive",
+        notes: String(formData.get("notes") ?? ""),
+        userId: session.id,
+      });
 
-    await logAuditEvent({
-      session,
-      action: "update",
-      entityType: "fuel_truck",
-      entityId: id,
-    });
-    revalidatePath(`/fuel-trucks/${id}`);
-    revalidatePath("/fuel-trucks");
-    redirect(`/fuel-trucks/${id}?updated=${Date.now()}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to update fuel tanker";
-    redirect(`/fuel-trucks/${id}?error=${encodeURIComponent(message)}`);
-  }
+      await logAuditEvent({
+        session,
+        action: "update",
+        entityType: "fuel_truck",
+        entityId: id,
+      });
+      revalidatePath(`/fuel-trucks/${id}`);
+      revalidatePath("/fuel-trucks");
+      redirect(`/fuel-trucks/${id}?updated=${Date.now()}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update fuel tanker";
+      redirect(`/fuel-trucks/${id}?error=${encodeURIComponent(message)}`);
+    }
+  });
 }
 
 async function addTruckRefill(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
-  await requireModuleAccess("fuel-truck");
+  await measureAsync("fuel-trucks/detail action addTruckRefill", async () => {
+    const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
+    await requireModuleAccess("fuel-truck");
 
-  const id = Number(formData.get("fuelTruckId"));
-  if (!id) return;
-  const receiptFile = formData.get("receipt");
-  const receipt =
-    isUploadLikeFile(receiptFile) && receiptFile.size > 0 ? await getUploadedFileBuffer(receiptFile) : null;
+    const id = Number(formData.get("fuelTruckId"));
+    if (!id) return;
+    const receiptFile = formData.get("receipt");
+    const receipt =
+      isUploadLikeFile(receiptFile) && receiptFile.size > 0 ? await getUploadedFileBuffer(receiptFile) : null;
 
-  try {
-    const result = await fuelTruckService.addRefill({
-    fuelTruckId: id,
-    refillDate: String(formData.get("refillDate") ?? ""),
-    refillTime: String(formData.get("refillTime") ?? ""),
-    odometerReading: formData.get("odometerReading") ? Number(formData.get("odometerReading")) : null,
-    fuelStationName: String(formData.get("fuelStationName") ?? ""),
-    vendorName: String(formData.get("vendorName") ?? ""),
-    quantityLiters: Number(formData.get("quantityLiters")),
-    ratePerLiter: Number(formData.get("ratePerLiter")),
-    totalAmount: Number(formData.get("totalAmount")),
-    billNumber: String(formData.get("billNumber") ?? ""),
-    paymentMode: String(formData.get("paymentMode") ?? ""),
-    driverName: String(formData.get("driverName") ?? ""),
-    notes: String(formData.get("notes") ?? ""),
-    receipt: receipt
-      ? {
-          fileName: receipt.fileName,
-          mimeType: receipt.mimeType,
-          sizeBytes: receipt.sizeBytes,
-          data: receipt.data,
-        }
-      : null,
-    userId: session.id,
-  });
-
-    await logAuditEvent({
-      session,
-      action: "create",
-      entityType: "fuel_truck_refill",
-      entityId: result.refillId,
-      details: { fuelTruckId: id, quantityLiters: Number(formData.get("quantityLiters")) },
+    try {
+      const result = await fuelTruckService.addRefill({
+      fuelTruckId: id,
+      refillDate: String(formData.get("refillDate") ?? ""),
+      refillTime: String(formData.get("refillTime") ?? ""),
+      odometerReading: formData.get("odometerReading") ? Number(formData.get("odometerReading")) : null,
+      fuelStationName: String(formData.get("fuelStationName") ?? ""),
+      vendorName: String(formData.get("vendorName") ?? ""),
+      quantityLiters: Number(formData.get("quantityLiters")),
+      ratePerLiter: Number(formData.get("ratePerLiter")),
+      totalAmount: Number(formData.get("totalAmount")),
+      billNumber: String(formData.get("billNumber") ?? ""),
+      paymentMode: String(formData.get("paymentMode") ?? ""),
+      driverName: String(formData.get("driverName") ?? ""),
+      notes: String(formData.get("notes") ?? ""),
+      receipt: receipt
+        ? {
+            fileName: receipt.fileName,
+            mimeType: receipt.mimeType,
+            sizeBytes: receipt.sizeBytes,
+            data: receipt.data,
+          }
+        : null,
+      userId: session.id,
     });
-    revalidatePath(`/fuel-trucks/${id}`);
-    revalidatePath("/fuel-trucks");
-    redirect(`/fuel-trucks/${id}?refilled=${Date.now()}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to save refill";
-    redirect(`/fuel-trucks/${id}?error=${encodeURIComponent(message)}`);
-  }
+
+      await logAuditEvent({
+        session,
+        action: "create",
+        entityType: "fuel_truck_refill",
+        entityId: result.refillId,
+        details: { fuelTruckId: id, quantityLiters: Number(formData.get("quantityLiters")) },
+      });
+      revalidatePath(`/fuel-trucks/${id}`);
+      revalidatePath("/fuel-trucks");
+      redirect(`/fuel-trucks/${id}?refilled=${Date.now()}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save refill";
+      redirect(`/fuel-trucks/${id}?error=${encodeURIComponent(message)}`);
+    }
+  });
 }
 
 async function addTruckIssue(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
-  await requireModuleAccess("fuel-truck");
+  await measureAsync("fuel-trucks/detail action addTruckIssue", async () => {
+    const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
+    await requireModuleAccess("fuel-truck");
 
-  const id = Number(formData.get("fuelTruckId"));
-  if (!id) return;
-  try {
-    const busId = Number(formData.get("busId"));
-    if (!Number.isFinite(busId) || busId <= 0) {
-      redirect(`/fuel-trucks/${id}?error=${encodeURIComponent("Please select a bus from the list before saving issue.")}`);
-    }
-    const result = await fuelTruckService.addIssue({
-    fuelTruckId: id,
-    busId,
-    issueDate: String(formData.get("issueDate") ?? ""),
-    issueTime: String(formData.get("issueTime") ?? ""),
-    litersIssued: Number(formData.get("litersIssued")),
-    odometerBeforeKm: optionalNumber(formData, "odometerBeforeKm"),
-    odometerAfterKm: optionalNumber(formData, "odometerAfterKm"),
-    amount: optionalNumber(formData, "amount") ?? 0,
-    companyName: String(formData.get("companyName") ?? ""),
-    issuedByName: String(formData.get("issuedByName") ?? ""),
-    busDriverName: String(formData.get("busDriverName") ?? ""),
-    routeReference: String(formData.get("routeReference") ?? ""),
-    remarks: String(formData.get("remarks") ?? ""),
-    userId: session.id,
-  });
-
-    await logAuditEvent({
-      session,
-      action: "create",
-      entityType: "fuel_truck_issue",
-      entityId: result.issueId,
-      details: { fuelTruckId: id, busId, litersIssued: Number(formData.get("litersIssued")) },
+    const id = Number(formData.get("fuelTruckId"));
+    if (!id) return;
+    try {
+      const busId = Number(formData.get("busId"));
+      if (!Number.isFinite(busId) || busId <= 0) {
+        redirect(`/fuel-trucks/${id}?error=${encodeURIComponent("Please select a bus from the list before saving issue.")}`);
+      }
+      const result = await fuelTruckService.addIssue({
+      fuelTruckId: id,
+      busId,
+      issueDate: String(formData.get("issueDate") ?? ""),
+      issueTime: String(formData.get("issueTime") ?? ""),
+      litersIssued: Number(formData.get("litersIssued")),
+      odometerBeforeKm: optionalNumber(formData, "odometerBeforeKm"),
+      odometerAfterKm: optionalNumber(formData, "odometerAfterKm"),
+      amount: optionalNumber(formData, "amount") ?? 0,
+      companyName: String(formData.get("companyName") ?? ""),
+      issuedByName: String(formData.get("issuedByName") ?? ""),
+      busDriverName: String(formData.get("busDriverName") ?? ""),
+      routeReference: String(formData.get("routeReference") ?? ""),
+      remarks: String(formData.get("remarks") ?? ""),
+      userId: session.id,
     });
-    revalidatePath(`/fuel-trucks/${id}`);
-    revalidatePath("/fuel-trucks");
-    if (busId) revalidatePath(`/buses/${busId}`);
-    redirect(`/fuel-trucks/${id}?issued=${Date.now()}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to save issue";
-    redirect(`/fuel-trucks/${id}?error=${encodeURIComponent(message)}`);
-  }
+
+      await logAuditEvent({
+        session,
+        action: "create",
+        entityType: "fuel_truck_issue",
+        entityId: result.issueId,
+        details: { fuelTruckId: id, busId, litersIssued: Number(formData.get("litersIssued")) },
+      });
+      revalidatePath(`/fuel-trucks/${id}`);
+      revalidatePath("/fuel-trucks");
+      if (busId) revalidatePath(`/buses/${busId}`);
+      redirect(`/fuel-trucks/${id}?issued=${Date.now()}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save issue";
+      redirect(`/fuel-trucks/${id}?error=${encodeURIComponent(message)}`);
+    }
+  });
 }
 
 async function updateTruckIssue(formData: FormData) {

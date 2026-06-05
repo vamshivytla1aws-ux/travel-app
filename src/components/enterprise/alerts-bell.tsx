@@ -42,12 +42,14 @@ export function AlertsBell() {
   const [loading, setLoading] = useState(true);
   const [alerts, setAlerts] = useState<DashboardExceptionAlert[]>([]);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
     setDismissedIds(readDismissedAlertIds());
   }, []);
 
   useEffect(() => {
+    if (!open || hasLoaded) return;
     let mounted = true;
     async function loadAlerts() {
       try {
@@ -57,6 +59,7 @@ export function AlertsBell() {
         const payload = (await response.json()) as AlertsResponse;
         if (!mounted) return;
         setAlerts(payload.alerts ?? []);
+        setHasLoaded(true);
       } catch {
         if (!mounted) return;
         setAlerts([]);
@@ -68,7 +71,7 @@ export function AlertsBell() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [open, hasLoaded]);
 
   const visibleAlerts = useMemo(
     () => alerts.filter((alert) => !dismissedIds.includes(alert.id)),
@@ -153,4 +156,3 @@ export function AlertsBell() {
     </div>
   );
 }
-

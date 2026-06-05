@@ -55,140 +55,146 @@ function optionalNumber(formData: FormData, key: string): number | null {
 
 async function createFuelTruck(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
-  await requireModuleAccess("fuel-truck");
+  await measureAsync("fuel-trucks/action createFuelTruck", async () => {
+    const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
+    await requireModuleAccess("fuel-truck");
 
-  try {
-    const createAnother = String(formData.get("createAnother") ?? "") === "1";
-    const truckId = await fuelTruckService.createFuelTruck({
-      truckCode: String(formData.get("truckCode") ?? ""),
-      truckName: String(formData.get("truckName") ?? ""),
-      registrationNumber: String(formData.get("registrationNumber") ?? ""),
-      tankCapacityLiters: Number(formData.get("tankCapacityLiters") ?? 0),
-      currentAvailableLiters: Number(formData.get("currentAvailableLiters") ?? 0),
-      lowStockThresholdLiters: Number(formData.get("lowStockThresholdLiters") ?? 0),
-      status: String(formData.get("status") ?? "active") as "active" | "inactive",
-      notes: String(formData.get("notes") ?? ""),
-      userId: session.id,
-    });
+    try {
+      const createAnother = String(formData.get("createAnother") ?? "") === "1";
+      const truckId = await fuelTruckService.createFuelTruck({
+        truckCode: String(formData.get("truckCode") ?? ""),
+        truckName: String(formData.get("truckName") ?? ""),
+        registrationNumber: String(formData.get("registrationNumber") ?? ""),
+        tankCapacityLiters: Number(formData.get("tankCapacityLiters") ?? 0),
+        currentAvailableLiters: Number(formData.get("currentAvailableLiters") ?? 0),
+        lowStockThresholdLiters: Number(formData.get("lowStockThresholdLiters") ?? 0),
+        status: String(formData.get("status") ?? "active") as "active" | "inactive",
+        notes: String(formData.get("notes") ?? ""),
+        userId: session.id,
+      });
 
-    await logAuditEvent({
-      session,
-      action: "create",
-      entityType: "fuel_truck",
-      entityId: truckId,
-      details: { truckCode: String(formData.get("truckCode") ?? "") },
-    });
-    revalidatePath("/fuel-trucks");
-    redirect(createAnother ? `/fuel-trucks?action=create&created=${Date.now()}` : `/fuel-trucks?created=${Date.now()}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to create fuel tanker";
-    redirect(`/fuel-trucks?action=create&error=${encodeURIComponent(message)}`);
-  }
+      await logAuditEvent({
+        session,
+        action: "create",
+        entityType: "fuel_truck",
+        entityId: truckId,
+        details: { truckCode: String(formData.get("truckCode") ?? "") },
+      });
+      revalidatePath("/fuel-trucks");
+      redirect(createAnother ? `/fuel-trucks?action=create&created=${Date.now()}` : `/fuel-trucks?created=${Date.now()}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to create fuel tanker";
+      redirect(`/fuel-trucks?action=create&error=${encodeURIComponent(message)}`);
+    }
+  });
 }
 
 async function addRefill(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
-  await requireModuleAccess("fuel-truck");
+  await measureAsync("fuel-trucks/action addRefill", async () => {
+    const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
+    await requireModuleAccess("fuel-truck");
 
-  const receiptFile = formData.get("receipt");
-  const receipt =
-    isUploadLikeFile(receiptFile) && receiptFile.size > 0 ? await getUploadedFileBuffer(receiptFile) : null;
+    const receiptFile = formData.get("receipt");
+    const receipt =
+      isUploadLikeFile(receiptFile) && receiptFile.size > 0 ? await getUploadedFileBuffer(receiptFile) : null;
 
-  try {
-    const createAnother = String(formData.get("createAnother") ?? "") === "1";
-    const result = await fuelTruckService.addRefill({
-      fuelTruckId: Number(formData.get("fuelTruckId")),
-      refillDate: String(formData.get("refillDate") ?? ""),
-      refillTime: String(formData.get("refillTime") ?? ""),
-      odometerReading: formData.get("odometerReading") ? Number(formData.get("odometerReading")) : null,
-      fuelStationName: String(formData.get("fuelStationName") ?? ""),
-      vendorName: String(formData.get("vendorName") ?? ""),
-      quantityLiters: Number(formData.get("quantityLiters")),
-      ratePerLiter: Number(formData.get("ratePerLiter")),
-      totalAmount: Number(formData.get("totalAmount")),
-      billNumber: String(formData.get("billNumber") ?? ""),
-      paymentMode: String(formData.get("paymentMode") ?? ""),
-      driverName: String(formData.get("driverName") ?? ""),
-      notes: String(formData.get("notes") ?? ""),
-      receipt: receipt
-        ? {
-            fileName: receipt.fileName,
-            mimeType: receipt.mimeType,
-            sizeBytes: receipt.sizeBytes,
-            data: receipt.data,
-          }
-        : null,
-      userId: session.id,
-    });
-
-    await logAuditEvent({
-      session,
-      action: "create",
-      entityType: "fuel_truck_refill",
-      entityId: result.refillId,
-      details: {
+    try {
+      const createAnother = String(formData.get("createAnother") ?? "") === "1";
+      const result = await fuelTruckService.addRefill({
         fuelTruckId: Number(formData.get("fuelTruckId")),
+        refillDate: String(formData.get("refillDate") ?? ""),
+        refillTime: String(formData.get("refillTime") ?? ""),
+        odometerReading: formData.get("odometerReading") ? Number(formData.get("odometerReading")) : null,
+        fuelStationName: String(formData.get("fuelStationName") ?? ""),
+        vendorName: String(formData.get("vendorName") ?? ""),
         quantityLiters: Number(formData.get("quantityLiters")),
-        closingStock: result.closingStock,
-      },
-    });
-    revalidatePath("/fuel-trucks");
-    revalidatePath("/dashboard");
-    redirect(createAnother ? `/fuel-trucks?action=refill&refilled=${Date.now()}` : `/fuel-trucks?refilled=${Date.now()}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to save refill";
-    redirect(`/fuel-trucks?action=refill&error=${encodeURIComponent(message)}`);
-  }
+        ratePerLiter: Number(formData.get("ratePerLiter")),
+        totalAmount: Number(formData.get("totalAmount")),
+        billNumber: String(formData.get("billNumber") ?? ""),
+        paymentMode: String(formData.get("paymentMode") ?? ""),
+        driverName: String(formData.get("driverName") ?? ""),
+        notes: String(formData.get("notes") ?? ""),
+        receipt: receipt
+          ? {
+              fileName: receipt.fileName,
+              mimeType: receipt.mimeType,
+              sizeBytes: receipt.sizeBytes,
+              data: receipt.data,
+            }
+          : null,
+        userId: session.id,
+      });
+
+      await logAuditEvent({
+        session,
+        action: "create",
+        entityType: "fuel_truck_refill",
+        entityId: result.refillId,
+        details: {
+          fuelTruckId: Number(formData.get("fuelTruckId")),
+          quantityLiters: Number(formData.get("quantityLiters")),
+          closingStock: result.closingStock,
+        },
+      });
+      revalidatePath("/fuel-trucks");
+      revalidatePath("/dashboard");
+      redirect(createAnother ? `/fuel-trucks?action=refill&refilled=${Date.now()}` : `/fuel-trucks?refilled=${Date.now()}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save refill";
+      redirect(`/fuel-trucks?action=refill&error=${encodeURIComponent(message)}`);
+    }
+  });
 }
 
 async function addIssue(formData: FormData) {
   "use server";
-  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
-  await requireModuleAccess("fuel-truck");
+  await measureAsync("fuel-trucks/action addIssue", async () => {
+    const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
+    await requireModuleAccess("fuel-truck");
 
-  try {
-    const createAnother = String(formData.get("createAnother") ?? "") === "1";
-    const busId = Number(formData.get("busId"));
-    if (!Number.isFinite(busId) || busId <= 0) {
-      redirect(`/fuel-trucks?action=issue&error=${encodeURIComponent("Please select a bus from the list before saving issue.")}`);
-    }
-    const result = await fuelTruckService.addIssue({
-      fuelTruckId: Number(formData.get("fuelTruckId")),
-      busId,
-      issueDate: String(formData.get("issueDate") ?? ""),
-      issueTime: String(formData.get("issueTime") ?? ""),
-      litersIssued: Number(formData.get("litersIssued")),
-      odometerBeforeKm: optionalNumber(formData, "odometerBeforeKm"),
-      odometerAfterKm: optionalNumber(formData, "odometerAfterKm"),
-      issuedByName: String(formData.get("issuedByName") ?? ""),
-      busDriverName: String(formData.get("busDriverName") ?? ""),
-      routeReference: String(formData.get("routeReference") ?? ""),
-      remarks: String(formData.get("remarks") ?? ""),
-      userId: session.id,
-    });
-
-    await logAuditEvent({
-      session,
-      action: "create",
-      entityType: "fuel_truck_issue",
-      entityId: result.issueId,
-      details: {
+    try {
+      const createAnother = String(formData.get("createAnother") ?? "") === "1";
+      const busId = Number(formData.get("busId"));
+      if (!Number.isFinite(busId) || busId <= 0) {
+        redirect(`/fuel-trucks?action=issue&error=${encodeURIComponent("Please select a bus from the list before saving issue.")}`);
+      }
+      const result = await fuelTruckService.addIssue({
         fuelTruckId: Number(formData.get("fuelTruckId")),
         busId,
+        issueDate: String(formData.get("issueDate") ?? ""),
+        issueTime: String(formData.get("issueTime") ?? ""),
         litersIssued: Number(formData.get("litersIssued")),
-        closingStock: result.closingStock,
-      },
-    });
-    revalidatePath("/fuel-trucks");
-    if (busId) revalidatePath(`/buses/${busId}`);
-    revalidatePath("/dashboard");
-    redirect(createAnother ? `/fuel-trucks?action=issue&issued=${Date.now()}` : `/fuel-trucks?issued=${Date.now()}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to save issue";
-    redirect(`/fuel-trucks?action=issue&error=${encodeURIComponent(message)}`);
-  }
+        odometerBeforeKm: optionalNumber(formData, "odometerBeforeKm"),
+        odometerAfterKm: optionalNumber(formData, "odometerAfterKm"),
+        issuedByName: String(formData.get("issuedByName") ?? ""),
+        busDriverName: String(formData.get("busDriverName") ?? ""),
+        routeReference: String(formData.get("routeReference") ?? ""),
+        remarks: String(formData.get("remarks") ?? ""),
+        userId: session.id,
+      });
+
+      await logAuditEvent({
+        session,
+        action: "create",
+        entityType: "fuel_truck_issue",
+        entityId: result.issueId,
+        details: {
+          fuelTruckId: Number(formData.get("fuelTruckId")),
+          busId,
+          litersIssued: Number(formData.get("litersIssued")),
+          closingStock: result.closingStock,
+        },
+      });
+      revalidatePath("/fuel-trucks");
+      if (busId) revalidatePath(`/buses/${busId}`);
+      revalidatePath("/dashboard");
+      redirect(createAnother ? `/fuel-trucks?action=issue&issued=${Date.now()}` : `/fuel-trucks?issued=${Date.now()}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save issue";
+      redirect(`/fuel-trucks?action=issue&error=${encodeURIComponent(message)}`);
+    }
+  });
 }
 
 type Props = {
@@ -211,6 +217,7 @@ type Props = {
     refillPage?: string;
     issuePage?: string;
     action?: string;
+    reports?: string;
     export?: string;
     error?: string;
   }>;
@@ -274,7 +281,8 @@ export default async function FuelTrucksPage(props: Props) {
       const searchParams = await props.searchParams;
       const modalAction = String(searchParams.action ?? "");
       const isEntryFlow = ENTRY_ACTIONS.has(modalAction);
-      const needsBuses = !isEntryFlow || modalAction === "issue";
+      const reportsRequested = searchParams.reports === "1";
+      const needsBuses = reportsRequested || modalAction === "issue";
 
       const [trucks, summary, buses, reports] = await Promise.all([
         measureAsync("fuel-trucks/page listFuelTrucks", () =>
@@ -298,7 +306,7 @@ export default async function FuelTrucksPage(props: Props) {
               ),
             )
           : Promise.resolve({ rows: [] as { id: number; bus_number: string; registration_number: string; odometer_km: string | null }[] }),
-        isEntryFlow
+        isEntryFlow || !reportsRequested
           ? Promise.resolve(EMPTY_REPORTS)
           : measureAsync("fuel-trucks/page getReports", () =>
               fuelTruckService.getReports({
@@ -315,6 +323,7 @@ export default async function FuelTrucksPage(props: Props) {
       return { searchParams, modalAction, isEntryFlow, needsBuses, trucks, summary, buses, reports };
     },
   );
+  const reportsRequested = searchParams.reports === "1";
 
   const now = new Date();
   const defaultDate = now.toISOString().slice(0, 10);
@@ -348,6 +357,7 @@ export default async function FuelTrucksPage(props: Props) {
   if (searchParams.driver) listBaseParams.set("driver", String(searchParams.driver));
   if (searchParams.page) listBaseParams.set("page", String(searchParams.page));
   if (searchParams.pageSize) listBaseParams.set("pageSize", String(searchParams.pageSize));
+  if (searchParams.reports) listBaseParams.set("reports", String(searchParams.reports));
   const listBaseHref = `/fuel-trucks${listBaseParams.toString() ? `?${listBaseParams.toString()}` : ""}`;
   const createParams = new URLSearchParams(listBaseParams);
   createParams.set("action", "create");
@@ -358,6 +368,15 @@ export default async function FuelTrucksPage(props: Props) {
   const createActionHref = `/fuel-trucks?${createParams.toString()}`;
   const refillActionHref = `/fuel-trucks?${refillParams.toString()}`;
   const issueActionHref = `/fuel-trucks?${issueParams.toString()}`;
+  const reportsParams = new URLSearchParams(listBaseParams);
+  reportsParams.set("reports", "1");
+  if (!reportsParams.get("fromDate")) reportsParams.set("fromDate", defaultDate);
+  const loadReportsHref = `/fuel-trucks?${reportsParams.toString()}`;
+  const hideReportsParams = new URLSearchParams(listBaseParams);
+  hideReportsParams.delete("reports");
+  hideReportsParams.delete("refillPage");
+  hideReportsParams.delete("issuePage");
+  const hideReportsHref = `/fuel-trucks${hideReportsParams.toString() ? `?${hideReportsParams.toString()}` : ""}`;
   const reportPageSize = 15;
   const requestedRefillPage = Number(searchParams.refillPage ?? "1");
   const requestedIssuePage = Number(searchParams.issuePage ?? "1");
@@ -777,34 +796,48 @@ export default async function FuelTrucksPage(props: Props) {
         {!isEntryFlow ? (
           <Card>
             <CardHeader>
-              <CardTitle>Reports & Ledger Filters</CardTitle>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle>Reports & Ledger Filters</CardTitle>
+                {reportsRequested ? (
+                  <Link href={hideReportsHref} className="inline-flex h-9 items-center rounded-md border px-3 text-sm">
+                    Hide Reports
+                  </Link>
+                ) : (
+                  <Link href={loadReportsHref} className="inline-flex h-9 items-center rounded-md border px-3 text-sm">
+                    Load Reports
+                  </Link>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <form className="grid gap-2 rounded-md border bg-background p-3 md:grid-cols-7">
-                <Input name="fromDate" type="date" defaultValue={searchParams.fromDate ?? ""} />
-                <Input name="toDate" type="date" defaultValue={searchParams.toDate ?? ""} />
-                <select name="fuelTruckId" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" defaultValue={searchParams.fuelTruckId ?? ""}>
-                  <option value="">All fuel tankers</option>
-                  {trucks.map((truck) => (
-                    <option key={truck.id} value={truck.id}>
-                      {truck.truckCode}
-                    </option>
-                  ))}
-                </select>
-                <select name="busId" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" defaultValue={searchParams.busId ?? ""}>
-                  <option value="">All buses</option>
-                  {buses.rows.map((bus) => (
-                    <option key={bus.id} value={bus.id}>
-                      {bus.registration_number} - {bus.bus_number}
-                    </option>
-                  ))}
-                </select>
-                <Input name="fuelStation" placeholder="Fuel station" defaultValue={searchParams.fuelStation ?? ""} />
-                <Input name="driver" placeholder="Driver name" defaultValue={searchParams.driver ?? ""} />
-                <Button type="submit">Run</Button>
-              </form>
+              {reportsRequested ? (
+                <>
+                  <form className="grid gap-2 rounded-md border bg-background p-3 md:grid-cols-7">
+                    <input type="hidden" name="reports" value="1" />
+                    <Input name="fromDate" type="date" defaultValue={searchParams.fromDate ?? ""} />
+                    <Input name="toDate" type="date" defaultValue={searchParams.toDate ?? ""} />
+                    <select name="fuelTruckId" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" defaultValue={searchParams.fuelTruckId ?? ""}>
+                      <option value="">All fuel tankers</option>
+                      {trucks.map((truck) => (
+                        <option key={truck.id} value={truck.id}>
+                          {truck.truckCode}
+                        </option>
+                      ))}
+                    </select>
+                    <select name="busId" className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" defaultValue={searchParams.busId ?? ""}>
+                      <option value="">All buses</option>
+                      {buses.rows.map((bus) => (
+                        <option key={bus.id} value={bus.id}>
+                          {bus.registration_number} - {bus.bus_number}
+                        </option>
+                      ))}
+                    </select>
+                    <Input name="fuelStation" placeholder="Fuel station" defaultValue={searchParams.fuelStation ?? ""} />
+                    <Input name="driver" placeholder="Driver name" defaultValue={searchParams.driver ?? ""} />
+                    <Button type="submit">Run</Button>
+                  </form>
 
-              <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="grid gap-4 lg:grid-cols-2">
                 <Card>
                   <CardHeader>
                     <CardTitle>Refill Report</CardTitle>
@@ -873,7 +906,7 @@ export default async function FuelTrucksPage(props: Props) {
                   </CardContent>
                 </Card>
 
-                <Card>
+                  <Card>
                 <CardHeader>
                   <CardTitle>Issue Report</CardTitle>
                 </CardHeader>
@@ -970,8 +1003,14 @@ export default async function FuelTrucksPage(props: Props) {
                     </div>
                   </div>
                 </CardContent>
-                </Card>
-              </div>
+                  </Card>
+                </div>
+                </>
+              ) : (
+                <div className="rounded-md border bg-background p-4 text-sm text-muted-foreground">
+                  Reports stay unloaded by default to keep this page fast. Use <span className="font-medium text-foreground">Load Reports</span> when you need refill and issue history.
+                </div>
+              )}
             </CardContent>
           </Card>
         ) : null}

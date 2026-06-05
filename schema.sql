@@ -404,6 +404,13 @@ CREATE INDEX IF NOT EXISTS idx_fuel_truck_refills_truck_date ON fuel_truck_refil
 CREATE INDEX IF NOT EXISTS idx_fuel_issues_truck_date ON fuel_issues(fuel_truck_id, issue_date DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_fuel_issues_bus_date ON fuel_issues(bus_id, issue_date DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_fuel_truck_ledger_truck_date ON fuel_truck_ledger(fuel_truck_id, transaction_date DESC, id DESC);
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_fuel_trucks_truck_code_trgm ON fuel_trucks USING gin (truck_code gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_fuel_trucks_truck_name_trgm ON fuel_trucks USING gin (truck_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_fuel_trucks_registration_number_trgm ON fuel_trucks USING gin (registration_number gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_fuel_truck_refills_fuel_station_name_trgm ON fuel_truck_refills USING gin (fuel_station_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_fuel_truck_refills_driver_name_trgm ON fuel_truck_refills USING gin (driver_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_fuel_issues_bus_driver_name_trgm ON fuel_issues USING gin (bus_driver_name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_trip_runs_date_status ON trip_runs(trip_date, status);
 CREATE INDEX IF NOT EXISTS idx_finance_loans_status ON finance_loans(status, id DESC);
 CREATE INDEX IF NOT EXISTS idx_finance_loans_registration ON finance_loans(registration_no);
