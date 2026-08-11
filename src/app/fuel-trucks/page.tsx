@@ -18,7 +18,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { measureAsync } from "@/lib/dev-bench";
 import { getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
-import { formatDateInAppTimeZone } from "@/lib/timezone";
+import { formatDateInAppTimeZone, getAppDateTimeInputDefaults } from "@/lib/timezone";
 import { safeDecodeURIComponent } from "@/lib/url";
 import { FuelTruckService } from "@/services/fuel-truck.service";
 import { BusSearchSelect } from "@/components/fuel-trucks/bus-search-select";
@@ -325,9 +325,7 @@ export default async function FuelTrucksPage(props: Props) {
   );
   const reportsRequested = searchParams.reports === "1";
 
-  const now = new Date();
-  const defaultDate = now.toISOString().slice(0, 10);
-  const defaultTime = now.toTimeString().slice(0, 5);
+  const { date: defaultDate, time: defaultTime } = getAppDateTimeInputDefaults();
   const requestedPageSize = Number(searchParams.pageSize ?? "15");
   const pageSize = PAGE_SIZE_OPTIONS.includes(requestedPageSize as (typeof PAGE_SIZE_OPTIONS)[number])
     ? requestedPageSize
@@ -370,7 +368,6 @@ export default async function FuelTrucksPage(props: Props) {
   const issueActionHref = `/fuel-trucks?${issueParams.toString()}`;
   const reportsParams = new URLSearchParams(listBaseParams);
   reportsParams.set("reports", "1");
-  if (!reportsParams.get("fromDate")) reportsParams.set("fromDate", defaultDate);
   const loadReportsHref = `/fuel-trucks?${reportsParams.toString()}`;
   const hideReportsParams = new URLSearchParams(listBaseParams);
   hideReportsParams.delete("reports");
@@ -500,7 +497,10 @@ export default async function FuelTrucksPage(props: Props) {
               Create Fuel Tanker
             </Link>
             <Link href={refillActionHref} className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium">
-              Fuel Tanker Refill History
+              Add Fuel Refill
+            </Link>
+            <Link href={`${loadReportsHref}#refill-history`} className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium">
+              View Refill History
             </Link>
             <Link href={issueActionHref} className="inline-flex h-10 items-center rounded-md border px-4 text-sm font-medium">
               Diesel Issue to Bus
@@ -838,7 +838,7 @@ export default async function FuelTrucksPage(props: Props) {
                   </form>
 
                   <div className="grid gap-4 lg:grid-cols-2">
-                <Card>
+                <Card id="refill-history" className="scroll-mt-24">
                   <CardHeader>
                     <CardTitle>Refill Report</CardTitle>
                   </CardHeader>

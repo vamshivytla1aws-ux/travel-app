@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MODULE_EXPORT_FIELDS, type ExportModuleKey } from "@/lib/module-export";
+import { Input } from "@/components/ui/input";
 
 type Props = {
   moduleKey: ExportModuleKey;
@@ -73,11 +74,11 @@ export function ModuleExportLauncher({
               </div>
               <div className="grid gap-1">
                 <label className="text-xs text-muted-foreground">From Date</label>
-                <input name="from" type="date" className="h-9 rounded-md border border-input px-3 text-sm" />
+                <Input name="from" type="date" />
               </div>
               <div className="grid gap-1">
                 <label className="text-xs text-muted-foreground">To Date</label>
-                <input name="to" type="date" className="h-9 rounded-md border border-input px-3 text-sm" />
+                <Input name="to" type="date" />
               </div>
               {moduleKey === "buses" ? (
                 <div className="grid gap-1 md:col-span-4">

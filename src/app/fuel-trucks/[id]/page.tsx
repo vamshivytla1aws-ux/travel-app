@@ -13,12 +13,13 @@ import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { measureAsync } from "@/lib/dev-bench";
 import { getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
-import { formatDateInAppTimeZone } from "@/lib/timezone";
+import { formatDateInAppTimeZone, getAppDateTimeInputDefaults } from "@/lib/timezone";
 import type { FuelIssue, FuelTruck, FuelTruckLedgerEntry, FuelTruckRefill } from "@/lib/types";
 import { safeDecodeURIComponent } from "@/lib/url";
 import { FuelTruckService } from "@/services/fuel-truck.service";
 import { BusSearchSelect } from "@/components/fuel-trucks/bus-search-select";
 import { RefillAmountFields } from "@/components/fuel-trucks/refill-amount-fields";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 
 const fuelTruckService = new FuelTruckService();
 const DETAIL_ENTRY_ACTIONS = new Set(["refill", "issue"]);
@@ -219,6 +220,34 @@ async function updateTruckIssue(formData: FormData) {
   }
 }
 
+async function deleteTruckIssue(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
+  await requireModuleAccess("fuel-truck");
+  const fuelTruckId = Number(formData.get("fuelTruckId"));
+  const issueId = Number(formData.get("issueId"));
+  if (!fuelTruckId || !issueId) return;
+
+  try {
+    const result = await fuelTruckService.deleteIssue(issueId, session.id);
+    await logAuditEvent({
+      session,
+      action: "delete",
+      entityType: "fuel_truck_issue",
+      entityId: issueId,
+      details: { fuelTruckId: result.fuelTruckId, busId: result.busId },
+    });
+    revalidatePath(`/fuel-trucks/${fuelTruckId}`);
+    revalidatePath("/fuel-trucks");
+    revalidatePath("/dashboard");
+    if (result.busId) revalidatePath(`/buses/${result.busId}`);
+    redirect(`/fuel-trucks/${fuelTruckId}?issueDeleted=${Date.now()}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete issue";
+    redirect(`/fuel-trucks/${fuelTruckId}?error=${encodeURIComponent(message)}`);
+  }
+}
+
 type Props = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{
@@ -226,6 +255,7 @@ type Props = {
     refilled?: string;
     issued?: string;
     issueUpdated?: string;
+    issueDeleted?: string;
     editIssueId?: string;
     action?: string;
     error?: string;
@@ -278,9 +308,7 @@ export default async function FuelTruckDetailPage(props: Props) {
     ? detail.issues.find((issue) => issue.id === editIssueId) ?? null
     : null;
 
-  const now = new Date();
-  const defaultDate = now.toISOString().slice(0, 10);
-  const defaultTime = now.toTimeString().slice(0, 5);
+  const { date: defaultDate, time: defaultTime } = getAppDateTimeInputDefaults();
   const refillActionHref = `/fuel-trucks/${detail.truck.id}?action=refill`;
   const issueActionHref = `/fuel-trucks/${detail.truck.id}?action=issue`;
   const baseDetailHref = `/fuel-trucks/${detail.truck.id}`;
@@ -299,6 +327,9 @@ export default async function FuelTruckDetailPage(props: Props) {
         ) : null}
         {searchParams.issueUpdated ? (
           <StatusAlert tone="success" message="Issue updated successfully." />
+        ) : null}
+        {searchParams.issueDeleted ? (
+          <StatusAlert tone="warning" message="Issue deleted from tanker stock and bus fuel history; stock was restored." />
         ) : null}
         {searchParams.error ? (
           <StatusAlert tone="error" message={safeDecodeURIComponent(searchParams.error)} />
@@ -506,6 +537,7 @@ export default async function FuelTruckDetailPage(props: Props) {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Bus Registration</TableHead>
                     <TableHead className="text-right">Opening</TableHead>
                     <TableHead className="text-right">In</TableHead>
                     <TableHead className="text-right">Out</TableHead>
@@ -519,6 +551,7 @@ export default async function FuelTruckDetailPage(props: Props) {
                         {formatDateInAppTimeZone(entry.transactionDate)} {entry.transactionTime.slice(0, 5)}
                       </TableCell>
                       <TableCell>{entry.transactionType}</TableCell>
+                      <TableCell>{entry.busRegistrationNumber ?? "-"}</TableCell>
                       <TableCell className="text-right">{entry.openingStock.toFixed(2)}</TableCell>
                       <TableCell className="text-right">{entry.quantityIn.toFixed(2)}</TableCell>
                       <TableCell className="text-right">{entry.quantityOut.toFixed(2)}</TableCell>
@@ -527,7 +560,7 @@ export default async function FuelTruckDetailPage(props: Props) {
                   ))}
                   {detail.ledger.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center text-muted-foreground">
                         No stock ledger entries yet.
                       </TableCell>
                     </TableRow>
@@ -659,9 +692,20 @@ export default async function FuelTruckDetailPage(props: Props) {
                     <TableCell>{issue.busDriverName ?? "-"}</TableCell>
                     <TableCell>{issue.routeReference ?? "-"}</TableCell>
                     <TableCell className="text-right">
-                      <Link href={`/fuel-trucks/${detail.truck.id}?editIssueId=${issue.id}`} className="text-blue-600 hover:underline">
-                        Edit
-                      </Link>
+                      <div className="flex items-center justify-end gap-3">
+                        <Link href={`/fuel-trucks/${detail.truck.id}?editIssueId=${issue.id}`} className="text-blue-600 hover:underline">
+                          Edit
+                        </Link>
+                        <form action={deleteTruckIssue}>
+                          <input type="hidden" name="fuelTruckId" value={detail.truck.id} />
+                          <input type="hidden" name="issueId" value={issue.id} />
+                          <ConfirmSubmitButton
+                            label="Delete"
+                            message={`Delete this ${issue.litersIssued.toFixed(2)} L issue? Tanker stock will be restored and the entry will be removed from bus ${issue.registrationNumber ?? issue.busNumber ?? issue.busId} history.`}
+                            className="text-red-500 hover:underline"
+                          />
+                        </form>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -213,6 +213,7 @@ export interface FuelTruckLedgerEntry {
   transactionType: "REFILL" | "ISSUE" | "ADJUSTMENT";
   referenceId: number | null;
   referenceType: string | null;
+  busRegistrationNumber: string | null;
   transactionDate: string;
   transactionTime: string;
   openingStock: number;

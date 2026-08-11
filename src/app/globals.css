@@ -176,6 +176,32 @@
 
 input, textarea, select { color-scheme: dark; }
 
+/* Native selects are retained for server-action forms, but every popup must
+   remain legible inside the dark dashboard theme. */
+.premium-app select {
+  border-color: rgba(255,255,255,.1);
+  background-color: rgba(6,17,29,.82) !important;
+  color: #eee9dd;
+  box-shadow: inset 0 1px rgba(255,255,255,.025);
+}
+
+.premium-app select:focus-visible {
+  border-color: rgba(217,185,102,.58);
+  outline: 2px solid rgba(217,185,102,.16);
+  outline-offset: 1px;
+}
+
+.premium-app select option,
+.premium-app select optgroup {
+  background: #081421;
+  color: #eee9dd;
+}
+
+.premium-time-scroll {
+  scrollbar-color: rgba(217,185,102,.45) rgba(5,11,19,.8);
+  scrollbar-width: thin;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;

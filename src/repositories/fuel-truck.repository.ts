@@ -61,6 +61,7 @@ export type FuelTruckLedgerRow = {
   transaction_type: "REFILL" | "ISSUE" | "ADJUSTMENT";
   reference_id: number | null;
   reference_type: string | null;
+  bus_registration_number: string | null;
   transaction_date: string;
   transaction_time: string;
   opening_stock: string;
@@ -142,11 +143,16 @@ export class FuelTruckRepository {
 
   async listLedger(fuelTruckId: number, limit = 50) {
     const result = await query<FuelTruckLedgerRow>(
-      `SELECT id, fuel_truck_id, transaction_type, reference_id, reference_type, transaction_date::text, transaction_time::text,
-              opening_stock::text, quantity_in::text, quantity_out::text, closing_stock::text, remarks, created_by, created_at::text
-       FROM fuel_truck_ledger
-       WHERE fuel_truck_id = $1
-       ORDER BY transaction_date DESC, transaction_time DESC, id DESC
+      `SELECT l.id, l.fuel_truck_id, l.transaction_type, l.reference_id, l.reference_type,
+              l.transaction_date::text, l.transaction_time::text, l.opening_stock::text,
+              l.quantity_in::text, l.quantity_out::text, l.closing_stock::text, l.remarks,
+              l.created_by, l.created_at::text, b.registration_number AS bus_registration_number
+       FROM fuel_truck_ledger l
+       LEFT JOIN fuel_issues fi
+         ON l.reference_type = 'fuel_issues' AND fi.id = l.reference_id
+       LEFT JOIN buses b ON b.id = fi.bus_id
+       WHERE l.fuel_truck_id = $1
+       ORDER BY l.transaction_date DESC, l.transaction_time DESC, l.id DESC
        LIMIT $2`,
       [fuelTruckId, limit],
     );

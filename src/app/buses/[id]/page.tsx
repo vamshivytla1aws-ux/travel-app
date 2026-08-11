@@ -13,7 +13,7 @@ import { logAuditEvent } from "@/lib/audit";
 import { ensureDocumentTables, getUploadedFileBuffer, isUploadLikeFile } from "@/lib/document-storage";
 import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
-import { formatDateInAppTimeZone, formatDateTimeInAppTimeZone } from "@/lib/timezone";
+import { formatDateInAppTimeZone, formatDateTimeInAppTimeZone, getAppDateTimeInputDefaults } from "@/lib/timezone";
 import { BusesService } from "@/services/buses.service";
 import { FuelService } from "@/services/fuel.service";
 import { FuelTruckService } from "@/services/fuel-truck.service";
@@ -381,9 +381,7 @@ export default async function BusDetailPage(props: Props) {
       : null;
   const fuelTrucks = await fuelTruckService.listFuelTrucks("", "active");
   const defaultOdometerStart = detail.latestFuel?.odometerAfterKm ?? detail.bus.odometerKm;
-  const now = new Date();
-  const defaultDate = now.toISOString().slice(0, 10);
-  const defaultTime = now.toTimeString().slice(0, 5);
+  const { date: defaultDate, time: defaultTime } = getAppDateTimeInputDefaults();
   const fuelPageHref = (page: number) => {
     const paramsObj = new URLSearchParams();
     Object.entries(searchParams).forEach(([key, value]) => {

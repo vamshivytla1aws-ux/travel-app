@@ -2,8 +2,13 @@ import * as React from "react"
 import { Input as InputPrimitive } from "@base-ui/react/input"
 
 import { cn } from "@/lib/utils"
+import { PremiumDateTimeInput } from "@/components/ui/premium-date-time-input"
 
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+  if (type === "date" || type === "time") {
+    return <PremiumDateTimeInput type={type as "date" | "time"} className={className} {...props} />
+  }
+
   return (
     <InputPrimitive
       type={type}

@@ -164,6 +164,7 @@ function mapLedger(row: FuelTruckLedgerRow): FuelTruckLedgerEntry {
     transactionType: row.transaction_type,
     referenceId: row.reference_id,
     referenceType: row.reference_type,
+    busRegistrationNumber: row.bus_registration_number,
     transactionDate: row.transaction_date,
     transactionTime: row.transaction_time,
     openingStock: Number(row.opening_stock),
@@ -660,14 +661,13 @@ export class FuelTruckService {
       const restoredLiters = Number(issue.liters_issued);
       const nextStock = Number((currentStock + restoredLiters).toFixed(2));
 
-      await client.query(`DELETE FROM fuel_issues WHERE id = $1`, [issueId]);
       await client.query(
         `DELETE FROM fuel_truck_ledger
-         WHERE transaction_type = 'ISSUE'
-           AND reference_type = 'fuel_issues'
+         WHERE reference_type = 'fuel_issues'
            AND reference_id = $1`,
         [issueId],
       );
+      await client.query(`DELETE FROM fuel_issues WHERE id = $1`, [issueId]);
       await client.query(
         `UPDATE fuel_trucks
          SET current_available_liters = $1, updated_by = $2, updated_at = NOW()

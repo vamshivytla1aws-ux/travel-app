@@ -17,7 +17,7 @@ import { requireModuleAccess, requireSession } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { ensureTransportEnhancements } from "@/lib/schema-ensure";
-import { formatDateInAppTimeZone } from "@/lib/timezone";
+import { formatDateInAppTimeZone, getAppDateTimeInputDefaults } from "@/lib/timezone";
 import { safeDecodeURIComponent } from "@/lib/url";
 
 const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 50, 100] as const;
@@ -501,7 +501,7 @@ export default async function RoutesPage(props: Props) {
                   id="assignmentDate"
                   name="assignmentDate"
                   type="date"
-                  defaultValue={formSource?.assignment_date ?? new Date().toISOString().slice(0, 10)}
+                  defaultValue={formSource?.assignment_date ?? getAppDateTimeInputDefaults().date}
                   required
                 />
 

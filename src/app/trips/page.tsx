@@ -16,6 +16,7 @@ import { requireModuleAccess } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { query } from "@/lib/db";
 import { TripsService } from "@/services/trips.service";
+import { getAppDateTimeInputDefaults } from "@/lib/timezone";
 
 const tripsService = new TripsService();
 const SHIFT_OPTIONS = ["general", "morning", "afternoon", "night", "unknown"] as const;
@@ -295,7 +296,7 @@ export default async function TripsPage(props: Props) {
     ),
   ]);
   const adhocTrips = adhocTripsResult.rows;
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = getAppDateTimeInputDefaults().date;
   const adhocTotalPages = Math.max(1, Math.ceil(adhocTripsResult.total / adhocTripsResult.pageSize));
   const editId = Number(searchParams.editId ?? "");
   const editTrip = Number.isFinite(editId) && editId > 0
