@@ -155,6 +155,80 @@ h1 em,h2 em { color: var(--gold-bright); font-style: italic; font-weight: 500; }
 .footer { position: relative; background: #03070d; border-top: 1px solid var(--line); }.footer-main { min-height: 330px; padding: 75px 0 60px; display: grid; grid-template-columns: 1.5fr .55fr 1fr auto; gap: 70px; }.footer-brand p { max-width: 360px; margin-top: 30px; color: #7f8a9a; font-size: .76rem; }.footer-nav,.footer-contact { display: flex; flex-direction: column; align-items: flex-start; gap: 9px; }.footer-nav > span,.footer-contact > span { margin-bottom: 16px; color: var(--gold); }.footer-nav a,.footer-contact a,.footer-contact p { display: flex; align-items: flex-start; gap: 9px; margin: 0; color: #9aa5b4; font-size: .72rem; transition: color .2s; }.footer-nav a:hover,.footer-contact a:hover { color: var(--gold-bright); }.footer-contact svg { width: 14px; margin-top: 5px; color: var(--gold); flex-shrink: 0; }.footer-top { display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid var(--line); color: var(--gold); transform: rotate(-45deg); transition: background .25s, color .25s; }.footer-top svg { width: 17px; }.footer-top:hover { background: var(--gold); color: var(--ink); }.footer-bottom { min-height: 74px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,.07); color: #697586; font-size: .63rem; }.footer-bottom p { margin: 0; }.footer-bottom a { color: var(--gold); }.footer-bottom a:hover { color: var(--gold-bright); }
 .footer-brand .brand-logo { height: 76px; }
 
+/* Shared premium card interaction */
+.service-card,
+.strength-item,
+.fleet-card,
+.client-tile,
+.contact-details,
+.enquiry-form,
+.map-panel {
+  position: relative;
+  isolation: isolate;
+  transition: transform .38s cubic-bezier(.16,1,.3,1), border-color .38s ease, box-shadow .38s ease, background-color .38s ease, filter .38s ease;
+}
+.contact-details,
+.enquiry-form,
+.map-panel { overflow: hidden; }
+.service-card::after,
+.strength-item::after,
+.fleet-card::after,
+.client-tile::after,
+.contact-details::after,
+.enquiry-form::after,
+.map-panel::after {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(115deg, rgba(240,217,143,.13), transparent 28%, transparent 72%, rgba(217,185,102,.06));
+  box-shadow: inset 0 1px 0 rgba(255,236,181,.42), inset 0 0 0 1px rgba(217,185,102,.22);
+  transition: opacity .38s ease;
+}
+.strength-item > svg,
+.contact-block > svg,
+.process-list svg,
+.client-tile strong,
+.fleet-card-copy { transition: transform .35s cubic-bezier(.16,1,.3,1), color .3s ease, filter .3s ease, letter-spacing .35s ease; }
+
+@media (hover: hover) and (pointer: fine) {
+  .service-card:hover,
+  .strength-item:hover,
+  .fleet-card:hover,
+  .client-tile:hover,
+  .contact-details:hover,
+  .enquiry-form:hover,
+  .map-panel:hover,
+  .contact-details:focus-within,
+  .enquiry-form:focus-within,
+  .map-panel:focus-within {
+    transform: translate3d(0,-6px,0);
+    border-color: rgba(217,185,102,.48);
+    box-shadow: 0 28px 70px rgba(0,0,0,.3), 0 8px 26px rgba(177,139,54,.1);
+  }
+  .service-card:hover::after,
+  .strength-item:hover::after,
+  .fleet-card:hover::after,
+  .client-tile:hover::after,
+  .contact-details:hover::after,
+  .enquiry-form:hover::after,
+  .map-panel:hover::after,
+  .contact-details:focus-within::after,
+  .enquiry-form:focus-within::after,
+  .map-panel:focus-within::after { opacity: 1; }
+  .strength-item:hover > svg,
+  .contact-details:hover .contact-block > svg,
+  .map-panel:hover .process-list svg {
+    color: var(--gold-bright);
+    filter: drop-shadow(0 0 9px rgba(217,185,102,.34));
+    transform: translate3d(0,-2px,0) scale(1.05);
+  }
+  .client-tile:hover strong { color: var(--gold-bright); letter-spacing: .11em; }
+  .fleet-card:hover .fleet-card-copy { transform: translate3d(0,-4px,0); }
+}
+
 @media (max-width: 1100px) {
   .desktop-nav { gap: 25px; }.hero { min-height: 840px; }.hero-copy { width: 62vw; }.service-grid { grid-template-columns: repeat(2,1fr); }.service-card { min-height: 340px; }.about-grid { gap: 70px; }.strength-grid { grid-template-columns: repeat(3,1fr); }.strength-item.large { grid-column: span 1; }.fleet-grid { grid-template-columns: 1fr 1fr; }.fleet-card:first-child { grid-column: 1/-1; height: 440px; }.fleet-card { height: 400px; }.contact-layout { grid-template-columns: .85fr 1.15fr; }.contact-details,.enquiry-form { padding: 32px; }.footer-main { gap: 36px; }
 }
