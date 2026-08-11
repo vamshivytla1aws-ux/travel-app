@@ -1,7 +1,23 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "DOCKERFILE"
+    "builder": "DOCKERFILE",
+    "watchPatterns": [
+      "/src/**",
+      "/public/**",
+      "/scripts/**",
+      "/db/**",
+      "/schema.sql",
+      "/package.json",
+      "/package-lock.json",
+      "/Dockerfile",
+      "/.dockerignore",
+      "/next.config.mjs",
+      "/tsconfig.json",
+      "/tailwind.config.js",
+      "/postcss.config.js",
+      "/railway.json"
+    ]
   },
   "deploy": {
     "restartPolicyType": "ON_FAILURE",

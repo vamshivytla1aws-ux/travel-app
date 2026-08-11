@@ -11,6 +11,7 @@ test-results
 tests
 android
 capacitor-www
+public-site
 .env
 .env.*
 !.env.example
