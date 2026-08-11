@@ -25,20 +25,23 @@ export function DashboardQuickActions({ allowedModules }: Props) {
   if (visibleActions.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Quick Actions</CardTitle>
+    <Card className="gap-3">
+      <CardHeader className="flex-row items-center justify-between">
+        <div>
+          <p className="text-[9px] font-bold tracking-[0.2em] text-[#b99a55] uppercase">Command Deck</p>
+          <CardTitle className="mt-1 font-display text-2xl text-[#f0e8d9]">Quick Actions</CardTitle>
+        </div>
       </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
+      <CardContent className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
         {visibleActions.map((item) => {
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className="inline-flex h-9 items-center gap-2 rounded-md border bg-white px-3 text-sm font-medium hover:bg-slate-50"
+              className="group flex min-h-12 items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 text-sm font-semibold text-[#b8c1cb] transition-all duration-200 hover:border-[#d9b966]/25 hover:bg-[#d9b966]/[0.07] hover:text-[#f0e7d5]"
             >
-              <Icon className="h-4 w-4" />
+              <span className="grid h-8 w-8 place-items-center rounded-lg border border-[#d9b966]/15 bg-[#d9b966]/[0.07] text-[#d9b966] transition-transform group-hover:scale-105"><Icon className="h-4 w-4" /></span>
               {item.label}
             </Link>
           );

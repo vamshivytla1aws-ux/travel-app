@@ -90,8 +90,8 @@ export function AlertsBell() {
         type="button"
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          "relative inline-flex h-9 items-center justify-center rounded px-2 text-slate-200 transition-colors hover:bg-[#151b2b] hover:text-yellow-200",
-          open ? "bg-[#151b2b] text-yellow-200" : "",
+          "relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-[#8f9cac] transition-colors hover:border-[#d9b966]/15 hover:bg-[#d9b966]/10 hover:text-[#e3c477]",
+          open ? "border-[#d9b966]/20 bg-[#d9b966]/10 text-[#e3c477]" : "",
         )}
         aria-label="Alerts"
         title="Alerts"
@@ -104,8 +104,8 @@ export function AlertsBell() {
         ) : null}
       </button>
       {open ? (
-        <div className="absolute right-0 z-50 mt-2 w-[360px] max-w-[90vw] rounded border border-slate-700 bg-[#0f1627] p-2 shadow-2xl">
-          <div className="mb-2 flex items-center justify-between border-b border-slate-700 pb-2">
+        <div className="absolute right-0 z-50 mt-2 w-[360px] max-w-[90vw] rounded-xl border border-[#d9b966]/15 bg-[#081421]/95 p-3 shadow-2xl backdrop-blur-xl">
+          <div className="mb-2 flex items-center justify-between border-b border-white/[0.07] pb-2">
             <p className="text-sm font-semibold text-slate-100">Alerts</p>
             <button
               type="button"
@@ -123,7 +123,7 @@ export function AlertsBell() {
               <p className="px-1 py-2 text-xs text-emerald-300">No active alerts.</p>
             ) : (
               visibleAlerts.map((alert) => (
-                <div key={alert.id} className="rounded border border-slate-700 bg-[#111a2d] p-2">
+                <div key={alert.id} className="rounded-lg border border-white/[0.07] bg-white/[0.025] p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">

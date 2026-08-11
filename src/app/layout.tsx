@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
-import { Inter, Roboto_Mono } from "next/font/google";
+import { Cormorant_Garamond, Manrope, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+const manrope = Manrope({
   variable: "--font-sans",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const cormorant = Cormorant_Garamond({
+  variable: "--font-display",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  display: "swap",
 });
 
 const robotoMono = Roboto_Mono({
@@ -13,8 +21,8 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Employee Transport Management",
-  description: "Transport operations dashboard",
+  title: "Jai Bhavani Travels | Operations Control",
+  description: "Jai Bhavani Travels transport operations control center",
 };
 
 export default function RootLayout({
@@ -25,7 +33,8 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${robotoMono.variable} h-full antialiased`}
+      className={`dark ${manrope.variable} ${cormorant.variable} ${robotoMono.variable} h-full antialiased`}
+      style={{ colorScheme: "dark" }}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

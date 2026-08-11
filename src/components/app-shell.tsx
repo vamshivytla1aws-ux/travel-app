@@ -1,11 +1,13 @@
 import { ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { EnterpriseNav } from "@/components/enterprise/enterprise-nav";
 import { EnterpriseBreadcrumbs } from "@/components/enterprise/enterprise-breadcrumbs";
+import { AlertsBell } from "@/components/enterprise/alerts-bell";
 import { WebOnly } from "@/components/enterprise/web-only";
 import { APP_MODULES, clearSessionCookie, getSession, type AppModule } from "@/lib/auth";
-import { enterpriseContainer } from "@/lib/ui-core";
 import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 
 async function logout() {
   "use server";
@@ -21,47 +23,50 @@ export async function AppShell({ children }: { children: ReactNode }) {
     : ["dashboard"];
 
   return (
-    <div className="min-h-screen bg-[#efefef]">
-      <header className="sticky top-0 z-30 border-b border-slate-800 bg-[#1f2331]">
-        <div className={`${enterpriseContainer} space-y-2 py-2`}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="min-w-0">
-              <h1 className="text-lg font-semibold text-white">Jai Bhavani Travels Tracking System</h1>
+    <div className="premium-app min-h-screen">
+      <div className="lg:pl-[76px] xl:pl-[248px]">
+        <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#07111d]/90 backdrop-blur-xl">
+          <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center gap-3 px-4 sm:px-6 lg:px-8">
+            <EnterpriseNav
+              allowedModules={allowedModules}
+              userFullName={session?.fullName}
+              userRole={session?.role}
+            />
+            <div className="flex min-w-0 items-center gap-3 lg:hidden">
+              <Image src="/brand/jbt-mark.webp" alt="JBT" width={34} height={34} className="h-8 w-8 object-contain mix-blend-screen" />
+              <span className="truncate text-xs font-semibold tracking-[0.16em] text-[#dcc078] uppercase">Operations</span>
             </div>
-            <WebOnly>
-              <div className="hidden items-center gap-3 text-sm lg:flex">
-                {session ? (
-                  <>
-                    <span className="text-slate-300">{session.fullName}</span>
+            <div className="hidden min-w-0 flex-1 md:block">
+              <EnterpriseBreadcrumbs />
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <AlertsBell />
+              {session ? (
+                <div className="hidden items-center gap-3 border-l border-white/10 pl-3 sm:flex">
+                  <div className="text-right leading-tight">
+                    <p className="max-w-40 truncate text-xs font-semibold text-[#f1ede4]">{session.fullName}</p>
+                    <p className="text-[10px] tracking-[0.12em] text-[#8290a1] uppercase">{session.role.replace("_", " ")}</p>
+                  </div>
+                  <span className="grid h-9 w-9 place-items-center rounded-full border border-[#d9b966]/30 bg-[#d9b966]/10 font-display text-lg font-semibold text-[#e5c879]">
+                    {session.fullName.charAt(0).toUpperCase()}
+                  </span>
+                  <WebOnly>
                     <form action={logout}>
-                      <Button
-                        type="submit"
-                        size="sm"
-                        className="border border-amber-600/50 bg-amber-400 font-semibold !text-slate-900 shadow-sm hover:bg-amber-300 hover:!text-slate-950"
-                      >
-                        Logout
+                      <Button type="submit" size="icon" variant="ghost" className="text-[#8f9cac] hover:text-[#e3c477]" title="Logout">
+                        <LogOut className="h-4 w-4" />
+                        <span className="sr-only">Logout</span>
                       </Button>
                     </form>
-                  </>
-                ) : (
-                  <Link href="/login" className="text-xs text-slate-200 hover:text-yellow-300">
-                    Sign in
-                  </Link>
-                )}
-              </div>
-            </WebOnly>
+                  </WebOnly>
+                </div>
+              ) : (
+                <Link href="/login" className="text-xs font-semibold text-[#dfbd6e] hover:text-[#efd995]">Sign in</Link>
+              )}
+            </div>
           </div>
-          <EnterpriseNav
-            allowedModules={allowedModules}
-            userFullName={session?.fullName}
-            userRole={session?.role}
-          />
-          <div className="hidden md:flex">
-            <EnterpriseBreadcrumbs />
-          </div>
-        </div>
-      </header>
-      <main className={`${enterpriseContainer} py-4 md:py-6`}>{children}</main>
+        </header>
+        <main className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 md:py-7 lg:px-8">{children}</main>
+      </div>
     </div>
   );
 }

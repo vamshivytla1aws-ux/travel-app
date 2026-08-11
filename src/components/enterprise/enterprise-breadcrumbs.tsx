@@ -22,17 +22,17 @@ export function EnterpriseBreadcrumbs() {
   });
 
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-slate-300">
-      <Link href="/dashboard" className="hover:text-yellow-200">
+    <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-[11px] tracking-wide text-[#718092]">
+      <Link href="/dashboard" className="transition-colors hover:text-[#dfbd6e]">
         Home
       </Link>
       {crumbs.map((crumb) => (
         <span key={crumb.href} className="flex items-center gap-2">
-          <span aria-hidden>/</span>
+          <span className="text-[#39495b]" aria-hidden>/</span>
           {crumb.isLast ? (
-            <span className="font-semibold text-yellow-200">{crumb.label}</span>
+            <span className="font-semibold text-[#d9c99f]">{crumb.label}</span>
           ) : (
-            <Link href={crumb.href} className="hover:text-yellow-200">
+            <Link href={crumb.href} className="transition-colors hover:text-[#dfbd6e]">
               {crumb.label}
             </Link>
           )}
@@ -41,4 +41,3 @@ export function EnterpriseBreadcrumbs() {
     </nav>
   );
 }
-

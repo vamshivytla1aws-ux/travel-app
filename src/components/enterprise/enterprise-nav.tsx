@@ -1,12 +1,27 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { CarFront, ChevronDown, ClipboardList, Fuel, Gauge, Info, KeyRound, Landmark, LogOut, MapPinned, Menu, Route, Timer, Truck, Users } from "lucide-react";
+import { useState } from "react";
+import {
+  CarFront,
+  ClipboardList,
+  Fuel,
+  Gauge,
+  Info,
+  KeyRound,
+  Landmark,
+  LogOut,
+  MapPinned,
+  Menu,
+  Route,
+  Timer,
+  Truck,
+  Users,
+} from "lucide-react";
 import { cn } from "@/lib/ui-core";
 import { AppModule } from "@/lib/auth";
-import { AlertsBell } from "@/components/enterprise/alerts-bell";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -25,14 +40,14 @@ const navGroups = [
     ],
   },
   {
-    label: "Fuel",
+    label: "Fuel & Finance",
     items: [
       { href: "/fuel-trucks", label: "Fuel Tankers", icon: Fuel, module: "fuel-truck" as AppModule },
       { href: "/finance", label: "Finance", icon: Landmark, module: "finance" as AppModule },
     ],
   },
   {
-    label: "Admin",
+    label: "Administration",
     items: [
       { href: "/admin/users", label: "Users", icon: KeyRound, module: "user-admin" as AppModule },
       { href: "/logs", label: "Logs", icon: ClipboardList, module: "logs" as AppModule },
@@ -46,313 +61,125 @@ type EnterpriseNavProps = {
   userRole?: "admin" | "dispatcher" | "fuel_manager" | "viewer" | "updater";
 };
 
+function isActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 function formatRoleLabel(role?: EnterpriseNavProps["userRole"]) {
   if (!role) return "Guest";
-  if (role === "fuel_manager") return "Fuel Manager";
-  return role.charAt(0).toUpperCase() + role.slice(1);
+  return role.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 }
 
 export function EnterpriseNav({ allowedModules, userFullName, userRole }: EnterpriseNavProps) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
-  const [isNativeApp, setIsNativeApp] = useState(false);
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const filteredGroups = navGroups
-    .map((group) => ({
-      label: group.label,
-      items: group.items.filter((item) => allowedModules.includes(item.module)),
-    }))
+    .map((group) => ({ ...group, items: group.items.filter((item) => allowedModules.includes(item.module)) }))
     .filter((group) => group.items.length > 0);
 
-  const adminGroup = filteredGroups.find((group) => group.label === "Admin");
-  const adminItems = adminGroup?.items ?? [];
-  const nonAdminGroups = filteredGroups.filter((group) => group.label !== "Admin");
-
-  const flatItems = nonAdminGroups.flatMap((group, groupIndex) =>
-    group.items.map((item, itemIndex) => ({
-      ...item,
-      groupLabel: group.label,
-      showGroupLabel: itemIndex === 0,
-      key: `${group.label}-${item.href}`,
-      dividerBefore: groupIndex > 0 && itemIndex === 0,
-    })),
+  const navigation = (mobile = false) => (
+    <nav aria-label="Main navigation" className={cn("space-y-5", mobile ? "px-3 py-4" : "flex-1 overflow-y-auto px-2 py-5 xl:px-3")}>
+      {filteredGroups.map((group) => (
+        <div key={group.label} className="space-y-1.5">
+          <p className={cn("px-3 text-[9px] font-bold tracking-[0.2em] text-[#687789] uppercase", mobile ? "" : "hidden xl:block")}>
+            {group.label}
+          </p>
+          {group.items.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(pathname, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={!mobile ? item.label : undefined}
+                onClick={() => mobile && setMobileOpen(false)}
+                className={cn(
+                  "group relative flex min-h-11 items-center rounded-lg text-sm font-semibold transition-[background-color,color,border-color,transform] duration-200",
+                  mobile ? "gap-3 px-3" : "justify-center px-2 xl:justify-start xl:gap-3 xl:px-3",
+                  active
+                    ? "border border-[#d9b966]/25 bg-[#d9b966]/10 text-[#eccf85] shadow-[inset_3px_0_0_#d9b966]"
+                    : "border border-transparent text-[#93a0af] hover:border-white/[0.06] hover:bg-white/[0.035] hover:text-[#f0e7d5]",
+                )}
+              >
+                <Icon className={cn("h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-105", active && "text-[#d9b966]")} />
+                <span className={cn(mobile ? "" : "hidden xl:inline")}>{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      ))}
+    </nav>
   );
 
-  const adminActive = Boolean(adminItems.some((item) => pathname.startsWith(item.href)));
-  const [adminExpanded, setAdminExpanded] = useState(adminActive);
-  useEffect(() => {
-    if (adminActive) setAdminExpanded(true);
-  }, [adminActive]);
-  useEffect(() => {
-    const maybeCapacitor = (globalThis as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
-    const nativeByBridge = maybeCapacitor?.isNativePlatform?.() === true;
-    setIsNativeApp(nativeByBridge);
-  }, []);
-  useEffect(() => {
-    const media = globalThis.matchMedia("(max-width: 1023px)");
-    const sync = () => setIsMobileViewport(media.matches);
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
+  return (
+    <>
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-[76px] flex-col border-r border-white/[0.07] bg-[#050c15]/96 shadow-[20px_0_70px_rgba(0,0,0,.24)] backdrop-blur-xl lg:flex xl:w-[248px]">
+        <div className="flex h-[88px] items-center justify-center border-b border-white/[0.07] px-3 xl:justify-start xl:px-5">
+          <Image src="/brand/jbt-mark.webp" alt="Jai Bhavani Travels" width={46} height={46} className="h-11 w-11 object-contain mix-blend-screen xl:hidden" priority />
+          <Image src="/brand/jai-bhavani-logo-horizontal.webp" alt="Jai Bhavani Travels" width={210} height={58} className="hidden h-auto w-[198px] object-contain mix-blend-screen xl:block" priority />
+        </div>
+        {navigation(false)}
+        <div className="border-t border-white/[0.07] p-2 xl:p-3">
+          <button
+            type="button"
+            onClick={() => setAboutOpen(true)}
+            className="flex min-h-10 w-full items-center justify-center gap-3 rounded-lg text-[#788697] transition-colors hover:bg-white/[0.035] hover:text-[#e3c477] xl:justify-start xl:px-3"
+            title="About"
+          >
+            <Info className="h-4 w-4" />
+            <span className="hidden text-xs font-semibold xl:inline">About System</span>
+          </button>
+        </div>
+      </aside>
 
-  if (isNativeApp || isMobileViewport) {
-    return (
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger
-          render={
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              className="text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200"
-            />
-          }
-        >
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetTrigger render={<Button size="icon" variant="ghost" className="lg:hidden" />}>
           <Menu className="h-5 w-5" />
           <span className="sr-only">Open navigation</span>
         </SheetTrigger>
-        <SheetContent
-          side="left"
-          overlayClassName="bg-black/55 supports-backdrop-filter:backdrop-blur-sm"
-          className="w-[82vw] max-w-[340px] border-slate-700 bg-[#101422] p-0 text-slate-200"
-        >
-          <SheetHeader className="border-b border-slate-700 bg-[#141a2a] px-4 py-4">
-            <SheetTitle className="text-base text-white">Jai Bhavani Travels</SheetTitle>
-            <p className="text-xs text-slate-400">
-              {formatRoleLabel(userRole)}
-              {userFullName ? ` • ${userFullName}` : ""}
+        <SheetContent side="left" overlayClassName="bg-black/65 backdrop-blur-sm" className="w-[86vw] max-w-[350px] border-r border-[#d9b966]/20 bg-[#060e18] p-0 text-[#eee9dd]">
+          <SheetHeader className="border-b border-white/[0.07] px-5 py-5 text-left">
+            <Image src="/brand/jai-bhavani-logo-horizontal.webp" alt="Jai Bhavani Travels" width={205} height={56} className="h-auto w-[190px] object-contain mix-blend-screen" priority />
+            <SheetTitle className="sr-only">Jai Bhavani Travels Navigation</SheetTitle>
+            <p className="pt-2 text-[10px] tracking-[0.14em] text-[#8290a1] uppercase">
+              {formatRoleLabel(userRole)}{userFullName ? ` · ${userFullName}` : ""}
             </p>
           </SheetHeader>
-          <nav className="space-y-3 p-3">
-            {nonAdminGroups.map((group) => (
-              <div key={group.label} className="space-y-1.5">
-                <div className="px-2 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">{group.label}</div>
-                {group.items.map((item) => {
-                  const active = pathname.startsWith(item.href);
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setOpen(false)}
-                      className={cn(
-                        "flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                        active
-                          ? "bg-[#1f2942] text-yellow-300 shadow-[inset_0_0_0_1px_rgba(250,204,21,0.35)]"
-                          : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
-                      )}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
+          <div className="flex-1 overflow-y-auto">{navigation(true)}</div>
+          <div className="space-y-1 border-t border-white/[0.07] p-3">
+            <button type="button" onClick={() => { setMobileOpen(false); setAboutOpen(true); }} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm text-[#a0abb8] hover:bg-white/[0.04] hover:text-[#e4c578]">
+              <Info className="h-4 w-4" /> About System
+            </button>
             {userRole ? (
-              <div className="space-y-1.5 border-t border-slate-700 pt-3">
-                <div className="px-2 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">Admin</div>
-                <button
-                  type="button"
-                  onClick={() => setAdminExpanded((value) => !value)}
-                  aria-expanded={adminExpanded}
-                  className={cn(
-                    "flex min-h-11 w-full items-center justify-between rounded-md border px-3 py-2 text-sm font-medium transition-colors",
-                    adminExpanded || adminActive
-                      ? "border-slate-500 bg-[#1a243d] text-yellow-300"
-                      : "border-slate-700 text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
-                  )}
-                >
-                  <span className="flex items-center gap-2">
-                    <KeyRound className="h-4 w-4" />
-                    Admin
-                  </span>
-                  <ChevronDown className={cn("h-4 w-4 transition-transform", adminExpanded ? "rotate-180" : "")} />
+              <form action="/api/auth/logout" method="post">
+                <button type="submit" className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm text-[#e49494] hover:bg-red-950/30">
+                  <LogOut className="h-4 w-4" /> Logout
                 </button>
-                {adminExpanded ? (
-                  <div className="space-y-1 pl-2">
-                    {adminItems.map((item) => {
-                      const ItemIcon = item.icon;
-                      const active = pathname.startsWith(item.href);
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          onClick={() => setOpen(false)}
-                          className={cn(
-                            "flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                            active
-                              ? "bg-[#1f2942] text-yellow-300 shadow-[inset_0_0_0_1px_rgba(250,204,21,0.35)]"
-                              : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
-                          )}
-                        >
-                          <ItemIcon className="h-4 w-4" />
-                          {item.label}
-                        </Link>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOpen(false);
-                        setAboutOpen(true);
-                      }}
-                      className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-[#151b2b] hover:text-yellow-200"
-                    >
-                      <Info className="h-4 w-4" />
-                      About
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+              </form>
             ) : null}
-            {userRole ? (
-              <div className="space-y-1.5 border-t border-slate-700 pt-3">
-                <form
-                  action="/api/auth/logout"
-                  method="post"
-                  onSubmit={() => setOpen(false)}
-                >
-                  <button
-                    type="submit"
-                    className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-rose-200 transition-colors hover:bg-rose-900/30 hover:text-rose-100"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Logout
-                  </button>
-                </form>
-              </div>
-            ) : null}
-          </nav>
+          </div>
         </SheetContent>
       </Sheet>
-    );
-  }
 
-  return (
-    <nav className="rounded border border-slate-700 bg-[#101422]">
-      <div className="flex items-center gap-1 px-1 py-1 md:flex-nowrap">
-        {flatItems.map((item) => {
-          const active = pathname.startsWith(item.href);
-          const Icon = item.icon;
-          return (
-            <div key={item.key} className="flex items-center">
-              {item.dividerBefore ? (
-                <div className="mx-1 h-6 w-px bg-slate-700" aria-hidden />
-              ) : null}
-              {item.showGroupLabel ? (
-                <span className="mr-1 rounded bg-slate-800 px-2 py-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                  {item.groupLabel}
-                </span>
-              ) : null}
-              <Link
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-2 rounded px-3 py-2 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-[#1a1f31] text-yellow-300"
-                    : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-              {item.module === "finance" ? <AlertsBell /> : null}
-            </div>
-          );
-        })}
-        {userRole ? (
-          <div className="ml-auto flex items-center">
-            <div className="mx-1 h-6 w-px bg-slate-700" aria-hidden />
-            <details className="group relative">
-              <summary
-                className={cn(
-                  "flex cursor-pointer list-none items-center gap-2 rounded px-3 py-2 text-sm font-medium transition-colors marker:content-none",
-                  adminActive
-                    ? "bg-[#1a1f31] text-yellow-300"
-                    : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
-                )}
-              >
-                <span className="rounded bg-slate-800 px-2 py-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                  Admin
-                </span>
-                <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
-              </summary>
-              <div className="absolute right-0 z-40 mt-1 w-48 rounded border border-slate-700 bg-[#0f1627] p-1 shadow-xl">
-                {adminItems.map((item) => {
-                  const ItemIcon = item.icon;
-                  const active = pathname.startsWith(item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center gap-2 rounded px-3 py-2 text-sm transition-colors",
-                        active
-                          ? "bg-[#1a1f31] text-yellow-300"
-                          : "text-slate-200 hover:bg-[#151b2b] hover:text-yellow-200",
-                      )}
-                    >
-                      <ItemIcon className="h-4 w-4" />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-                {userRole ? (
-                  <button
-                    type="button"
-                    onClick={() => setAboutOpen(true)}
-                    className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-[#151b2b] hover:text-yellow-200"
-                  >
-                    <Info className="h-4 w-4" />
-                    About
-                  </button>
-                ) : null}
-              </div>
-            </details>
-          </div>
-        ) : null}
-      </div>
       <Dialog open={aboutOpen} onOpenChange={setAboutOpen}>
-        <DialogContent className="max-w-xl rounded-2xl border border-white/40 bg-white/65 shadow-2xl backdrop-blur-md">
+        <DialogContent className="max-w-xl border-[#d9b966]/20 bg-[#0a1624] shadow-2xl">
           <DialogHeader>
-            <DialogTitle>About AASTHIX</DialogTitle>
-            <DialogDescription>
-              Product information and company contact details.
-            </DialogDescription>
+            <DialogTitle className="font-display text-3xl text-[#f0e8d9]">About AASTHIX</DialogTitle>
+            <DialogDescription>Product information and company contact details.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-2 text-sm text-slate-900">
-            <p><span className="font-semibold">Developed by:</span> aasthix talent pvt ltd</p>
-            <p><span className="font-semibold">Company Name:</span> AASTHIX</p>
-            <p>
-              <span className="font-semibold">URL:</span>{" "}
-              <a href="https://www.aasthix.com" target="_blank" rel="noreferrer" className="text-blue-700 underline underline-offset-2">
-                www.aasthix.com
-              </a>
-            </p>
-            <p>
-              <span className="font-semibold">Reachout to:</span>{" "}
-              <a href="mailto:contact@aasthix.com" className="text-blue-700 underline underline-offset-2">
-                contact@aasthix.com
-              </a>
-            </p>
-            <p><span className="font-semibold">Author:</span> Vamshi Vytla</p>
-            <p className="leading-relaxed">
-              <span className="font-semibold">Address:</span> Unit.No. 114, Manjeera Trinity Corporate, JNTU - Hitech Road, beside LuLu Mall, Ashok Nagar, Kukatpally Housing Board Colony, Kukatpally, Hyderabad, Telangana 500072.
-            </p>
-            <p>
-              <span className="font-semibold">Tel:</span>{" "}
-              <a href="tel:+919573543933" className="text-blue-700 underline underline-offset-2">
-                +91 9573543933
-              </a>
-            </p>
+          <div className="grid gap-2 text-sm text-[#b7c0ca]">
+            <p><span className="font-semibold text-[#eee9dd]">Developed by:</span> aasthix talent pvt ltd</p>
+            <p><span className="font-semibold text-[#eee9dd]">Company Name:</span> AASTHIX</p>
+            <p><span className="font-semibold text-[#eee9dd]">URL:</span> <a href="https://www.aasthix.com" target="_blank" rel="noreferrer" className="text-[#dfbd6e] underline underline-offset-2">www.aasthix.com</a></p>
+            <p><span className="font-semibold text-[#eee9dd]">Reachout to:</span> <a href="mailto:contact@aasthix.com" className="text-[#dfbd6e] underline underline-offset-2">contact@aasthix.com</a></p>
+            <p><span className="font-semibold text-[#eee9dd]">Author:</span> Vamshi Vytla</p>
+            <p className="leading-relaxed"><span className="font-semibold text-[#eee9dd]">Address:</span> Unit.No. 114, Manjeera Trinity Corporate, JNTU - Hitech Road, beside LuLu Mall, Ashok Nagar, Kukatpally Housing Board Colony, Kukatpally, Hyderabad, Telangana 500072.</p>
+            <p><span className="font-semibold text-[#eee9dd]">Tel:</span> <a href="tel:+919573543933" className="text-[#dfbd6e] underline underline-offset-2">+91 9573543933</a></p>
           </div>
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>Close</DialogClose>
-          </DialogFooter>
+          <DialogFooter><DialogClose render={<Button variant="outline" />}>Close</DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
-    </nav>
+    </>
   );
 }
