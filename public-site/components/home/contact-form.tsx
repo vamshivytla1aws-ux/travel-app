@@ -14,12 +14,13 @@ const schema = z.object({
 });
 
 type Errors = Partial<Record<keyof z.infer<typeof schema>, string>>;
+type SubmitStatus = "idle" | "submitting" | "success" | "error";
 
 export function ContactForm() {
   const [errors, setErrors] = useState<Errors>({});
-  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState<SubmitStatus>("idle");
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
     const result = schema.safeParse(Object.fromEntries(new FormData(form)));
@@ -27,15 +28,27 @@ export function ContactForm() {
       const nextErrors: Errors = {};
       result.error.issues.forEach((issue) => { nextErrors[issue.path[0] as keyof Errors] = issue.message; });
       setErrors(nextErrors);
-      setReady(false);
+      setStatus("idle");
       return;
     }
+
     setErrors({});
-    setReady(true);
-    const { name, company, phone, email, requirement, message } = result.data;
-    const subject = encodeURIComponent(`Corporate transport enquiry — ${company}`);
-    const body = encodeURIComponent(`Name: ${name}\nCompany: ${company}\nPhone: ${phone}\nEmail: ${email}\nRequirement: ${requirement}\n\nMessage:\n${message}`);
-    window.location.href = `mailto:jaibhavanitravels.enquiries@gmail.com?subject=${subject}&body=${body}`;
+    setStatus("submitting");
+
+    try {
+      const response = await fetch("/api/enquiries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...result.data, website: new FormData(form).get("website") }),
+      });
+
+      if (!response.ok) throw new Error("Enquiry delivery failed");
+
+      form.reset();
+      setStatus("success");
+    } catch {
+      setStatus("error");
+    }
   }
 
   const fields = [
@@ -48,7 +61,11 @@ export function ContactForm() {
 
   return (
     <form className="enquiry-form" data-premium-card noValidate onSubmit={handleSubmit}>
-      <div className="form-heading"><span>Corporate enquiry</span><h3>Request a callback</h3><p>Tell us what your workforce needs. Your details open in your email app—nothing is stored on this website.</p></div>
+      <div className="form-heading"><span>Corporate enquiry</span><h3>Request a callback</h3><p>Tell us what your workforce needs and our team will contact you shortly.</p></div>
+      <div className="form-honeypot" aria-hidden="true">
+        <label htmlFor="website">Website</label>
+        <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off" />
+      </div>
       <div className="form-grid">
         {fields.map((field) => (
           <div className={`field ${"wide" in field && field.wide ? "wide" : ""}`} key={field.name}>
@@ -63,8 +80,13 @@ export function ContactForm() {
           {errors.message && <span className="field-error" id="message-error">{errors.message}</span>}
         </div>
       </div>
-      <button className="button button-gold form-submit" type="submit" data-magnetic>Request a callback <ArrowUpRight /></button>
-      {ready && <p className="form-ready" role="status"><CheckCircle2 /> Your enquiry is ready in your email app.</p>}
+      <button className="button button-gold form-submit" type="submit" data-magnetic disabled={status === "submitting"}>
+        {status === "submitting" ? "Sending enquiry…" : "Request a callback"} <ArrowUpRight />
+      </button>
+      <div aria-live="polite">
+        {status === "success" && <p className="form-ready" role="status"><CheckCircle2 /> Your enquiry has been sent successfully.</p>}
+        {status === "error" && <p className="form-error" role="alert">We couldn&apos;t send your enquiry. Please try again or contact us directly.</p>}
+      </div>
     </form>
   );
 }
