@@ -4,6 +4,8 @@ import { AboutSection, Clients, FleetSection, Services, WhyChooseUs } from "@/co
 import { StatsStrip } from "@/components/home/stats";
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
+import { LuxuryInterlude } from "@/components/home/luxury-interlude";
+import { PremiumEffects } from "@/components/ui/premium-effects";
 
 const structuredData = {
   "@context": "https://schema.org",
@@ -30,8 +32,10 @@ export default function Home() {
   return (
     <>
       <a className="skip-link" href="#main-content">Skip to main content</a>
+      <div className="page-grain" aria-hidden="true" />
+      <PremiumEffects />
       <Header />
-      <main id="main-content"><Hero /><Services /><StatsStrip /><AboutSection /><WhyChooseUs /><FleetSection /><Clients /><ContactSection /></main>
+      <main id="main-content"><Hero /><Services /><StatsStrip /><AboutSection /><LuxuryInterlude /><WhyChooseUs /><FleetSection /><Clients /><ContactSection /></main>
       <Footer />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }} />
     </>

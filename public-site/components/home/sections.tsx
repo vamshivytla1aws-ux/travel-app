@@ -38,13 +38,13 @@ export function Services() {
   return (
     <section id="services" className="section services-section">
       <div className="container">
-        <Reveal className="section-heading heading-row">
+        <Reveal className="section-heading heading-row" mask>
           <div><p className="eyebrow"><span /> Our services</p><h2>Mobility built around<br /><em>your workforce.</em></h2></div>
           <p>Dependable corporate transportation designed for the rhythm, scale and responsibility of modern operations.</p>
         </Reveal>
         <div className="service-grid">
           {services.map(({ icon: Icon, number, title, copy }, index) => (
-            <Reveal key={title} className="service-card" delay={index * 0.06}>
+            <Reveal key={title} className="service-card" delay={index * 0.06} premiumCard>
               <div className="service-icon"><Icon /></div><span className="card-number">{number}</span>
               <h3>{title}</h3><p>{copy}</p><span className="card-link">Explore solution <ArrowRight /></span>
             </Reveal>
@@ -60,11 +60,11 @@ export function AboutSection() {
     <section id="about" className="section about-section">
       <div className="bus-outline" aria-hidden="true"><BusFront /></div>
       <div className="container about-grid">
-        <Reveal className="about-label">
+        <Reveal className="about-label" mask>
           <p className="eyebrow"><span /> What we are</p>
           <div className="about-index">80<span>+</span><small>Strong fleet</small></div>
         </Reveal>
-        <Reveal className="about-copy" delay={0.08}>
+        <Reveal className="about-copy" delay={0.08} mask>
           <h2>Moving people.<br /><em>Powering business.</em></h2>
           <p className="lead">Jai Bhavani Travels is a trusted corporate transportation company providing reliable employee pick-up and drop services for organizations across the Hyderabad industrial region.</p>
           <p>With a fleet of around 80 buses and a workforce of more than 100 employees, we focus on safe transportation, punctual operations, disciplined fleet management and long-term corporate partnerships.</p>
@@ -79,13 +79,13 @@ export function WhyChooseUs() {
   return (
     <section className="section why-section">
       <div className="container">
-        <Reveal className="section-heading heading-row">
+        <Reveal className="section-heading heading-row" mask>
           <div><p className="eyebrow"><span /> Why Jai Bhavani</p><h2>Confidence in<br /><em>every kilometre.</em></h2></div>
           <p>Operational discipline, experienced people and a service mindset that keeps your workforce moving.</p>
         </Reveal>
         <div className="strength-grid">
           {strengths.map(({ icon: Icon, title, copy, large }, index) => (
-            <Reveal key={title} className={`strength-item ${large ? "large" : ""}`} delay={(index % 4) * 0.04}>
+            <Reveal key={title} className={`strength-item ${large ? "large" : ""}`} delay={(index % 4) * 0.04} premiumCard>
               <Icon /><div><h3>{title}</h3><p>{copy}</p></div><span><Check /></span>
             </Reveal>
           ))}
@@ -105,13 +105,13 @@ export function FleetSection() {
   return (
     <section className="section fleet-section">
       <div className="container">
-        <Reveal className="section-heading heading-row fleet-heading">
+        <Reveal className="section-heading heading-row fleet-heading" mask>
           <div><p className="eyebrow"><span /> Our fleet</p><h2>Built for dependable<br /><em>employee mobility.</em></h2></div>
           <div className="fleet-count"><strong>80+</strong><span>Buses in our<br />overall fleet</span></div>
         </Reveal>
         <div className="fleet-grid">
           {fleet.map((item, index) => (
-            <Reveal className="fleet-card" key={item.title} delay={index * 0.08}>
+            <Reveal className="fleet-card" key={item.title} delay={index * 0.08} premiumCard>
               <Image src="/images/jai-bhavani-hero-coaches.webp" alt={`${item.title} for corporate employee transportation`} fill sizes="(max-width: 760px) 100vw, 33vw" style={{ objectPosition: item.position }} />
               <div className="fleet-overlay" />
               <div className="fleet-card-copy"><span>0{index + 1}</span><p>{item.tag}</p><h3>{item.title}</h3></div>
@@ -128,14 +128,14 @@ export function Clients() {
   return (
     <section id="clients" className="section clients-section">
       <div className="container">
-        <Reveal className="clients-intro">
+        <Reveal className="clients-intro" mask>
           <p className="eyebrow"><span /> Trusted partnerships</p>
           <h2>Trusted by leading organizations</h2>
           <p>Supporting respected businesses with professional employee transportation.</p>
         </Reveal>
         <div className="client-grid" aria-label="Organizations served by Jai Bhavani Travels">
           {["TOSHIBA", "MRF", "DMart", "MAHINDRA"].map((client, index) => (
-            <Reveal className="client-tile" key={client} delay={index * 0.06}>
+            <Reveal className="client-tile" key={client} delay={index * 0.06} premiumCard>
               <span>0{index + 1}</span><strong>{client}</strong><Sparkles aria-hidden="true" />
             </Reveal>
           ))}

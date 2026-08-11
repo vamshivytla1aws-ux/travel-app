@@ -1,9 +1,9 @@
 "use client";
 
-import { motion, useMotionValue, useReducedMotion, useSpring } from "framer-motion";
+import { motion, useMotionValue, useReducedMotion, useScroll, useSpring, useTransform } from "framer-motion";
 import { ArrowUpRight, BusFront, MapPin, MessageCircle, Phone, Route, ShieldCheck, UsersRound } from "lucide-react";
 import Image from "next/image";
-import type { MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 
 const quickStats = [
   { icon: BusFront, value: "80+", label: "Buses" },
@@ -13,11 +13,26 @@ const quickStats = [
 ];
 
 export function Hero() {
+  const heroRef = useRef<HTMLElement>(null);
   const reduced = useReducedMotion();
+  const [desktopMotion, setDesktopMotion] = useState(false);
   const rawX = useMotionValue(0);
   const rawY = useMotionValue(0);
   const x = useSpring(rawX, { stiffness: 55, damping: 22 });
   const y = useSpring(rawY, { stiffness: 55, damping: 22 });
+  const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
+  const imageLift = useTransform(scrollYProgress, [0, 1], [0, -54]);
+  const imageScale = useTransform(scrollYProgress, [0, 1], [1, 1.035]);
+  const copyLift = useTransform(scrollYProgress, [0, 1], [0, -34]);
+  const copyOpacity = useTransform(scrollYProgress, [0, 0.72, 1], [1, 0.86, 0.08]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 900px)");
+    const update = () => setDesktopMotion(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   function handlePointer(event: MouseEvent<HTMLElement>) {
     if (reduced || window.innerWidth < 900) return;
@@ -27,33 +42,43 @@ export function Hero() {
   }
 
   return (
-    <section id="home" className="hero" onMouseMove={handlePointer} onMouseLeave={() => { rawX.set(0); rawY.set(0); }}>
+    <section ref={heroRef} id="home" className="hero" onMouseMove={handlePointer} onMouseLeave={() => { rawX.set(0); rawY.set(0); }}>
       <motion.div
         className="hero-image"
-        initial={reduced ? false : { opacity: 0, x: 70, scale: 1.04 }}
-        animate={{ opacity: 1, x: 0, scale: 1 }}
-        transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
-        style={{ x, y }}
+        style={!desktopMotion || reduced ? undefined : { y: imageLift, scale: imageScale }}
       >
-        <Image
-          src="/images/jai-bhavani-hero-coaches.webp"
-          alt="Two premium employee transport coaches travelling on a highway at blue hour"
-          fill
-          priority
-          fetchPriority="high"
-          sizes="100vw"
-          quality={90}
-        />
+        <motion.div
+          className="hero-image-enter"
+          initial={reduced ? false : { opacity: 0, x: 70, scale: 1.04 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <motion.div className="hero-image-parallax" style={{ x, y }}>
+            <Image
+              src="/images/jai-bhavani-hero-coaches.webp"
+              alt="Two premium employee transport coaches travelling on a highway at blue hour"
+              fill
+              priority
+              fetchPriority="high"
+              sizes="100vw"
+              quality={90}
+            />
+          </motion.div>
+        </motion.div>
       </motion.div>
       <div className="hero-shade" aria-hidden="true" />
       <div className="road-streak road-streak-one" aria-hidden="true" />
       <div className="road-streak road-streak-two" aria-hidden="true" />
+      <div className="road-streak road-streak-three" aria-hidden="true" />
+      <div className="headlight-bloom" aria-hidden="true" />
       <div className="hero-orbit" aria-hidden="true" />
+      <div className="hero-handoff" aria-hidden="true" />
       <div className="container hero-content">
         <motion.div
           className="hero-copy"
           initial={reduced ? false : "hidden"}
           animate="visible"
+          style={!desktopMotion || reduced ? undefined : { y: copyLift, opacity: copyOpacity }}
           variants={{ visible: { transition: { staggerChildren: 0.11, delayChildren: 0.2 } } }}
         >
           <motion.p className="eyebrow" variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
@@ -66,7 +91,7 @@ export function Hero() {
             Reliable employee pick-up and drop services backed by a modern fleet, an experienced team and an unwavering commitment to safety, punctuality and operational excellence.
           </motion.p>
           <motion.div className="hero-actions" variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}>
-            <a className="button button-gold" href="#contact">Get a quote <ArrowUpRight /></a>
+            <a className="button button-gold" href="#contact" data-magnetic>Get a quote <ArrowUpRight /></a>
             <a className="button button-ghost" href="tel:+919494665519"><Phone /> Contact us</a>
             <a className="icon-button" href="https://wa.me/919494665519" target="_blank" rel="noopener noreferrer" aria-label="Chat with Jai Bhavani Travels on WhatsApp"><MessageCircle /></a>
           </motion.div>

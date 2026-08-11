@@ -47,7 +47,7 @@ export function ContactForm() {
   ] as const;
 
   return (
-    <form className="enquiry-form" noValidate onSubmit={handleSubmit}>
+    <form className="enquiry-form" data-premium-card noValidate onSubmit={handleSubmit}>
       <div className="form-heading"><span>Corporate enquiry</span><h3>Request a callback</h3><p>Tell us what your workforce needs. Your details open in your email app—nothing is stored on this website.</p></div>
       <div className="form-grid">
         {fields.map((field) => (
@@ -63,7 +63,7 @@ export function ContactForm() {
           {errors.message && <span className="field-error" id="message-error">{errors.message}</span>}
         </div>
       </div>
-      <button className="button button-gold form-submit" type="submit">Request a callback <ArrowUpRight /></button>
+      <button className="button button-gold form-submit" type="submit" data-magnetic>Request a callback <ArrowUpRight /></button>
       {ready && <p className="form-ready" role="status"><CheckCircle2 /> Your enquiry is ready in your email app.</p>}
     </form>
   );

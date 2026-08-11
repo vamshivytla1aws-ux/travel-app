@@ -43,6 +43,7 @@ export function Header() {
 
   return (
     <header className={`site-header ${scrolled || open ? "is-scrolled" : ""}`}>
+      <span className="header-progress" aria-hidden="true"><span /></span>
       <div className="header-inner">
         <Logo onClick={() => setOpen(false)} />
         <nav className="desktop-nav" aria-label="Primary navigation">
