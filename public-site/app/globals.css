@@ -264,6 +264,22 @@ h1 em,h2 em { color: var(--gold-bright); font-style: italic; font-weight: 500; }
 }
 
 @media (max-width: 1100px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-grid > div {
+    min-width: 0;
+    overflow: hidden;
+    padding-inline: clamp(24px, 4vw, 44px);
+  }
+
+  .stats-grid > div:nth-child(n + 3) strong {
+    font-size: clamp(1.55rem, 4vw, 2.3rem);
+    letter-spacing: -0.025em;
+    white-space: nowrap;
+  }
+
   .desktop-nav { gap: 25px; }.hero { min-height: 840px; }.hero-copy { width: 62vw; }.service-grid { grid-template-columns: repeat(2,1fr); }.service-card { min-height: 340px; }.about-grid { gap: 70px; }.strength-grid { grid-template-columns: repeat(3,1fr); }.strength-item.large { grid-column: span 1; }.fleet-grid { grid-template-columns: 1fr 1fr; }.fleet-card:first-child { grid-column: 1/-1; height: 440px; }.fleet-card { height: 400px; }.contact-layout { grid-template-columns: .85fr 1.15fr; }.contact-details,.enquiry-form { padding: 32px; }.footer-main { gap: 36px; }
 }
 
