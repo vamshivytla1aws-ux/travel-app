@@ -1,15 +1,18 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { BusFront } from "lucide-react";
+import { BusFront, Plus, Search } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { BusesLiveCount } from "@/components/buses/buses-live-count";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
 import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { StatusAlert } from "@/components/ui/status-alert";
 import {
   Table,
   TableBody,
@@ -133,135 +136,184 @@ export default async function BusesPage(props: Props) {
         }
       />
       {searchParams.updated ? (
-        <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-          Bus status updated successfully.
-        </div>
+        <StatusAlert className="mb-4" tone="success" message="Bus status updated successfully." />
       ) : null}
       {searchParams.created ? (
-        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
-          Bus created successfully.
-        </div>
+        <StatusAlert className="mb-4" tone="success" message="Bus created successfully." />
       ) : null}
       {searchParams.deleted ? (
-        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
-          Bus deleted successfully.
-        </div>
+        <StatusAlert className="mb-4" tone="warning" message="Bus deleted successfully." />
       ) : null}
       {searchParams.error === "duplicate" ? (
-        <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          Bus number or registration already exists.
-        </div>
+        <StatusAlert className="mb-4" tone="error" message="Bus number or registration already exists." />
       ) : null}
-      <Card className="border-slate-300">
-        <CardHeader className="border-b border-slate-300 bg-white">
-          <CardTitle className="text-base font-semibold">Bus Fleet - {formatDateInAppTimeZone(new Date())}</CardTitle>
+      <Card className="mt-5 border-[#d9b966]/15 bg-[#081421]/90">
+        <CardHeader className="border-b border-white/[0.07] bg-white/[0.015] sm:grid-cols-[1fr_auto] sm:items-center">
+          <div>
+            <p className="mb-1 text-[10px] font-bold tracking-[0.16em] text-[#cda954] uppercase">Fleet Registry</p>
+            <CardTitle className="font-display text-2xl">Bus Fleet</CardTitle>
+            <p className="mt-1 text-xs text-[#7f8d9e]">Operational register · {formatDateInAppTimeZone(new Date())}</p>
+          </div>
           <BusesLiveCount />
         </CardHeader>
-        <CardContent className="space-y-5 bg-[#f5f5f5] p-5">
-          <form action={createBus} className="grid gap-3 rounded border border-slate-300 bg-white p-3 md:grid-cols-6">
-            <Input name="busNumber" placeholder="Bus Number" required />
-            <Input name="registrationNumber" placeholder="Registration Number" required />
-            <Input name="make" placeholder="Make" required />
-            <Input name="model" placeholder="Model" required />
-            <Input name="seater" type="number" min={1} placeholder="Seaters" required />
-            <div className="flex items-center gap-2">
-              <Input name="odometerKm" type="number" placeholder="Odmoteter (kms)" required />
-              <button className="h-9 rounded-md bg-primary px-3 text-xs text-primary-foreground">Create</button>
+        <CardContent className="space-y-4 p-4 sm:p-5">
+          <section className="rounded-xl border border-white/[0.07] bg-[#06111d]/65 p-4 shadow-[inset_0_1px_rgba(255,255,255,.02)]">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-[#eee9dd]">Register a Bus</h2>
+                <p className="mt-0.5 text-xs text-[#718093]">Add a vehicle to the active fleet register.</p>
+              </div>
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#d9b966]/20 bg-[#d9b966]/10 text-[#dfbd6e]" aria-hidden>
+                <Plus className="h-4 w-4" />
+              </span>
             </div>
-          </form>
-          <form className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
-            <Input
-              name="q"
-              placeholder="Search by bus number and/or registration"
-              defaultValue={searchParams.q}
-              className="bg-white"
-            />
-            <button className="h-9 rounded-none bg-yellow-400 px-5 text-sm font-semibold text-black hover:bg-yellow-300">
-              Search
-            </button>
-            <Link href="/buses" className="self-center text-xs text-slate-600 hover:underline">
-              Clear
-            </Link>
-            <div className="grid gap-1">
-              <label className="text-xs font-medium text-slate-700">Status</label>
-              <select
-                name="status"
-                defaultValue={searchParams.status}
-                className="h-9 rounded-none border border-slate-400 bg-white px-3 py-1 text-sm"
-              >
-                <option value="">All</option>
-                <option value="active">Active</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-          </form>
+            <form action={createBus} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <Input name="busNumber" placeholder="Bus number" aria-label="Bus number" required />
+              <Input name="registrationNumber" placeholder="Registration number" aria-label="Registration number" required />
+              <Input name="make" placeholder="Make" aria-label="Make" required />
+              <Input name="model" placeholder="Model" aria-label="Model" required />
+              <Input name="seater" type="number" min={1} placeholder="Seaters" aria-label="Seaters" required />
+              <Input name="odometerKm" type="number" placeholder="Odometer (km)" aria-label="Odometer in kilometres" required />
+              <div className="flex justify-end sm:col-span-2 xl:col-span-3">
+                <Button type="submit" size="lg" className="w-full sm:w-auto">
+                  <Plus className="h-4 w-4" /> Create Bus
+                </Button>
+              </div>
+            </form>
+          </section>
 
-          <Table className="bg-white">
-            <TableHeader>
-              <TableRow>
-                <TableHead>S.No</TableHead>
-                <TableHead>Bus Number</TableHead>
-                <TableHead>Registration</TableHead>
-                <TableHead>Make / Model</TableHead>
-                <TableHead>Seater</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Odmoteter (kms)</TableHead>
-                <TableHead>Previous Day Mileage</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {buses.map((bus, index) => (
-                <TableRow key={bus.id}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell>{bus.busNumber}</TableCell>
-                  <TableCell>{bus.registrationNumber}</TableCell>
-                  <TableCell>
-                    {bus.make} {bus.model}
-                  </TableCell>
-                  <TableCell>{bus.seater}</TableCell>
-                  <TableCell>
-                    <Badge variant={bus.status === "active" ? "default" : "secondary"}>{bus.status}</Badge>
-                  </TableCell>
-                  <TableCell>{bus.odometerKm.toLocaleString()}</TableCell>
-                  <TableCell>
-                    {bus.previousDayMileageKmpl !== null ? `${bus.previousDayMileageKmpl.toFixed(2)}` : "-"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <form action={updateBusStatus} className="flex items-center gap-2">
-                        <input type="hidden" name="busId" value={bus.id} />
-                        <select
-                          name="status"
-                          defaultValue={bus.status}
-                          className="h-8 rounded-md border border-input bg-transparent px-2 text-xs"
-                        >
-                          <option value="active">active</option>
-                          <option value="maintenance">maintenance</option>
-                          <option value="inactive">inactive</option>
-                        </select>
-                        <button className="h-8 rounded-md bg-primary px-2 text-xs text-primary-foreground">
-                          Update
-                        </button>
-                      </form>
-                      <Link className="text-blue-600 hover:underline" href={`/buses/${bus.id}`}>
-                        View
-                      </Link>
-                      <form action={deleteBus}>
-                        <input type="hidden" name="busId" value={bus.id} />
-                        <ConfirmSubmitButton
-                          label="Delete"
-                          message="Are you sure you want to delete this bus?"
-                          className="text-red-600 hover:underline"
-                        />
-                      </form>
-                    </div>
-                  </TableCell>
+          <section className="rounded-xl border border-white/[0.07] bg-[#06111d]/65 p-4 shadow-[inset_0_1px_rgba(255,255,255,.02)]">
+            <div className="mb-4">
+              <h2 className="text-sm font-semibold text-[#eee9dd]">Search Fleet</h2>
+              <p className="mt-0.5 text-xs text-[#718093]">Find vehicles by bus number, registration, or operating status.</p>
+            </div>
+            <form className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto_auto] lg:items-end">
+              <div className="grid gap-1.5">
+                <Label htmlFor="bus-search">Bus or registration</Label>
+                <Input
+                  id="bus-search"
+                  name="q"
+                  placeholder="Search bus number or registration"
+                  defaultValue={searchParams.q}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="bus-status">Status</Label>
+                <select
+                  id="bus-status"
+                  name="status"
+                  defaultValue={searchParams.status}
+                  className="h-9 rounded-lg border border-white/10 bg-[#06111d]/70 px-3 text-sm text-[#eee9dd] outline-none transition-colors focus:border-[#d9b966]/55 focus:ring-2 focus:ring-[#d9b966]/15"
+                >
+                  <option value="">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <Button type="submit" size="lg">
+                <Search className="h-4 w-4" /> Search
+              </Button>
+              <Link href="/buses" className="inline-flex h-9 items-center justify-center rounded-lg border border-white/10 px-4 text-sm font-semibold text-[#aeb8c4] transition-colors hover:border-[#d9b966]/25 hover:bg-[#d9b966]/[0.07] hover:text-[#efd995]">
+                Clear
+              </Link>
+            </form>
+          </section>
+
+          <section>
+            <div className="mb-3 flex items-end justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-[#eee9dd]">Fleet Directory</h2>
+                <p className="mt-0.5 text-xs text-[#718093]">Status, mileage, and vehicle controls.</p>
+              </div>
+              <span className="font-mono text-xs text-[#9aa7b5]">{buses.length} records</span>
+            </div>
+
+            <Table className="min-w-[1120px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>S.No</TableHead>
+                  <TableHead>Bus Number</TableHead>
+                  <TableHead>Registration</TableHead>
+                  <TableHead>Make / Model</TableHead>
+                  <TableHead>Seater</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Odometer (km)</TableHead>
+                  <TableHead>Previous Day Mileage</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {buses.map((bus, index) => (
+                  <TableRow key={bus.id}>
+                    <TableCell className="font-mono text-[#748397]">{String(index + 1).padStart(2, "0")}</TableCell>
+                    <TableCell className="font-mono font-semibold text-[#eee9dd]">{bus.busNumber}</TableCell>
+                    <TableCell className="font-mono text-[#c3ccd5]">{bus.registrationNumber}</TableCell>
+                    <TableCell className="max-w-[240px] truncate font-medium text-[#d9dee4]" title={`${bus.make} ${bus.model}`}>
+                      {bus.make} {bus.model}
+                    </TableCell>
+                    <TableCell className="font-mono">{bus.seater}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={
+                          bus.status === "active"
+                            ? "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-300"
+                            : bus.status === "maintenance"
+                              ? "border-amber-400/20 bg-amber-400/[0.08] text-amber-300"
+                              : "border-white/10 bg-white/[0.04] text-[#a6b0bc]"
+                        }
+                      >
+                        {bus.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono">{bus.odometerKm.toLocaleString()}</TableCell>
+                    <TableCell className="font-mono">
+                      {bus.previousDayMileageKmpl !== null ? `${bus.previousDayMileageKmpl.toFixed(2)}` : "-"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <form action={updateBusStatus} className="flex items-center gap-1.5">
+                          <input type="hidden" name="busId" value={bus.id} />
+                          <select
+                            name="status"
+                            aria-label={`Status for bus ${bus.busNumber}`}
+                            defaultValue={bus.status}
+                            className="h-8 w-[116px] rounded-lg border border-white/10 bg-[#06111d]/80 px-2 text-xs text-[#dce1e6] outline-none focus:border-[#d9b966]/45"
+                          >
+                            <option value="active">active</option>
+                            <option value="maintenance">maintenance</option>
+                            <option value="inactive">inactive</option>
+                          </select>
+                          <button className="h-8 rounded-lg border border-[#d9b966]/20 bg-[#d9b966]/10 px-2.5 text-xs font-semibold text-[#e5c879] transition-colors hover:bg-[#d9b966]/15">
+                            Update
+                          </button>
+                        </form>
+                        <Link className="inline-flex h-8 items-center rounded-lg px-2 text-xs font-semibold text-[#dfbd6e] transition-colors hover:bg-[#d9b966]/10" href={`/buses/${bus.id}`}>
+                          View
+                        </Link>
+                        <form action={deleteBus}>
+                          <input type="hidden" name="busId" value={bus.id} />
+                          <ConfirmSubmitButton
+                            label="Delete"
+                            message="Are you sure you want to delete this bus?"
+                            className="h-8 rounded-lg px-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-400/10 hover:text-red-200"
+                          />
+                        </form>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {buses.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="h-24 text-center text-[#748397]">
+                      No buses found. Adjust the filters or register a new bus.
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </section>
         </CardContent>
       </Card>
     </AppShell>
