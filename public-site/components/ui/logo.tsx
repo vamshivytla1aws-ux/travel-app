@@ -6,7 +6,7 @@ export function Logo({ onClick }: { onClick?: () => void }) {
     <Link className="brand" href="#home" aria-label="Jai Bhavani Travels home" onClick={onClick}>
       <Image
         className="brand-logo"
-        src="/brand/jai-bhavani-logo-horizontal.webp"
+        src="/brand/jai-bhavani-logo-transparent.png"
         alt="JBT Jai Bhavani Travels"
         width={700}
         height={216}

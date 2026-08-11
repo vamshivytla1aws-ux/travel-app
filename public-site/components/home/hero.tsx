@@ -1,15 +1,15 @@
 "use client";
 
 import { motion, useMotionValue, useReducedMotion, useSpring } from "framer-motion";
-import { ArrowUpRight, MapPin, MessageCircle, Phone } from "lucide-react";
+import { ArrowUpRight, BusFront, MapPin, MessageCircle, Phone, Route, ShieldCheck, UsersRound } from "lucide-react";
 import Image from "next/image";
 import type { MouseEvent } from "react";
 
 const quickStats = [
-  ["80+", "Buses"],
-  ["100+", "Employees"],
-  ["Employee", "Pick-up & Drop"],
-  ["Safe & Reliable", "Operations"],
+  { icon: BusFront, value: "80+", label: "Buses" },
+  { icon: UsersRound, value: "100+", label: "Employees" },
+  { icon: Route, value: "Employee", label: "Pick-up & Drop" },
+  { icon: ShieldCheck, value: "Safe & Reliable", label: "Operations" },
 ];
 
 export function Hero() {
@@ -80,7 +80,12 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1, duration: 0.7 }}
         >
-          {quickStats.map(([value, label]) => <div key={label}><strong>{value}</strong><span>{label}</span></div>)}
+          {quickStats.map(({ icon: Icon, value, label }) => (
+            <div key={label}>
+              <Icon aria-hidden="true" />
+              <span className="hero-stat-copy"><strong>{value}</strong><span>{label}</span></span>
+            </div>
+          ))}
         </motion.div>
       </div>
       <a className="scroll-cue" href="#services" aria-label="Scroll to services"><span /> Explore</a>
