@@ -17,7 +17,7 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; background: var(--ink); overflow-x: clip; }
+html { scroll-behavior: smooth; background: var(--ink); overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { margin: 0; background: var(--ink); color: var(--white); font-family: var(--font-sans), Arial, sans-serif; font-size: 15px; line-height: 1.7; overflow-x: hidden; }
 .page-grain { position: fixed; z-index: 140; inset: 0; pointer-events: none; opacity: .18; mix-blend-mode: soft-light; background-image: repeating-radial-gradient(circle at 0 0, transparent 0, rgba(255,255,255,.035) 1px, transparent 2px, transparent 5px); background-size: 9px 9px; }
 ::selection { background: var(--gold); color: var(--ink); }
@@ -292,10 +292,18 @@ h1 em,h2 em { color: var(--gold-bright); font-style: italic; font-weight: 500; }
   .luxury-interlude p { flex-direction: column; align-items: center; gap: .04em; white-space: normal; text-align: center; font-size: 2.35rem; }
   .luxury-monogram { font-size: 14rem; }
   .stats-grid > div { min-width: 0; overflow: hidden; }
-  .stats-grid > div:nth-child(n+3) { padding-inline: 14px; }
+  .stats-grid > div:nth-child(n+3) {
+    grid-column: 1 / -1;
+    min-height: 88px;
+    padding: 20px 24px;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 14px;
+    border-left: 1px solid rgba(5,11,19,.18);
+  }
   .stats-grid > div:nth-child(n+3) strong {
     max-width: 100%;
-    font-size: clamp(1.15rem,5.9vw,1.45rem);
+    font-size: 1.55rem;
     letter-spacing: -.025em;
     white-space: nowrap;
   }
