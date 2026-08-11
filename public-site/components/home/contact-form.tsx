@@ -35,7 +35,7 @@ export function ContactForm() {
     const { name, company, phone, email, requirement, message } = result.data;
     const subject = encodeURIComponent(`Corporate transport enquiry — ${company}`);
     const body = encodeURIComponent(`Name: ${name}\nCompany: ${company}\nPhone: ${phone}\nEmail: ${email}\nRequirement: ${requirement}\n\nMessage:\n${message}`);
-    window.location.href = `mailto:jaibhavanitravels9@gmail.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:jaibhavanitravels.enquiries@gmail.com?subject=${subject}&body=${body}`;
   }
 
   const fields = [
