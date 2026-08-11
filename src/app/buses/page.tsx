@@ -229,18 +229,18 @@ export default async function BusesPage(props: Props) {
               <span className="font-mono text-xs text-[#9aa7b5]">{buses.length} records</span>
             </div>
 
-            <Table className="min-w-[1120px]">
+            <Table className="min-w-[1040px] table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead>S.No</TableHead>
-                  <TableHead>Bus Number</TableHead>
-                  <TableHead>Registration</TableHead>
-                  <TableHead>Make / Model</TableHead>
-                  <TableHead>Seater</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Odometer (km)</TableHead>
-                  <TableHead>Previous Day Mileage</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="w-[46px]">S.No</TableHead>
+                  <TableHead className="w-[80px]">Bus Number</TableHead>
+                  <TableHead className="w-[110px]">Registration</TableHead>
+                  <TableHead className="w-[180px]">Make / Model</TableHead>
+                  <TableHead className="w-[60px]">Seater</TableHead>
+                  <TableHead className="w-[90px]">Status</TableHead>
+                  <TableHead className="w-[110px]">Odometer (km)</TableHead>
+                  <TableHead className="w-[140px]">Previous Day Mileage</TableHead>
+                  <TableHead className="w-[254px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -279,7 +279,7 @@ export default async function BusesPage(props: Props) {
                             name="status"
                             aria-label={`Status for bus ${bus.busNumber}`}
                             defaultValue={bus.status}
-                            className="h-8 w-[116px] rounded-lg border border-white/10 bg-[#06111d]/80 px-2 text-xs text-[#dce1e6] outline-none focus:border-[#d9b966]/45"
+                            className="h-8 w-[100px] rounded-lg border border-white/10 bg-[#06111d]/80 px-2 text-xs text-[#dce1e6] outline-none focus:border-[#d9b966]/45"
                           >
                             <option value="active">active</option>
                             <option value="maintenance">maintenance</option>
