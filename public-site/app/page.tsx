@@ -13,7 +13,7 @@ const structuredData = {
   name: "Jai Bhavani Travels",
   url: "https://www.jaibhavanitravels.com",
   logo: "https://www.jaibhavanitravels.com/brand/jai-bhavani-logo-transparent.png",
-  email: "jaibhavanitravels.enquiries@gmail.com",
+  email: ["jaibhavanitravels9@gmail.com", "jaibhavanitravels.enquiries@gmail.com"],
   telephone: "+91-9494665519",
   description: "Corporate employee transportation, employee pick-up and drop, route planning and fleet operations across the Hyderabad industrial region.",
   address: {

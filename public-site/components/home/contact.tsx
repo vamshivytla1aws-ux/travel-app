@@ -17,7 +17,7 @@ export function ContactSection() {
         <div className="contact-layout">
           <Reveal className="contact-details" premiumCard>
             <div className="contact-block"><Phone /><div><span>Phone</span><a href="tel:+919494665519">+91 94946 65519</a><a href="tel:+919866243498">+91 98662 43498</a><a href="tel:+919666227227">+91 96662 27227</a></div></div>
-            <div className="contact-block"><Mail /><div><span>Email</span><a href="mailto:jaibhavanitravels.enquiries@gmail.com">jaibhavanitravels.enquiries@gmail.com</a></div></div>
+            <div className="contact-block"><Mail /><div><span>Email</span><a href="mailto:jaibhavanitravels9@gmail.com">jaibhavanitravels9@gmail.com</a><a href="mailto:jaibhavanitravels.enquiries@gmail.com">jaibhavanitravels.enquiries@gmail.com</a></div></div>
             <div className="contact-block"><MapPin /><div><span>Address</span><address>Plot No 5 and 26, Pramuk Nagar,<br />Isnapur, Patancheru, Sangareddy,<br />Telangana — 502307</address></div></div>
             <div className="contact-actions">
               <a className="button button-gold" href="tel:+919494665519" data-magnetic>Call now <Phone /></a>
