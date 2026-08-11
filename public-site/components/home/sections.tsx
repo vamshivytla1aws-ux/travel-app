@@ -125,6 +125,19 @@ export function FleetSection() {
 }
 
 export function Clients() {
+  const clients = [
+    "TOSHIBA",
+    "MRF",
+    "DMart",
+    "MAHINDRA",
+    "Style Union",
+    "Optimus Pharma",
+    "SMT Cardiovascular Pvt. Ltd.",
+    "Valentine Laboratory",
+    "Hammond Power Solutions Pvt. Ltd.",
+    "Tofflon India Pvt. Ltd.",
+  ];
+
   return (
     <section id="clients" className="section clients-section">
       <div className="container">
@@ -134,7 +147,7 @@ export function Clients() {
           <p>Supporting respected businesses with professional employee transportation.</p>
         </Reveal>
         <div className="client-grid" aria-label="Organizations served by Jai Bhavani Travels">
-          {["TOSHIBA", "MRF", "DMart", "MAHINDRA"].map((client, index) => (
+          {clients.map((client, index) => (
             <Reveal className="client-tile" key={client} delay={index * 0.06} premiumCard>
               <span>0{index + 1}</span><strong>{client}</strong><Sparkles aria-hidden="true" />
             </Reveal>
