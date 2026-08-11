@@ -679,6 +679,33 @@ export class FuelTruckService {
     });
   }
 
+  async deleteLedgerTransaction(ledgerId: number, userId?: number | null) {
+    await ensureTransportEnhancements();
+    const ledgerResult = await query<{
+      reference_id: number | null;
+      reference_type: string | null;
+    }>(
+      `SELECT reference_id, reference_type
+       FROM fuel_truck_ledger
+       WHERE id = $1`,
+      [ledgerId],
+    );
+    const ledger = ledgerResult.rows[0];
+    if (!ledger) throw new Error("Stock ledger entry not found");
+    if (!ledger.reference_id) throw new Error("This audit-only stock entry is protected and cannot be deleted");
+
+    if (ledger.reference_type === "fuel_issues") {
+      const result = await this.deleteIssue(ledger.reference_id, userId);
+      return { ...result, deletedType: "ISSUE" as const, referenceId: ledger.reference_id };
+    }
+    if (ledger.reference_type === "fuel_truck_refills") {
+      const result = await this.deleteRefill(ledger.reference_id, userId);
+      return { ...result, busId: null, deletedType: "REFILL" as const, referenceId: ledger.reference_id };
+    }
+
+    throw new Error("This adjustment is an audit-only entry and must remain in the stock ledger");
+  }
+
   async deleteRefill(refillId: number, userId?: number | null) {
     await ensureTransportEnhancements();
     return withTransaction(async (client) => {

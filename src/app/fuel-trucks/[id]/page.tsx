@@ -248,6 +248,34 @@ async function deleteTruckIssue(formData: FormData) {
   }
 }
 
+async function deleteLedgerTransaction(formData: FormData) {
+  "use server";
+  const session = await requireSession(["admin", "dispatcher", "fuel_manager", "updater"]);
+  await requireModuleAccess("fuel-truck");
+  const fuelTruckId = Number(formData.get("fuelTruckId"));
+  const ledgerId = Number(formData.get("ledgerId"));
+  if (!fuelTruckId || !ledgerId) return;
+
+  try {
+    const result = await fuelTruckService.deleteLedgerTransaction(ledgerId, session.id);
+    await logAuditEvent({
+      session,
+      action: "delete",
+      entityType: result.deletedType === "ISSUE" ? "fuel_truck_issue" : "fuel_truck_refill",
+      entityId: result.referenceId,
+      details: { fuelTruckId: result.fuelTruckId, busId: result.busId, source: "stock_ledger" },
+    });
+    revalidatePath(`/fuel-trucks/${fuelTruckId}`);
+    revalidatePath("/fuel-trucks");
+    revalidatePath("/dashboard");
+    if (result.busId) revalidatePath(`/buses/${result.busId}`);
+    redirect(`/fuel-trucks/${fuelTruckId}?ledgerDeleted=${Date.now()}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete ledger transaction";
+    redirect(`/fuel-trucks/${fuelTruckId}?error=${encodeURIComponent(message)}`);
+  }
+}
+
 type Props = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{
@@ -256,6 +284,7 @@ type Props = {
     issued?: string;
     issueUpdated?: string;
     issueDeleted?: string;
+    ledgerDeleted?: string;
     editIssueId?: string;
     action?: string;
     error?: string;
@@ -330,6 +359,9 @@ export default async function FuelTruckDetailPage(props: Props) {
         ) : null}
         {searchParams.issueDeleted ? (
           <StatusAlert tone="warning" message="Issue deleted from tanker stock and bus fuel history; stock was restored." />
+        ) : null}
+        {searchParams.ledgerDeleted ? (
+          <StatusAlert tone="warning" message="Stock transaction deleted successfully and all linked records were synchronized." />
         ) : null}
         {searchParams.error ? (
           <StatusAlert tone="error" message={safeDecodeURIComponent(searchParams.error)} />
@@ -542,6 +574,7 @@ export default async function FuelTruckDetailPage(props: Props) {
                     <TableHead className="text-right">In</TableHead>
                     <TableHead className="text-right">Out</TableHead>
                     <TableHead className="text-right">Closing</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -556,11 +589,26 @@ export default async function FuelTruckDetailPage(props: Props) {
                       <TableCell className="text-right">{entry.quantityIn.toFixed(2)}</TableCell>
                       <TableCell className="text-right">{entry.quantityOut.toFixed(2)}</TableCell>
                       <TableCell className="text-right">{entry.closingStock.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">
+                        {entry.referenceId && (entry.referenceType === "fuel_issues" || entry.referenceType === "fuel_truck_refills") ? (
+                          <form action={deleteLedgerTransaction}>
+                            <input type="hidden" name="fuelTruckId" value={detail.truck.id} />
+                            <input type="hidden" name="ledgerId" value={entry.id} />
+                            <ConfirmSubmitButton
+                              label="Delete"
+                              message={`Delete this ${entry.transactionType.toLowerCase()} transaction? Linked stock and ${entry.referenceType === "fuel_issues" ? "bus history" : "refill history"} records will also be updated.`}
+                              className="text-red-500 hover:underline"
+                            />
+                          </form>
+                        ) : (
+                          <span className="text-xs text-muted-foreground" title="Audit-only adjustments are protected">Protected</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                   {detail.ledger.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground">
                         No stock ledger entries yet.
                       </TableCell>
                     </TableRow>

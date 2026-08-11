@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { BusFront, Plus, Search } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { BusesLiveCount } from "@/components/buses/buses-live-count";
+import { NavigableTableRow } from "@/components/ui/navigable-table-row";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { EnterprisePageHeader } from "@/components/enterprise/enterprise-page-header";
 import { ModuleExportLauncher } from "@/components/exports/module-export-launcher";
@@ -240,15 +241,19 @@ export default async function BusesPage(props: Props) {
                   <TableHead className="w-[90px]">Status</TableHead>
                   <TableHead className="w-[110px]">Odometer (km)</TableHead>
                   <TableHead className="w-[140px]">Previous Day Mileage</TableHead>
-                  <TableHead className="w-[254px] text-right">Actions</TableHead>
+                  <TableHead className="w-[210px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {buses.map((bus, index) => (
-                  <TableRow key={bus.id}>
+                  <NavigableTableRow key={bus.id} href={`/buses/${bus.id}`} navigationLabel={`Open bus ${bus.registrationNumber}`}>
                     <TableCell className="font-mono text-[#748397]">{String(index + 1).padStart(2, "0")}</TableCell>
                     <TableCell className="font-mono font-semibold text-[#eee9dd]">{bus.busNumber}</TableCell>
-                    <TableCell className="font-mono text-[#c3ccd5]">{bus.registrationNumber}</TableCell>
+                    <TableCell className="font-mono text-[#c3ccd5]">
+                      <Link className="relative z-10 text-[#dfbd6e] hover:underline" href={`/buses/${bus.id}`}>
+                        {bus.registrationNumber}
+                      </Link>
+                    </TableCell>
                     <TableCell className="max-w-[240px] truncate font-medium text-[#d9dee4]" title={`${bus.make} ${bus.model}`}>
                       {bus.make} {bus.model}
                     </TableCell>
@@ -289,9 +294,6 @@ export default async function BusesPage(props: Props) {
                             Update
                           </button>
                         </form>
-                        <Link className="inline-flex h-8 items-center rounded-lg px-2 text-xs font-semibold text-[#dfbd6e] transition-colors hover:bg-[#d9b966]/10" href={`/buses/${bus.id}`}>
-                          View
-                        </Link>
                         <form action={deleteBus}>
                           <input type="hidden" name="busId" value={bus.id} />
                           <ConfirmSubmitButton
@@ -302,7 +304,7 @@ export default async function BusesPage(props: Props) {
                         </form>
                       </div>
                     </TableCell>
-                  </TableRow>
+                  </NavigableTableRow>
                 ))}
                 {buses.length === 0 ? (
                   <TableRow>

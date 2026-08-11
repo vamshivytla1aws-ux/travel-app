@@ -23,6 +23,7 @@ import { safeDecodeURIComponent } from "@/lib/url";
 import { FuelTruckService } from "@/services/fuel-truck.service";
 import { BusSearchSelect } from "@/components/fuel-trucks/bus-search-select";
 import { RefillAmountFields } from "@/components/fuel-trucks/refill-amount-fields";
+import { NavigableTableRow } from "@/components/ui/navigable-table-row";
 
 const fuelTruckService = new FuelTruckService();
 const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 50, 100] as const;
@@ -720,29 +721,27 @@ export default async function FuelTrucksPage(props: Props) {
                   <TableHead>Available (L)</TableHead>
                   <TableHead>Threshold</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {visibleTrucks.map((truck) => (
-                  <TableRow key={truck.id}>
+                  <NavigableTableRow key={truck.id} href={`/fuel-trucks/${truck.id}`} navigationLabel={`Open fuel tanker ${truck.registrationNumber}`}>
                     <TableCell>{truck.truckCode}</TableCell>
                     <TableCell>{truck.truckName}</TableCell>
-                    <TableCell>{truck.registrationNumber}</TableCell>
+                    <TableCell>
+                      <Link className="text-blue-600 hover:underline" href={`/fuel-trucks/${truck.id}`}>
+                        {truck.registrationNumber}
+                      </Link>
+                    </TableCell>
                     <TableCell>{truck.tankCapacityLiters.toFixed(2)}</TableCell>
                     <TableCell>{truck.currentAvailableLiters.toFixed(2)}</TableCell>
                     <TableCell>{truck.lowStockThresholdLiters.toFixed(2)}</TableCell>
                     <TableCell>{truck.status}</TableCell>
-                    <TableCell className="text-right">
-                      <Link className="text-blue-600 hover:underline" href={`/fuel-trucks/${truck.id}`}>
-                        View
-                      </Link>
-                    </TableCell>
-                  </TableRow>
+                  </NavigableTableRow>
                 ))}
                 {visibleTrucks.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground">
                       No fuel tankers found. Adjust filters or create a new tanker.
                     </TableCell>
                   </TableRow>
