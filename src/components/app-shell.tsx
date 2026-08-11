@@ -24,15 +24,15 @@ export async function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="premium-app min-h-screen">
+      <EnterpriseNav
+        allowedModules={allowedModules}
+        userFullName={session?.fullName}
+        userRole={session?.role}
+      />
       <div className="lg:pl-[76px] xl:pl-[248px]">
         <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#07111d]/90 backdrop-blur-xl">
           <div className="mx-auto flex h-16 w-full max-w-[1600px] items-center gap-3 px-4 sm:px-6 lg:px-8">
-            <EnterpriseNav
-              allowedModules={allowedModules}
-              userFullName={session?.fullName}
-              userRole={session?.role}
-            />
-            <div className="flex min-w-0 items-center gap-3 lg:hidden">
+            <div className="ml-12 flex min-w-0 items-center gap-3 lg:hidden">
               <Image src="/brand/jbt-mark.webp" alt="JBT" width={34} height={34} className="h-8 w-8 object-contain mix-blend-screen" />
               <span className="truncate text-xs font-semibold tracking-[0.16em] text-[#dcc078] uppercase">Operations</span>
             </div>

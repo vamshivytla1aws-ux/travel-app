@@ -79,7 +79,13 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
     .filter((group) => group.items.length > 0);
 
   const navigation = (mobile = false) => (
-    <nav aria-label="Main navigation" className={cn("space-y-5", mobile ? "px-3 py-4" : "flex-1 overflow-y-auto px-2 py-5 xl:px-3")}>
+    <nav
+      aria-label="Main navigation"
+      className={cn(
+        "space-y-5",
+        mobile ? "px-3 py-4" : "sidebar-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2 py-5 xl:px-3",
+      )}
+    >
       {filteredGroups.map((group) => (
         <div key={group.label} className="space-y-1.5">
           <p className={cn("px-3 text-[9px] font-bold tracking-[0.2em] text-[#687789] uppercase", mobile ? "" : "hidden xl:block")}>
@@ -114,7 +120,7 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-50 hidden w-[76px] flex-col border-r border-white/[0.07] bg-[#050c15]/96 shadow-[20px_0_70px_rgba(0,0,0,.24)] backdrop-blur-xl lg:flex xl:w-[248px]">
+      <aside className="fixed inset-y-0 left-0 z-50 hidden w-[76px] flex-col overflow-hidden border-r border-white/[0.07] bg-[#050c15]/96 shadow-[20px_0_70px_rgba(0,0,0,.24)] backdrop-blur-xl lg:flex xl:w-[248px]">
         <div className="flex h-[88px] items-center justify-center border-b border-white/[0.07] px-3 xl:justify-start xl:px-5">
           <Image src="/brand/jbt-mark.webp" alt="Jai Bhavani Travels" width={46} height={46} className="h-11 w-11 object-contain mix-blend-screen xl:hidden" priority />
           <Image src="/brand/jai-bhavani-logo-horizontal.webp" alt="Jai Bhavani Travels" width={210} height={58} className="hidden h-auto w-[198px] object-contain mix-blend-screen xl:block" priority />
@@ -134,7 +140,7 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
       </aside>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetTrigger render={<Button size="icon" variant="ghost" className="lg:hidden" />}>
+        <SheetTrigger render={<Button size="icon" variant="ghost" className="fixed left-3 top-3 z-50 lg:hidden" />}>
           <Menu className="h-5 w-5" />
           <span className="sr-only">Open navigation</span>
         </SheetTrigger>
@@ -146,7 +152,7 @@ export function EnterpriseNav({ allowedModules, userFullName, userRole }: Enterp
               {formatRoleLabel(userRole)}{userFullName ? ` · ${userFullName}` : ""}
             </p>
           </SheetHeader>
-          <div className="flex-1 overflow-y-auto">{navigation(true)}</div>
+          <div className="sidebar-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto">{navigation(true)}</div>
           <div className="space-y-1 border-t border-white/[0.07] p-3">
             <button type="button" onClick={() => { setMobileOpen(false); setAboutOpen(true); }} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm text-[#a0abb8] hover:bg-white/[0.04] hover:text-[#e4c578]">
               <Info className="h-4 w-4" /> About System
