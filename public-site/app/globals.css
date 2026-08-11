@@ -133,7 +133,8 @@ h1 em,h2 em { color: var(--gold-bright); font-style: italic; font-weight: 500; }
 .stats-grid > div { padding: 34px 44px; display: flex; flex-direction: column; justify-content: center; border-right: 1px solid rgba(5,11,19,.18); }
 .stats-grid > div:first-child { border-left: 1px solid rgba(5,11,19,.18); }
 .stats-grid strong { font-family: var(--font-display), serif; font-size: 2.65rem; line-height: 1; font-weight: 700; text-transform: uppercase; }
-.stats-grid span { font-size: .63rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+.stats-grid strong > span { font: inherit; letter-spacing: inherit; text-transform: inherit; }
+.stats-grid > div > span { font-size: .63rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
 .about-section { overflow: hidden; background: #060d17; }
 .about-grid { display: grid; grid-template-columns: .66fr 1.34fr; gap: 110px; }
 .about-label { display: flex; flex-direction: column; justify-content: space-between; min-height: 510px; border-right: 1px solid var(--line); }
