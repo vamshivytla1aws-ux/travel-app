@@ -1,13 +1,17 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export function Logo({ onClick }: { onClick?: () => void }) {
   return (
     <Link className="brand" href="#home" aria-label="Jai Bhavani Travels home" onClick={onClick}>
-      <span className="brand-mark" aria-hidden="true"><span>JB</span></span>
-      <span className="brand-copy">
-        <strong>Jai Bhavani</strong>
-        <span>Travels</span>
-      </span>
+      <Image
+        className="brand-logo"
+        src="/brand/jai-bhavani-logo-horizontal.webp"
+        alt="JBT Jai Bhavani Travels"
+        width={700}
+        height={216}
+        priority
+      />
     </Link>
   );
 }
