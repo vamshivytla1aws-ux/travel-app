@@ -149,7 +149,7 @@ export function Clients() {
         <div className="client-grid" aria-label="Organizations served by Jai Bhavani Travels">
           {clients.map((client, index) => (
             <Reveal className="client-tile" key={client} delay={index * 0.06} premiumCard>
-              <span>0{index + 1}</span><strong>{client}</strong><Sparkles aria-hidden="true" />
+              <span>0{index + 1}</span><strong title={client}>{client}</strong><Sparkles aria-hidden="true" />
             </Reveal>
           ))}
         </div>
