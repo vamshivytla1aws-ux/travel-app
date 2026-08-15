@@ -5,7 +5,7 @@ import "./globals.css";
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 const cormorant = Cormorant_Garamond({ subsets: ["latin"], variable: "--font-display", weight: ["500", "600", "700"], display: "swap" });
 
-const description = "Reliable corporate employee pick-up and drop services with a fleet of 80+ buses serving Isnapur, Patancheru, Sangareddy and the Hyderabad region.";
+const description = "Reliable corporate employee transportation with an 80+ bus fleet, live GPS tracking, CCTV-supported oversight and disciplined operations across the Hyderabad region.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.jaibhavanitravels.com"),
