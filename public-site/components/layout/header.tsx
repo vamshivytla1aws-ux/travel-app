@@ -2,6 +2,7 @@
 
 import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { HeaderBusJourney } from "@/components/layout/header-bus-journey";
 import { Logo } from "@/components/ui/logo";
 
 const links = [
@@ -46,6 +47,7 @@ export function Header() {
       <span className="header-progress" aria-hidden="true"><span /></span>
       <div className="header-inner">
         <Logo onClick={() => setOpen(false)} />
+        <HeaderBusJourney />
         <nav className="desktop-nav" aria-label="Primary navigation">
           {links.map(([label, id]) => (
             <a key={id} href={`#${id}`} className={active === id ? "active" : ""}>{label}</a>
