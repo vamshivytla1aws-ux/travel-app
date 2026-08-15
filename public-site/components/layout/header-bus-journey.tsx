@@ -9,6 +9,8 @@ export function HeaderBusJourney() {
       <span className="header-journey-reflection" />
       <div className="header-journey-motion">
         <div className="header-journey-direction">
+          <span className="header-bus-road-beam" />
+          <span className="header-bus-road-focus" />
           <div className="header-journey-scale">
             <svg className="header-bus" viewBox="0 0 164 56" focusable="false">
               <defs>
